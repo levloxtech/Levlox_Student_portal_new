@@ -134,7 +134,22 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: [FRONTEND_URL, 'http://localhost:5173', 'http://localhost:3000'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like curl, mobile, server-to-server)
+    if (!origin) return callback(null, true);
+    // Allow localhost, vercel deployments, FRONTEND_URL, or any levlox domain
+    if (
+      origin === FRONTEND_URL ||
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1') ||
+      origin.endsWith('.vercel.app') ||
+      origin.includes('levlox') ||
+      process.env.NODE_ENV !== 'production'
+    ) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Range'],
   exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length'],
