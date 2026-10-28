@@ -151,29 +151,27 @@ function deleteDocument(name, id) {
 }
 
 // User & Super Admin Initialization
-const DEFAULT_ADMIN_EMAIL = 'admin@levlox.com';
-const DEFAULT_ADMIN_PASSWORD = 'Admin@123';
+const DEFAULT_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'levloxtech@gmail.com';
+const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Root@123';
 
 function ensureSuperAdmin() {
   const users = loadCollection('users');
   const adminEmails = [
-    'sales@levlox.in',
-    'admin@levlox.com',
-    (process.env.MAIL_USER || '').toLowerCase(),
+    DEFAULT_ADMIN_EMAIL.toLowerCase(),
   ].filter(Boolean);
 
   const { salt, hash } = hashPassword(DEFAULT_ADMIN_PASSWORD);
 
   adminEmails.forEach((email) => {
     let adminUser = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-    const adminId = email.includes('sales') ? 'super_admin_sales' : 'super_admin_001';
+    const adminId = 'super_admin_001';
 
     if (!adminUser) {
       adminUser = {
         id: adminId,
         uid: adminId,
         email: email.toLowerCase(),
-        name: email.includes('sales') ? 'Levlox Admin' : 'Super Admin',
+        name: 'Levlox Admin',
         role: 'admin',
         status: 'active',
         salt,
