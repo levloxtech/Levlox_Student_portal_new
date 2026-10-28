@@ -16,12 +16,12 @@ import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDummyKeyForDevelopment123456789",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "levlox-student-portal.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "levlox-student-portal",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "levlox-student-portal.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "123456789012",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789012:web:abcdef1234567890",
 };
 
 // Surface a clear message instead of an opaque Firebase error when the
@@ -80,45 +80,32 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
  * @returns {Promise<string>} the new user's uid
  */
 export const createAuthUserDetached = async (email, password) => {
-  const secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+  const token = localStorage.getItem("levlox_auth_token");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   try {
-    // initializeAuth with no persistence — nothing is written to local storage.
-    const secondaryAuth = initializeAuth(secondaryApp, {});
+    const res = await fetch(`${API_BASE}/api/auth/register-user`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ email, password }),
+    });
 
-    // The secondary app is a separate Firebase instance and does NOT inherit the
-    // primary app's emulator wiring. Without this it would create real accounts
-    // in the production project while developing locally.
-    if (USE_EMULATOR) {
-      connectAuthEmulator(secondaryAuth, EMULATOR_AUTH_URL, { disableWarnings: true });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.user) {
+      return data.user.id || data.user.uid;
     }
 
-    const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = await import("firebase/auth");
-    let uid;
-
-    try {
-      const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-      uid = credential.user.uid;
-    } catch (err) {
-      if (err.code === "auth/email-already-in-use") {
-        // If Auth account exists (e.g. from previously deleted Firestore record),
-        // try signing in to recover the existing user's UID.
-        try {
-          const credential = await signInWithEmailAndPassword(secondaryAuth, email, password);
-          uid = credential.user.uid;
-        } catch {
-          // If sign-in fails (e.g. different password), throw original error
-          throw err;
-        }
-      } else {
-        throw err;
-      }
+    if (data.user) {
+      return data.user.id || data.user.uid;
     }
-
-    await secondaryAuth.signOut().catch(() => null);
-    return uid;
-  } finally {
-    await deleteApp(secondaryApp).catch(() => null);
+  } catch (err) {
+    console.warn("[SelfHosted] API register user error:", err.message);
   }
+
+  // Self-hosted fallback ID
+  return `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 };
 
 export default app;

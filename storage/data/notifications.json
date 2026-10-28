@@ -1,0 +1,228 @@
+[
+  {
+    "id": "notif_1792907601958_76e544",
+    "userId": "trainer_sarah_001",
+    "title": "📢 Notice: Automated Global Academic Circular Test",
+    "message": "This announcement verifies instant multi-role broadcast reaching students and faculty.",
+    "type": "announcement",
+    "data": {
+      "announcementId": "doc_1792907601957_5b9ec0f0",
+      "title": "Automated Global Academic Circular Test",
+      "priority": "High",
+      "attachmentUrl": null,
+      "batchName": "All Students"
+    },
+    "link": "/student?tab=announcements-tab",
+    "read": false,
+    "createdAt": "2026-10-25T05:53:21.958Z",
+    "createdBy": "Academic Administration"
+  },
+  {
+    "id": "notif_1792907601958_67341d",
+    "userId": "student_1792668024758_4af415",
+    "title": "📢 Notice: Automated Global Academic Circular Test",
+    "message": "This announcement verifies instant multi-role broadcast reaching students and faculty.",
+    "type": "announcement",
+    "data": {
+      "announcementId": "doc_1792907601957_5b9ec0f0",
+      "title": "Automated Global Academic Circular Test",
+      "priority": "High",
+      "attachmentUrl": null,
+      "batchName": "All Students"
+    },
+    "link": "/student?tab=announcements-tab",
+    "read": true,
+    "createdAt": "2026-10-25T05:53:21.958Z",
+    "createdBy": "Academic Administration",
+    "uid": "notif_1792907601958_67341d",
+    "updatedAt": "2026-10-25T06:13:12.854Z"
+  },
+  {
+    "id": "notif_1792907562909_595ac0",
+    "userId": "trainer_sarah_001",
+    "title": "📢 Notice: Automated Global Academic Circular Test",
+    "message": "This announcement verifies instant multi-role broadcast reaching students and faculty.",
+    "type": "announcement",
+    "data": {
+      "announcementId": "doc_1792907562908_03f5e75b",
+      "title": "Automated Global Academic Circular Test",
+      "priority": "High",
+      "attachmentUrl": null,
+      "batchName": "All Students"
+    },
+    "link": "/student?tab=announcements-tab",
+    "read": false,
+    "createdAt": "2026-10-25T05:52:42.909Z",
+    "createdBy": "Academic Administration"
+  },
+  {
+    "id": "notif_1792907562909_8a8ebb",
+    "userId": "student_1792668024758_4af415",
+    "title": "📢 Notice: Automated Global Academic Circular Test",
+    "message": "This announcement verifies instant multi-role broadcast reaching students and faculty.",
+    "type": "announcement",
+    "data": {
+      "announcementId": "doc_1792907562908_03f5e75b",
+      "title": "Automated Global Academic Circular Test",
+      "priority": "High",
+      "attachmentUrl": null,
+      "batchName": "All Students"
+    },
+    "link": "/student?tab=announcements-tab",
+    "read": true,
+    "createdAt": "2026-10-25T05:52:42.909Z",
+    "createdBy": "Academic Administration",
+    "uid": "notif_1792907562909_8a8ebb",
+    "updatedAt": "2026-10-25T06:13:12.860Z"
+  },
+  {
+    "id": "notif_1792907514256_263389",
+    "userId": "trainer_sarah_001",
+    "title": "📢 Notice: Automated Global Academic Circular Test",
+    "message": "This announcement verifies instant multi-role broadcast reaching students and faculty.",
+    "type": "announcement",
+    "data": {
+      "announcementId": "doc_1792907514253_c62073bb",
+      "title": "Automated Global Academic Circular Test",
+      "priority": "High",
+      "attachmentUrl": null,
+      "batchName": "All Students"
+    },
+    "link": "/student?tab=announcements-tab",
+    "read": false,
+    "createdAt": "2026-10-25T05:51:54.256Z",
+    "createdBy": "Academic Administration"
+  },
+  {
+    "id": "notif_1792907514256_093427",
+    "userId": "student_1792668024758_4af415",
+    "title": "📢 Notice: Automated Global Academic Circular Test",
+    "message": "This announcement verifies instant multi-role broadcast reaching students and faculty.",
+    "type": "announcement",
+    "data": {
+      "announcementId": "doc_1792907514253_c62073bb",
+      "title": "Automated Global Academic Circular Test",
+      "priority": "High",
+      "attachmentUrl": null,
+      "batchName": "All Students"
+    },
+    "link": "/student?tab=announcements-tab",
+    "read": true,
+    "createdAt": "2026-10-25T05:51:54.256Z",
+    "createdBy": "Academic Administration",
+    "uid": "notif_1792907514256_093427",
+    "updatedAt": "2026-10-25T06:13:12.865Z"
+  },
+  {
+    "id": "notif_1792689454880_13822d",
+    "userId": "student_1792668024758_4af415",
+    "title": "🚨 Google Meet Starting in 5 Minutes!",
+    "message": "\"Artificial inteligence \" for lev-ai-05 starts in 5 minutes (22:53). Classroom is now unlocked!",
+    "type": "live_class_5min",
+    "data": {
+      "classId": "doc_1792689451046_20901374",
+      "batchId": "doc_1792663077641_40688aea",
+      "batchName": "lev-ai-05",
+      "meetLink": "https://meet.google.com/qqa-xrei-mwy",
+      "platform": "Google Meet",
+      "title": "Artificial inteligence ",
+      "time": "22:53"
+    },
+    "link": "/student/my-courses",
+    "read": true,
+    "createdAt": "2026-10-22T17:17:34.880Z",
+    "createdBy": "system",
+    "uid": "notif_1792689454880_13822d",
+    "updatedAt": "2026-10-22T18:05:48.580Z"
+  },
+  {
+    "id": "notif_1792689451082_a2b5bb",
+    "userId": "student_1792668024758_4af415",
+    "title": "🔴 New Live Class: Artificial inteligence ",
+    "message": "\"Artificial inteligence \" for lev-ai-05 is scheduled on 2026-10-22 at 22:53. Meeting room unlocks 5 minutes before class.",
+    "type": "live_class",
+    "data": {
+      "classId": "doc_1792689451046_20901374",
+      "batchId": "doc_1792663077641_40688aea",
+      "batchName": "lev-ai-05",
+      "trainerId": null,
+      "meetLink": "https://meet.google.com/qqa-xrei-mwy",
+      "platform": "Google Meet",
+      "date": "2026-10-22",
+      "time": "22:53"
+    },
+    "link": "/student/my-courses",
+    "read": true,
+    "createdAt": "2026-10-22T17:17:31.081Z",
+    "createdBy": "super_admin_001",
+    "uid": "notif_1792689451082_a2b5bb",
+    "updatedAt": "2026-10-22T18:05:48.594Z"
+  },
+  {
+    "id": "notif_1792685312338_12cb65",
+    "userId": "student_1792668024758_4af415",
+    "title": "🚨 Google Meet Starting in 5 Minutes!",
+    "message": "\"Artificial inteligence \" for lev-ai-05 starts in 5 minutes (21:40). Classroom is now unlocked!",
+    "type": "live_class_5min",
+    "data": {
+      "classId": "doc_1792685309895_4f3f7be6",
+      "batchId": "doc_1792663077641_40688aea",
+      "batchName": "lev-ai-05",
+      "meetLink": "https://meet.google.com/qqa-xrei-mwy",
+      "platform": "Google Meet",
+      "title": "Artificial inteligence ",
+      "time": "21:40"
+    },
+    "link": "/student/my-courses",
+    "read": true,
+    "createdAt": "2026-10-22T16:08:32.337Z",
+    "createdBy": "system",
+    "uid": "notif_1792685312338_12cb65",
+    "updatedAt": "2026-10-22T16:09:06.757Z"
+  },
+  {
+    "id": "notif_1792685309925_f68cf8",
+    "userId": "student_1792668024758_4af415",
+    "title": "🔴 New Live Class: Artificial inteligence ",
+    "message": "\"Artificial inteligence \" for lev-ai-05 is scheduled on 2026-10-22 at 21:40. Meeting room unlocks 5 minutes before class.",
+    "type": "live_class",
+    "data": {
+      "classId": "doc_1792685309895_4f3f7be6",
+      "batchId": "doc_1792663077641_40688aea",
+      "batchName": "lev-ai-05",
+      "trainerId": null,
+      "meetLink": "https://meet.google.com/qqa-xrei-mwy",
+      "platform": "Google Meet",
+      "date": "2026-10-22",
+      "time": "21:40"
+    },
+    "link": "/student/my-courses",
+    "read": true,
+    "createdAt": "2026-10-22T16:08:29.925Z",
+    "createdBy": "super_admin_001",
+    "uid": "notif_1792685309925_f68cf8",
+    "updatedAt": "2026-10-22T16:09:26.208Z"
+  },
+  {
+    "id": "notif_1792675490415_358d37",
+    "userId": "student_1792668024758_4af415",
+    "title": "🚨 Google Meet Starting in 5 Minutes!",
+    "message": "\"Artificial inteligence \" for lev-ai-05 starts in 5 minutes (18:50). Classroom is now unlocked!",
+    "type": "live_class_5min",
+    "data": {
+      "classId": "doc_1792675136750_402c5d11",
+      "batchId": "doc_1792663077641_40688aea",
+      "batchName": "lev-ai-05",
+      "meetLink": "https://meet.google.com/qqa-xrei-mwy",
+      "platform": "Google Meet",
+      "title": "Artificial inteligence ",
+      "time": "18:50"
+    },
+    "link": "/student/my-courses",
+    "read": true,
+    "createdAt": "2026-10-22T13:24:50.414Z",
+    "createdBy": "system",
+    "uid": "notif_1792675490415_358d37",
+    "updatedAt": "2026-10-22T13:26:21.973Z"
+  }
+]

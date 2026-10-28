@@ -1,0 +1,52 @@
+[
+  {
+    "name": "abdul kalam ",
+    "email": "abdulkalamazad09092002@gmail.com",
+    "phone": "9489607785",
+    "course": "Fullstack Engineering",
+    "batch_id": "doc_1792663077641_40688aea",
+    "batch_name": "lev-ai-05",
+    "rollNumber": "LVX070137",
+    "feesStatus": "Pending Payment",
+    "feesTotal": 20000,
+    "feesPaidAmount": 10000,
+    "feesRemainingAmount": 10000,
+    "status": "active",
+    "emailVerified": true,
+    "verificationStatus": "Verified",
+    "emailDeliveryStatus": "Sent",
+    "verificationToken": "iRWbzpyLqVGKulDfItfdAjjhCaxig2CO",
+    "verificationTokenExpiresAt": "2026-10-24T11:20:25.744Z",
+    "role": "student",
+    "mustChangePassword": false,
+    "createdBy": "super_admin_001",
+    "dob": "2026-10-22",
+    "gender": "Male",
+    "city": "Trichy",
+    "location": "T.V.K Nagar",
+    "current_location": "T.V.K Nagar",
+    "guardian_name": "father ",
+    "guardian_phone": "9942138401",
+    "batchId": "doc_1792663077641_40688aea",
+    "courseId": "",
+    "course_id": "",
+    "createdAt": {
+      "_methodName": "serverTimestamp"
+    },
+    "id": "student_1792668024758_4af415",
+    "uid": "student_1792668024758_4af415",
+    "updatedAt": "2026-10-25T06:04:03.496Z",
+    "emailSentAt": "2026-10-22T11:20:29.976Z",
+    "lastEmailTemplate": "studentWelcome",
+    "verifiedAt": "2026-10-22T11:23:30.339Z",
+    "profile_pic": "http://localhost:4000/uploads/profiles/venket_JPG_1792669605413_41c2397d.jpg",
+    "profilePhotoUrl": "http://localhost:4000/uploads/profiles/venket_JPG_1792669605413_41c2397d.jpg",
+    "attendance": {
+      "present": 1,
+      "absent": 0,
+      "total_days": 1,
+      "percentage": 100
+    },
+    "feesPaymentDate": "2026-10-25"
+  }
+]

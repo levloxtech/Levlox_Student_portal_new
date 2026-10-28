@@ -251,10 +251,10 @@ const StudyMaterialsPage = ({ dashboardData, isPaid }) => {
             onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
             onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', margin: 0, textTransform: 'uppercase', letterSpacing: 0.4 }}>{s.label}</p>
+              <p style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-secondary)', margin: 0, textTransform: 'uppercase', letterSpacing: 0.4 }}>{s.label}</p>
               <div style={{ width: 34, height: 34, borderRadius: 9, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.color }}>{s.icon}</div>
             </div>
-            <p style={{ fontSize: 28, fontWeight: 800, margin: 0, color: s.color, letterSpacing: -0.5 }}>{s.val}</p>
+            <p style={{ fontSize: 22, fontWeight: 800, margin: 0, color: s.color, letterSpacing: -0.4 }}>{s.val}</p>
           </div>
         ))}
       </div>
@@ -264,11 +264,11 @@ const StudyMaterialsPage = ({ dashboardData, isPaid }) => {
         {/* Search */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, padding: '9px 14px', flex: 1, minWidth: 200, transition: 'all 0.15s' }}>
           <Search size={14} color="var(--text-secondary)" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search notes, subjects…" style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13.5, fontFamily: 'inherit', width: '100%', color: 'var(--text-primary)' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search notes, subjects…" style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12.5, fontFamily: 'inherit', width: '100%', color: 'var(--text-primary)' }} />
         </div>
 
         {/* Sort */}
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ padding: '9px 12px', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, color: 'var(--text-primary)', background: 'white', cursor: 'pointer', outline: 'none' }}>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ padding: '8px 12px', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 10, fontFamily: 'inherit', fontSize: 12.5, color: 'var(--text-primary)', background: 'white', cursor: 'pointer', outline: 'none' }}>
           <option value="recent">Newest First</option>
           <option value="alpha">A–Z</option>
         </select>
@@ -282,7 +282,7 @@ const StudyMaterialsPage = ({ dashboardData, isPaid }) => {
           ))}
         </div>
 
-        <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>{filtered.length} files</span>
+        <span style={{ fontSize: 11.5, color: 'var(--text-secondary)', fontWeight: 600 }}>{filtered.length} files</span>
       </div>
 
       {/* ── SUBJECT FILTER PILLS ── */}
@@ -308,10 +308,10 @@ const StudyMaterialsPage = ({ dashboardData, isPaid }) => {
       {!search && subject === 'all' && (
         <div style={{ marginBottom: 36 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Clock size={18} color="var(--primary-color)" /> Recent Notes
+            <h3 style={{ fontSize: 14.5, fontWeight: 750, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Clock size={16} color="var(--primary-color)" /> Recent Notes
             </h3>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>Last 7 days</span>
+            <span style={{ fontSize: 11.5, color: 'var(--text-secondary)', fontWeight: 600 }}>Last 7 days</span>
           </div>
           {/* Horizontal scroll with large preview cards */}
           <div style={{ display: 'flex', gap: 18, overflowX: 'auto', paddingBottom: 8 }}>
@@ -344,10 +344,10 @@ const StudyMaterialsPage = ({ dashboardData, isPaid }) => {
       {!search && subject === 'all' && popularNotes.length > 0 && (
         <div style={{ marginBottom: 36 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Star size={18} color="#F59E0B" style={{ fill: '#F59E0B' }} /> Popular Notes
+            <h3 style={{ fontSize: 14.5, fontWeight: 750, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Star size={16} color="#F59E0B" style={{ fill: '#F59E0B' }} /> Popular Notes
             </h3>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>Most downloaded</span>
+            <span style={{ fontSize: 11.5, color: 'var(--text-secondary)', fontWeight: 600 }}>Most downloaded</span>
           </div>
           {/* ranked list */}
           <div style={{ background: 'white', border: '1px solid var(--border-color)', borderRadius: 18, overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
@@ -391,11 +391,11 @@ const StudyMaterialsPage = ({ dashboardData, isPaid }) => {
       {/* ── ALL NOTES GRID / LIST ── */}
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Zap size={18} color="var(--primary-color)" />
+          <h3 style={{ fontSize: 14.5, fontWeight: 750, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Zap size={16} color="var(--primary-color)" />
             {search ? `"${search}"` : subject === 'all' ? 'All Study Materials' : subject}
           </h3>
-          <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 8, background: 'rgba(108,60,240,0.06)', color: 'var(--primary-color)' }}>
+          <span style={{ fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 8, background: 'rgba(108,60,240,0.06)', color: 'var(--primary-color)' }}>
             {filtered.length} files
           </span>
         </div>

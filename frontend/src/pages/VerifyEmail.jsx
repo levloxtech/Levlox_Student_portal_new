@@ -119,14 +119,20 @@ const VerifyEmail = () => {
 
     setSubmitting(true);
     try {
-      // Activate account in Firestore
-      await updateStudent(uid, {
+      const patchData = {
         status: "active",
         emailVerified: true,
         verificationStatus: "Verified",
         verifiedAt: new Date().toISOString(),
         mustChangePassword: false,
-      });
+      };
+
+      if (newPassword && newPassword.trim()) {
+        patchData.password = newPassword.trim();
+      }
+
+      // Activate account and save password in database
+      await updateStudent(uid, patchData);
 
       setStatusState("success");
     } catch (err) {

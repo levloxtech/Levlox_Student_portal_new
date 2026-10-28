@@ -51,6 +51,26 @@ export const validatePasswordStrength = (password) => {
  * reauthenticate first — that is also what verifies the user actually knows it.
  */
 export const changeOwnPassword = async (currentPassword, newPassword) => {
+  const token = localStorage.getItem("levlox_auth_token");
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+
+  if (token) {
+    const res = await fetch(`${API_BASE}/api/auth/change-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to change password.");
+    }
+    return true;
+  }
+
   const user = auth.currentUser;
   if (!user) throw new Error("You are not signed in.");
   if (!user.email) throw new Error("This account has no email address linked.");

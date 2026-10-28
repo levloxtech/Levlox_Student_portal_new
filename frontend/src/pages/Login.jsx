@@ -20,6 +20,7 @@ import CustomModal from '../components/Modal';
 import leveloxLogo from '../assets/levelox-icon-transparent.png';
 import { normalizeMobile, mobileToAuthId, isValidMobile } from '../services/phoneIdentity';
 import { resendVerificationEmail } from '../services/emailService';
+import { useAuth } from '../context/AuthContext';
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECONDS = 30;
@@ -61,6 +62,7 @@ const Login = () => {
   const [isLocked, setIsLocked] = useState(false);
 
   const navigate = useNavigate();
+  const { loginWithCredentials } = useAuth();
 
   /* ════ LOAD REMEMBERED IDENTIFIER ════ */
   useEffect(() => {
@@ -282,7 +284,7 @@ const Login = () => {
     const rawInput = identifier.trim();
 
     if (!rawInput) {
-      setIdentifierError('Please enter your mobile number or email address.');
+      setIdentifierError('Please enter your email address or mobile number.');
       valid = false;
     }
 
@@ -292,126 +294,46 @@ const Login = () => {
     }
     if (!valid) return;
 
-    let authEmail = rawInput;
-    if (isValidMobile(rawInput)) {
-      authEmail = mobileToAuthId(rawInput);
-    } else if (!rawInput.includes('@')) {
-      setIdentifierError('Please enter a valid email address or 10-digit mobile number.');
-      return;
-    }
-
     setLoading(true);
     try {
-      const credential = await signInWithEmailAndPassword(
-        auth,
-        authEmail,
-        password
-      );
-      const firebaseUser = credential.user;
-
-      // Resolve the account's role from Firestore. Admin records take priority.
-      let adminDoc = null;
-      let trainerDoc = null;
-      let studentDoc = null;
-      try {
-        [adminDoc, trainerDoc, studentDoc] = await Promise.all([
-          getAdmin(firebaseUser.uid).catch(() => null),
-          getDocument('trainers', firebaseUser.uid).catch(() => null),
-          getStudent(firebaseUser.uid).catch(() => null),
-        ]);
-      } catch (firestoreErr) {
-        console.error('[Login] Firestore profile lookup failed:', firestoreErr);
-        await signOut(auth);
-        throw new Error('Unable to verify your account profile due to a database connection error. Please try again.');
-      }
-
-      let role = null;
-      if (adminDoc) {
-        role = 'admin';
-      } else if (trainerDoc) {
-        if (trainerDoc.status === 'disabled' || trainerDoc.status === 'Inactive') {
-          await signOut(auth);
-          throw new Error('Your trainer account has been disabled. Please contact your administrator.');
-        }
-        role = 'trainer';
-      } else if (studentDoc) {
-        if (studentDoc.status === 'disabled' || studentDoc.status === 'inactive') {
-          await signOut(auth);
-          throw new Error('Your account has been disabled. Please contact your administrator.');
-        }
-        if (
-          studentDoc.status === 'Pending Email Verification' ||
-          studentDoc.status === 'pending_verification' ||
-          studentDoc.emailVerified === false ||
-          studentDoc.verificationStatus === 'Pending'
-        ) {
-          await signOut(auth);
-          setUnverifiedStudent(studentDoc);
-          setUnverifiedModalOpen(true);
-          throw new Error('Please verify your email address to access your training.');
-        }
-        role = 'student';
-      } else {
-        await signOut(auth);
-        throw new Error(
-          'No portal profile is linked to this account. Please contact your Levlox administrator.'
-        );
-      }
+      const { role } = await loginWithCredentials(rawInput, password);
 
       // Clear failed attempts on success
       setFailedAttempts(0);
       sessionStorage.removeItem('loginAttempts');
       sessionStorage.removeItem('loginLockoutEnd');
 
-      // Remember the email if requested
+      // Remember the email/identifier if requested
       if (rememberMe) localStorage.setItem('rememberedIdentifier', rawInput);
       else localStorage.removeItem('rememberedIdentifier');
 
-      // AuthContext's onAuthStateChanged listener loads the profile from here.
+      // Route user to appropriate portal dashboard
       if (role === 'admin') navigate('/admin', { replace: true });
       else if (role === 'trainer') navigate('/trainer', { replace: true });
       else navigate('/student', { replace: true });
 
     } catch (err) {
-      console.error('[Login] Firebase Auth sign-in failed:', {
-        code: err?.code,
-        message: err?.message,
-        error: err
-      });
+      console.error('[Login] Authentication failed:', err.message);
 
-      if (isConfigError(err?.code)) {
-        showToast('Sign-In Unavailable', getFirebaseAuthError(err.code), 'error');
-        setLoading(false);
+      const isRateLimit = (err.message || '').toLowerCase().includes('too many') || (err.message || '').toLowerCase().includes('rate');
+
+      let locked = false;
+      if (!isRateLimit) {
+        locked = recordFailedAttempt();
+      }
+
+      if (locked) {
+        showToast(
+          'Too Many Attempts',
+          `Account temporarily locked for ${LOCKOUT_SECONDS} seconds. Please wait.`,
+          'error'
+        );
         return;
       }
 
-      const isNetworkError =
-        err?.code === 'auth/network-request-failed' ||
-        err?.message?.includes('database connection error') ||
-        err?.message?.includes('fetch');
-
-      // Network failures and server errors must NOT decrement the attempt counter
-      if (!isNetworkError) {
-        const locked = recordFailedAttempt();
-        if (locked) {
-          showToast(
-            'Too Many Attempts',
-            `Account temporarily locked for ${LOCKOUT_SECONDS} seconds. Please wait.`,
-            'error'
-          );
-          setLoading(false);
-          return;
-        }
-      }
-
-      const isOwnError = !err.code;
-      const remaining = MAX_ATTEMPTS - (failedAttempts + (isNetworkError ? 0 : 1));
-      const errorMsg = isOwnError
-        ? err.message
-        : getFirebaseAuthError(err.code) +
-        (!isNetworkError && remaining > 0 ? ` (${remaining} attempt${remaining > 1 ? 's' : ''} remaining)` : '');
-
-      showToast('Sign-In Failed', errorMsg, 'error');
+      const remaining = MAX_ATTEMPTS - (failedAttempts + 1);
+      const remainingNotice = (!isRateLimit && remaining > 0) ? ` (${remaining} attempt${remaining > 1 ? 's' : ''} remaining)` : '';
+      showToast('Sign-In Failed', (err.message || 'Invalid email or password.') + remainingNotice, 'error');
     } finally {
       setLoading(false);
     }
@@ -465,43 +387,43 @@ const Login = () => {
             }} />
 
             {/* LOGO */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
               <img
                 src={leveloxLogo}
                 alt="Levlox Logo"
                 style={{
-                  width: 84,
-                  height: 84,
+                  width: 80,
+                  height: 80,
                   objectFit: 'contain',
-                  marginBottom: 18,
-                  filter: 'drop-shadow(0 0 20px rgba(139, 92, 246, 0.6))',
+                  marginBottom: 16,
+                  filter: 'drop-shadow(0 0 24px rgba(69, 104, 245, 0.55))',
                 }}
               />
               <h1 style={{
-                fontSize: 22, fontWeight: 800, color: '#FFFFFF',
-                letterSpacing: -0.5, margin: '0 0 6px', textAlign: 'center',
+                fontSize: 23, fontWeight: 850, color: '#FFFFFF',
+                letterSpacing: -0.4, margin: '0 0 6px', textAlign: 'center',
               }}>
-                Welcome Back to <span style={{ color: '#A78BFA' }}>Levlox</span>
+                Welcome to <span style={{ color: '#4568F5' }}>Levlox</span> <span style={{ fontSize: 11, background: 'linear-gradient(135deg, #4568F5, #8B5CF6)', color: '#FFFFFF', padding: '2px 8px', borderRadius: 999, fontWeight: 800, verticalAlign: 'middle', letterSpacing: 0.8 }}>NOVA</span>
               </h1>
-              <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.38)', margin: 0, textAlign: 'center', fontWeight: 500 }}>
-                Sign in to access your dashboard
+              <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.65)', margin: 0, textAlign: 'center', fontWeight: 500 }}>
+                Intelligent Learning Experience Platform
               </p>
             </div>
 
             {/* LOCKOUT BANNER */}
             {isLocked && (
               <div style={{
-                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+                background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.25)',
                 borderRadius: 12, padding: '14px 16px', marginBottom: 20,
                 display: 'flex', alignItems: 'center', gap: 12,
               }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Shield size={18} color="#F87171" strokeWidth={1.75} />
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(244,63,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Shield size={18} color="#FB7185" strokeWidth={1.75} />
                 </div>
                 <div>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#FCA5A5' }}>Account Temporarily Locked</p>
-                  <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(252,165,165,0.7)' }}>
-                    Too many failed attempts. Try again in <span style={{ fontWeight: 800, color: '#FCA5A5' }}>{lockoutCountdown}s</span>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#FECDD3' }}>Account Temporarily Locked</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(254,205,211,0.7)' }}>
+                    Too many failed attempts. Try again in <span style={{ fontWeight: 800, color: '#FECDD3' }}>{lockoutCountdown}s</span>
                   </p>
                 </div>
               </div>
@@ -525,7 +447,7 @@ const Login = () => {
             <form onSubmit={handleLoginSubmit} noValidate className="animated-form">
               {/* Email Address or Mobile Number */}
               <div style={{ marginBottom: identifierError ? 10 : 20 }}>
-                <label style={labelStyle} htmlFor="identifier">Email Address</label>
+                <label style={labelStyle} htmlFor="identifier">Email Address or Mobile Number</label>
                 <div className={`input-group-relative ${identifierError ? 'error-border' : ''}`}>
                   <div className="input-icon-left">
                     <Mail size={16} />
@@ -533,17 +455,15 @@ const Login = () => {
                   <input
                     id="identifier"
                     className="premium-input"
-                    type="email"
-                    placeholder="Enter your email address"
+                    type="text"
+                    placeholder="Enter email or mobile number"
                     value={identifier}
                     onChange={e => { setIdentifier(e.target.value); setIdentifierError(''); }}
                     disabled={isLocked}
-                    autoComplete="email"
+                    autoComplete="username"
                     required
                     style={{ cursor: isLocked ? 'not-allowed' : 'text', paddingLeft: '48px', paddingRight: '18px' }}
                   />
-
-
                 </div>
                 {identifierError && <p style={errorStyle}>{identifierError}</p>}
               </div>
@@ -587,14 +507,14 @@ const Login = () => {
                     onClick={() => setRememberMe(r => !r)}
                     style={{
                       width: 18, height: 18, borderRadius: 5, border: rememberMe ? 'none' : '1.5px solid rgba(255,255,255,0.2)',
-                      background: rememberMe ? '#6C3CF0' : 'transparent',
+                      background: rememberMe ? '#4568F5' : 'transparent',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                       cursor: 'pointer', transition: 'all 0.15s',
                     }}
                   >
                     {rememberMe && <Check size={11} color="white" strokeWidth={3} />}
                   </div>
-                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>Remember me</span>
+                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 500 }}>Remember me</span>
                 </label>
                 <button
                   type="button"
@@ -604,11 +524,11 @@ const Login = () => {
                   }}
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                    fontSize: 13, color: '#A78BFA', fontWeight: 600, fontFamily: 'inherit',
+                    fontSize: 13, color: '#8198FD', fontWeight: 600, fontFamily: 'inherit',
                     transition: 'color 0.15s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#C4B5FD'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#A78BFA'}
+                  onMouseEnter={e => e.currentTarget.style.color = '#A3B8FF'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#8198FD'}
                 >
                   Forgot password?
                 </button>
@@ -620,19 +540,19 @@ const Login = () => {
                 id="login-btn"
                 disabled={loading || isLocked}
                 style={{
-                  width: '100%', height: 52, borderRadius: 14, border: 'none',
+                  width: '100%', height: 50, borderRadius: 12, border: 'none',
                   background: isLocked
-                    ? 'rgba(108,60,240,0.2)'
-                    : 'linear-gradient(135deg, #6C3CF0 0%, #4c22bc 100%)',
+                    ? 'rgba(69,104,245,0.2)'
+                    : 'linear-gradient(135deg, #4568F5 0%, #3554D8 100%)',
+                  boxShadow: isLocked ? 'none' : '0 4px 18px rgba(69, 104, 245, 0.38)',
                   color: isLocked ? 'rgba(255,255,255,0.3)' : 'white',
-                  fontSize: 15, fontWeight: 800, cursor: isLocked || loading ? 'not-allowed' : 'pointer',
+                  fontSize: 15, fontWeight: 750, cursor: isLocked || loading ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                  transition: 'all 0.18s ease',
                   fontFamily: 'inherit', letterSpacing: -0.2,
-                  boxShadow: isLocked ? 'none' : '0 8px 24px rgba(108,60,240,0.35), inset 0 1px 0 rgba(255,255,255,0.12)',
-                  transition: 'all 0.22s',
                 }}
-                onMouseEnter={e => { if (!isLocked && !loading) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 14px 32px rgba(108,60,240,0.45), inset 0 1px 0 rgba(255,255,255,0.12)'; } }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = isLocked ? 'none' : '0 8px 24px rgba(108,60,240,0.35), inset 0 1px 0 rgba(255,255,255,0.12)'; }}
+                onMouseEnter={e => { if (!isLocked && !loading) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(69,104,245,0.45)'; } }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = isLocked ? 'none' : '0 4px 18px rgba(69,104,245,0.38)'; }}
               >
                 {loading ? (
                   <>

@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react';
 import {
   User, Mail, Phone, Lock, Edit3, Camera, Save, X,
   GraduationCap, MapPin, Building2, Briefcase, CheckCircle,
-  FileText, Calendar, Award, BookOpen, Percent, Users, UserCheck
+  FileText, Calendar, Award, BookOpen, Percent, Users, UserCheck, Clock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { updateStudent, uploadProfileImage, classifyFirestoreError, formatCurrency, getStudentFeeDetails } from '../services/firebaseService';
-
-const MAX_AVATAR_BYTES = 3 * 1024 * 1024; // 3 MB
+import { updateStudent, uploadProfileImage, getDocument, getDocuments, classifyFirestoreError, formatCurrency, getStudentFeeDetails } from '../services/firebaseService';
+import { compressImage } from '../utils/imageCompressor';
 
 const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }) => {
   const { uid, applyProfilePatch } = useAuth();
   const [profileData, setProfileData] = useState(null);
+  const [batchDetails, setBatchDetails] = useState(null);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,10 +50,16 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
   const [profilePic, setProfilePic] = useState('');
   const [college, setCollege] = useState('Levlox Technical Institute');
   const [company, setCompany] = useState('');
+  const [dob, setDob] = useState('');
+  const [gender, setGender] = useState('');
+  const [city, setCity] = useState('');
+  const [guardianName, setGuardianName] = useState('');
+  const [guardianPhone, setGuardianPhone] = useState('');
+  const [guardianRelation, setGuardianRelation] = useState('Guardian');
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+  }, [dashboardData, uid]);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -63,17 +69,42 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
   const fetchProfile = async () => {
     setLoading(true);
     try {
-      if (dashboardData?.student) {
-        const d = dashboardData.student;
+      let d = dashboardData?.student;
+      if (!d && uid) {
+        d = await getDocument('students', uid);
+      }
+      if (d) {
         setProfileData(d);
         setName(d.name || '');
         setEmail(d.email || '');
         setPhone(d.phone || '');
-        setCurrentLocation(d.current_location || '');
+        setCurrentLocation(d.current_location || d.location || '');
         setPermanentAddress(d.permanent_address || '');
-        setProfilePic(d.profile_pic || '');
+        setProfilePic(d.profile_pic || d.profilePhotoUrl || '');
         setCollege(d.college || 'Levlox Technical Institute');
         setCompany(d.company || '');
+        setDob(d.dob || d.date_of_birth || d.dateOfBirth || '');
+        setGender(d.gender || '');
+        setCity(d.city || '');
+        setGuardianName(d.guardian_name || d.guardianName || '');
+        setGuardianPhone(d.guardian_phone || d.guardianPhone || d.guardianContact || '');
+        setGuardianRelation(d.guardian_relation || d.guardianRelation || 'Guardian');
+
+        // Look up assigned batch details from local server database
+        const bId = d.batchId || d.batch_id;
+        const bName = d.batch_name || d.batch || '';
+        try {
+          const allBatches = await getDocuments('batches');
+          const matched = allBatches.find(b =>
+            (bId && (b.id === bId || b.uid === bId || b.batchId === bId)) ||
+            (bName && (b.name === bName || b.code === bName || (b.name && bName && b.name.toLowerCase() === bName.toLowerCase())))
+          );
+          if (matched) {
+            setBatchDetails(matched);
+          }
+        } catch (bErr) {
+          console.warn('[StudentProfile] Could not fetch batch details:', bErr.message);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -100,12 +131,19 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
       const patch = {
         name: name.trim(),
         current_location: currentLocation.trim(),
+        location: currentLocation.trim(),
         permanent_address: permanentAddress.trim(),
         college: college.trim(),
         company: company.trim(),
+        dob: dob.trim(),
+        gender: gender.trim(),
+        city: city.trim(),
+        guardian_name: guardianName.trim(),
+        guardian_phone: guardianPhone.trim(),
+        guardian_relation: guardianRelation.trim(),
       };
 
-      // Files go to Firebase Storage; Firestore only holds the download URL.
+      // Files go to self-hosted server local storage
       if (pendingAvatar) {
         const photoUrl = await uploadProfileImage(uid, pendingAvatar);
         patch.profile_pic = photoUrl;
@@ -134,11 +172,17 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
       setName(profileData.name || '');
       setEmail(profileData.email || '');
       setPhone(profileData.phone || '');
-      setCurrentLocation(profileData.current_location || '');
+      setCurrentLocation(profileData.current_location || profileData.location || '');
       setPermanentAddress(profileData.permanent_address || '');
-      setProfilePic(profileData.profile_pic || '');
+      setProfilePic(profileData.profile_pic || profileData.profilePhotoUrl || '');
       setCollege(profileData.college || 'Levlox Technical Institute');
       setCompany(profileData.company || '');
+      setDob(profileData.dob || profileData.date_of_birth || profileData.dateOfBirth || '');
+      setGender(profileData.gender || '');
+      setCity(profileData.city || '');
+      setGuardianName(profileData.guardian_name || profileData.guardianName || '');
+      setGuardianPhone(profileData.guardian_phone || profileData.guardianPhone || profileData.guardianContact || '');
+      setGuardianRelation(profileData.guardian_relation || profileData.guardianRelation || 'Guardian');
     }
     setPendingAvatar(null);
     setSaveError('');
@@ -146,22 +190,41 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
   };
 
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setSaveError('Please choose an image file.');
-      return;
-    }
-    if (file.size > MAX_AVATAR_BYTES) {
-      setSaveError('Image is too large. Please choose a file under 3 MB.');
+      setSaveError('Please choose a valid image file (JPG, PNG, WEBP).');
       return;
     }
 
     setSaveError('');
-    setPendingAvatar(file);
-    setProfilePic(URL.createObjectURL(file)); // preview until saved
+    try {
+      // Auto-compress high-MB photos smoothly in browser (< 300KB)
+      const compressed = await compressImage(file, 900, 0.85);
+      setPendingAvatar(compressed);
+      const preview = URL.createObjectURL(compressed);
+      setProfilePic(preview);
+
+      // If user is in view mode, auto-save and upload to server storage immediately
+      if (!editing && uid) {
+        setSaving(true);
+        const photoUrl = await uploadProfileImage(uid, compressed);
+        await updateStudent(uid, { profile_pic: photoUrl, profilePhotoUrl: photoUrl });
+        setProfileData(prev => ({ ...(prev || {}), profile_pic: photoUrl, profilePhotoUrl: photoUrl }));
+        setProfilePic(photoUrl);
+        setPendingAvatar(null);
+        applyProfilePatch({ profile_pic: photoUrl, profilePhotoUrl: photoUrl });
+        if (onProfileUpdate) onProfileUpdate({ profile_pic: photoUrl, profilePhotoUrl: photoUrl });
+        showToast('Profile photo updated successfully ✓');
+      }
+    } catch (err) {
+      console.error('[StudentProfile] upload error:', err);
+      setSaveError('Failed to process/upload image. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -215,8 +278,8 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
 
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>LMS Student Profile</h2>
-        <p style={{ margin: '4px 0 0', fontSize: 13.5, color: 'var(--text-secondary)' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 750, margin: 0, color: 'var(--text-primary)', letterSpacing: -0.3 }}>LMS Student Profile</h2>
+        <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
           Manage your personal details and view your locked academic profile.
         </p>
       </div>
@@ -250,8 +313,8 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
           flexDirection: 'column'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 8, color: '#121118' }}>
-              <User size={18} color="var(--primary-color)" /> Personal Information
+            <h3 style={{ fontSize: 14.5, fontWeight: 750, margin: 0, display: 'flex', alignItems: 'center', gap: 8, color: '#121118' }}>
+              <User size={16} color="var(--primary-color)" /> Personal Information
             </h3>
             {!editing ? (
               <button
@@ -345,13 +408,14 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
                   </div>
                 )}
               </div>
-              {editing && (
-                <label style={{
+              <label 
+                title="Upload/change profile photo (auto-compressed)"
+                style={{
                   position: 'absolute',
                   bottom: 0,
                   right: 0,
-                  width: 28,
-                  height: 28,
+                  width: 30,
+                  height: 30,
                   background: 'var(--primary-color)',
                   borderRadius: '50%',
                   display: 'flex',
@@ -359,18 +423,21 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
                   justifyContent: 'center',
                   color: '#fff',
                   cursor: 'pointer',
-                  border: '2px solid #fff',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.15)'
-                }}>
-                  <Camera size={12} />
-                  <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-                </label>
-              )}
+                  border: '2.5px solid #fff',
+                  boxShadow: '0 4px 10px rgba(108,60,240,0.3)',
+                  transition: 'transform 0.15s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <Camera size={13} />
+                <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+              </label>
             </div>
             <div>
               <h4 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>Profile Photo</h4>
               <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
-                {editing ? 'Accepts JPG, PNG formats.' : 'Only student can upload a profile picture.'}
+                {saving && pendingAvatar ? 'Compressing & uploading to server...' : 'Accepts JPG, PNG formats. High-MB camera photos auto-compressed.'}
               </p>
             </div>
           </div>
@@ -413,17 +480,106 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
               </div>
             </div>
 
-            {/* Current Location */}
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Current Location</label>
-              {editing ? (
-                <input type="text" className="form-input" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--border-color)', fontSize: 13.5, fontWeight: 600, outline: 'none' }} value={currentLocation} onChange={e => setCurrentLocation(e.target.value)} placeholder="e.g. Bangalore, India" />
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--surface-alt)', borderRadius: 10, border: '1.5px solid transparent' }}>
-                  <MapPin size={15} color="var(--primary-color)" />
-                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{currentLocation || 'Not added'}</span>
-                </div>
-              )}
+            {/* Date of Birth & Gender Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Date of Birth</label>
+                {editing ? (
+                  <input type="date" className="form-input" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--border-color)', fontSize: 13.5, fontWeight: 600, outline: 'none' }} value={dob} onChange={e => setDob(e.target.value)} />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--surface-alt)', borderRadius: 10, border: '1.5px solid transparent' }}>
+                    <Calendar size={15} color="var(--primary-color)" />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{dob || 'Not specified'}</span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Gender</label>
+                {editing ? (
+                  <select className="form-select" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--border-color)', fontSize: 13.5, fontWeight: 600, outline: 'none', background: '#FFF' }} value={gender} onChange={e => setGender(e.target.value)}>
+                    <option value="">-- Select Gender --</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--surface-alt)', borderRadius: 10, border: '1.5px solid transparent' }}>
+                    <User size={15} color="var(--primary-color)" />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{gender || 'Not specified'}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* City & Location Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>City</label>
+                {editing ? (
+                  <input type="text" className="form-input" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--border-color)', fontSize: 13.5, fontWeight: 600, outline: 'none' }} value={city} onChange={e => setCity(e.target.value)} placeholder="e.g. Bangalore, Chennai" />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--surface-alt)', borderRadius: 10, border: '1.5px solid transparent' }}>
+                    <MapPin size={15} color="var(--primary-color)" />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{city || 'Not added'}</span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Current Location</label>
+                {editing ? (
+                  <input type="text" className="form-input" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--border-color)', fontSize: 13.5, fontWeight: 600, outline: 'none' }} value={currentLocation} onChange={e => setCurrentLocation(e.target.value)} placeholder="e.g. Indiranagar, Bangalore" />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--surface-alt)', borderRadius: 10, border: '1.5px solid transparent' }}>
+                    <MapPin size={15} color="var(--primary-color)" />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{currentLocation || 'Not added'}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Guardian Information Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 0.9fr', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Guardian Name</label>
+                {editing ? (
+                  <input type="text" className="form-input" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--border-color)', fontSize: 13.5, fontWeight: 600, outline: 'none' }} value={guardianName} onChange={e => setGuardianName(e.target.value)} placeholder="Parent/Guardian name" />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--surface-alt)', borderRadius: 10, border: '1.5px solid transparent' }}>
+                    <Users size={15} color="var(--primary-color)" />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{guardianName || 'Not added'}</span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Guardian Contact Phone</label>
+                {editing ? (
+                  <input type="tel" className="form-input" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--border-color)', fontSize: 13.5, fontWeight: 600, outline: 'none' }} value={guardianPhone} onChange={e => setGuardianPhone(e.target.value)} placeholder="Guardian phone" />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--surface-alt)', borderRadius: 10, border: '1.5px solid transparent' }}>
+                    <Phone size={15} color="var(--primary-color)" />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{guardianPhone || 'Not added'}</span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Relationship</label>
+                {editing ? (
+                  <select className="form-select" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--border-color)', fontSize: 13.5, fontWeight: 600, outline: 'none', background: '#FFF' }} value={guardianRelation} onChange={e => setGuardianRelation(e.target.value)}>
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
+                    <option value="Guardian">Guardian</option>
+                    <option value="Spouse">Spouse</option>
+                    <option value="Sibling">Sibling</option>
+                    <option value="Other">Other</option>
+                  </select>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--surface-alt)', borderRadius: 10, border: '1.5px solid transparent' }}>
+                    <UserCheck size={15} color="var(--primary-color)" />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{guardianRelation || 'Guardian'}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Permanent Address */}
@@ -481,18 +637,26 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
             display: 'flex',
             flexDirection: 'column'
           }}>
-            <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 8, color: '#121118' }}>
-              <GraduationCap size={18} color="var(--primary-color)" /> Academic Information
+            <h3 style={{ fontSize: 14.5, fontWeight: 750, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8, color: '#121118' }}>
+              <GraduationCap size={16} color="var(--primary-color)" /> Academic Information
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {[
-                { label: 'Course', val: course, icon: <BookOpen size={15} color="var(--primary-color)" /> },
-                { label: 'Batch', val: batchName, icon: <Users size={15} color="var(--primary-color)" /> },
-                { label: 'Trainer', val: trainer, icon: <UserCheck size={15} color="var(--primary-color)" /> },
-                { label: 'Batch Status', val: profileData?.batch_status || 'N/A', icon: <CheckCircle size={15} color="var(--primary-color)" /> },
-                { label: 'Start Date', val: profileData?.batch_start_date || 'N/A', icon: <Calendar size={15} color="var(--primary-color)" /> },
-                { label: 'End Date', val: profileData?.batch_end_date || 'N/A', icon: <Calendar size={15} color="var(--primary-color)" /> },
+                { label: 'Course', val: batchDetails?.course_name || course, icon: <BookOpen size={15} color="var(--primary-color)" /> },
+                { label: 'Batch Name', val: batchDetails?.name || batchName, icon: <Users size={15} color="var(--primary-color)" /> },
+                { label: 'Batch Code', val: batchDetails?.code || batchDetails?.batchId || 'BAT-7183', icon: <Award size={15} color="var(--primary-color)" /> },
+                { label: 'Assigned Trainer', val: batchDetails?.trainer_name || trainer, icon: <UserCheck size={15} color="var(--primary-color)" /> },
+                {
+                  label: 'Batch Status',
+                  val: batchDetails?.status || profileData?.batch_status || 'Active',
+                  valColor: '#16A34A',
+                  icon: <CheckCircle size={15} color="#16A34A" />
+                },
+                { label: 'Schedule / Timing', val: batchDetails?.timing || 'Regular Schedule', icon: <Clock size={15} color="var(--primary-color)" /> },
+                { label: 'Start Date', val: batchDetails?.start_date || profileData?.batch_start_date || 'N/A', icon: <Calendar size={15} color="var(--primary-color)" /> },
+                { label: 'End Date', val: batchDetails?.end_date || profileData?.batch_end_date || 'N/A', icon: <Calendar size={15} color="var(--primary-color)" /> },
+                { label: 'Duration', val: batchDetails?.duration_days ? `${batchDetails.duration_days} Days` : (batchDetails?.start_date && batchDetails?.end_date ? 'Standard Duration' : 'N/A'), icon: <Clock size={15} color="var(--primary-color)" /> },
                 { label: 'Attendance %', val: `${attendancePct}%`, icon: <Percent size={15} color="var(--primary-color)" /> }
               ].map((f, i) => (
                 <div

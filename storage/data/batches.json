@@ -1,0 +1,20 @@
+[
+  {
+    "name": "lev-ai-05",
+    "course_name": "Fullstack Engineering",
+    "trainer_name": "Dr. Sarah Jenkins",
+    "start_date": "2026-10-22",
+    "end_date": "2026-12-11",
+    "duration_days": 50,
+    "timing": "10:00 AM - 12:00 PM",
+    "status": "Active",
+    "max_students": 30,
+    "code": "BAT-7183",
+    "batchId": "BAT-7183",
+    "student_ids": [],
+    "id": "doc_1792663077641_40688aea",
+    "uid": "doc_1792663077641_40688aea",
+    "createdAt": "2026-10-22T09:57:57.641Z",
+    "updatedAt": "2026-10-22T09:57:57.641Z"
+  }
+]

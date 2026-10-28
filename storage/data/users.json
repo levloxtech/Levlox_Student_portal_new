@@ -1,0 +1,66 @@
+[
+  {
+    "id": "super_admin_001",
+    "uid": "super_admin_001",
+    "email": "admin@levlox.com",
+    "name": "Super Admin",
+    "role": "admin",
+    "status": "active",
+    "salt": "43da873d314568b19b3869c29f18f6fd",
+    "passwordHash": "9d2c987992d7103c3fecaace6adfb55df6baf243f8300c7d5ce4fcf6ab39495ec2baed9e3846e9fb219191ce0585af1bfd227d02e31272ea6f339e0659bb85c9",
+    "createdAt": "2026-10-08T12:10:48.693Z",
+    "updatedAt": "2026-10-08T12:10:48.699Z"
+  },
+  {
+    "id": "super_admin_sales",
+    "uid": "super_admin_sales",
+    "email": "sales@levlox.in",
+    "name": "Levlox Admin",
+    "role": "admin",
+    "status": "active",
+    "salt": "43da873d314568b19b3869c29f18f6fd",
+    "passwordHash": "9d2c987992d7103c3fecaace6adfb55df6baf243f8300c7d5ce4fcf6ab39495ec2baed9e3846e9fb219191ce0585af1bfd227d02e31272ea6f339e0659bb85c9",
+    "createdAt": "2026-10-22T10:07:36.631Z"
+  },
+  {
+    "id": "trainer_sarah_001",
+    "uid": "trainer_sarah_001",
+    "email": "trainer@levlox.com",
+    "name": "Dr. Sarah Jenkins",
+    "phone": "9876543210",
+    "role": "trainer",
+    "status": "active",
+    "salt": "8736767c0b5a1bbf1659b5cbe64737d3",
+    "passwordHash": "f0f494a750839a3f328cf5bb3a7868f736f567e437084cdc16cb6307e0628babb3b142272a65b7c21399ad21b8beca3eba32e6602ca0618d201abe4650134e34",
+    "assigned_batch_ids": [
+      "doc_1792663077641_40688aea"
+    ],
+    "createdAt": "2026-10-20T08:00:00.000Z",
+    "updatedAt": "2026-10-25T05:51:54.150Z",
+    "customPasswordSet": true
+  },
+  {
+    "id": "student_1792668024758_4af415",
+    "uid": "student_1792668024758_4af415",
+    "email": "abdulkalamazad09092002@gmail.com",
+    "name": "abdul kalam ",
+    "role": "student",
+    "phone": "9489607785",
+    "status": "active",
+    "salt": "061fabb9f5cf131b1a21bbd64a232cc1",
+    "passwordHash": "57d7aaab640e8b5c3a7af6b5922e9d08178dc64ef9d7b0139160862382a43024e9f27c35716dc3f895ca977a1317df345bb0fba83f213126334abe992a257f0e",
+    "createdAt": "2026-10-22T11:20:24.758Z",
+    "dob": "2026-10-22",
+    "gender": "Male",
+    "city": "Trichy",
+    "location": "T.V.K Nagar",
+    "guardianName": "father ",
+    "guardianPhone": "9942138401",
+    "guardianRelation": "",
+    "profilePic": "http://localhost:4000/uploads/profiles/venket_JPG_1792669605413_41c2397d.jpg",
+    "updatedAt": "2026-10-25T06:04:03.499Z",
+    "customPasswordSet": true,
+    "profile_pic": "http://localhost:4000/uploads/profiles/venket_JPG_1792669605413_41c2397d.jpg",
+    "profilePhotoUrl": "http://localhost:4000/uploads/profiles/venket_JPG_1792669605413_41c2397d.jpg"
+  }
+]

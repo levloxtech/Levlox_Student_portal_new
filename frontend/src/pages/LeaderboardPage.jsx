@@ -101,11 +101,11 @@ const LeaderboardPage = ({ user, currentUid = null, leaderboard = null }) => {
       {/* Header */}
       <div className="leaderboard-header" style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>LMS Leaderboard</h2>
-          <p className="desktop-only" style={{ margin: '4px 0 0', fontSize: 13.5, color: 'var(--text-secondary)' }}>
+          <h2 style={{ fontSize: 18, fontWeight: 750, margin: 0, color: 'var(--text-primary)', letterSpacing: -0.3 }}>LMS Leaderboard</h2>
+          <p className="desktop-only" style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
             Track learning milestones, mock interview performance, and active live session ranking.
           </p>
-          <p className="mobile-only" style={{ display: 'none', margin: '4px 0 0', fontSize: 13.5, color: 'var(--text-secondary)' }}>
+          <p className="mobile-only" style={{ display: 'none', margin: '3px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
             Track learning milestones and rankings.
           </p>
         </div>
@@ -113,24 +113,24 @@ const LeaderboardPage = ({ user, currentUid = null, leaderboard = null }) => {
         {/* Global Summary Badge (DESKTOP) */}
         <div className="leaderboard-badges-container desktop-only" style={{ display: 'flex', gap: 12 }}>
           <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 14, padding: '8px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 90, flex: 1 }}>
-            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--primary-color)' }}>{currentStudentRank > 0 ? `#${currentStudentRank}` : '-'}</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--primary-color)' }}>{currentStudentRank > 0 ? `#${currentStudentRank}` : '-'}</span>
             <span style={{ fontSize: 10, color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.5 }}>Your Rank</span>
           </div>
           <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border-color)', borderRadius: 14, padding: '8px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 90, flex: 1 }}>
-            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>{totalStudents}</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>{totalStudents}</span>
             <span style={{ fontSize: 10, color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.5 }}>Total Users</span>
           </div>
         </div>
 
         {/* Global Summary Badge (MOBILE) */}
         <div className="leaderboard-badges-container mobile-only" style={{ display: 'none', width: '100%', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 16, padding: '16px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '48%', boxSizing: 'border-box', height: 85, justifyContent: 'center' }}>
-            <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--primary-color)' }}>{currentStudentRank > 0 ? `#${currentStudentRank}` : '-'}</span>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 700, marginTop: 4 }}>Your Rank</span>
+          <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 16, padding: '14px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '48%', boxSizing: 'border-box', height: 80, justifyContent: 'center' }}>
+            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--primary-color)' }}>{currentStudentRank > 0 ? `#${currentStudentRank}` : '-'}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 700, marginTop: 3 }}>Your Rank</span>
           </div>
-          <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border-color)', borderRadius: 16, padding: '16px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '48%', boxSizing: 'border-box', height: 85, justifyContent: 'center' }}>
-            <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)' }}>{totalStudents} Students</span>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 700, marginTop: 4 }}>Total Users</span>
+          <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border-color)', borderRadius: 16, padding: '14px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '48%', boxSizing: 'border-box', height: 80, justifyContent: 'center' }}>
+            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>{totalStudents} Students</span>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 700, marginTop: 3 }}>Total Users</span>
           </div>
         </div>
       </div>
@@ -163,9 +163,9 @@ const LeaderboardPage = ({ user, currentUid = null, leaderboard = null }) => {
               <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#F1F5F9', border: '2px solid #94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 18, fontWeight: 800 }}>
                 {topThree[1].profile_pic ? <img src={topThree[1].profile_pic} alt="avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : (topThree[1].name?.[0] || 'S')}
               </div>
-              <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800 }}>{topThree[1].name}</h4>
-              <p style={{ margin: '0 0 10px', fontSize: 11.5, color: 'var(--text-secondary)', fontWeight: 700 }}>2nd Performer</p>
-              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--primary-color)', background: 'var(--primary-light)', padding: '5px 12px', borderRadius: 20 }}>
+              <h4 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 750 }}>{topThree[1].name}</h4>
+              <p style={{ margin: '0 0 8px', fontSize: 11, color: 'var(--text-secondary)', fontWeight: 700 }}>2nd Performer</p>
+              <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--primary-color)', background: 'var(--primary-light)', padding: '4px 11px', borderRadius: 20 }}>
                 {activeTab === 'overall' ? `${topThree[1].overall_score} pts` : activeTab === 'mock' ? `${topThree[1].average_score}% Avg` : activeTab === 'tasks' ? `${topThree[1].completed_assignments} Tasks` : `${topThree[1].activity_points} pts`}
               </span>
             </div>
@@ -192,12 +192,12 @@ const LeaderboardPage = ({ user, currentUid = null, leaderboard = null }) => {
                 <Crown size={16} color="#F59E0B" style={{ position: 'absolute', top: -14, left: 'calc(50% - 8px)' }} />
                 {topThree[0].profile_pic ? <img src={topThree[0].profile_pic} alt="avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : (topThree[0].name?.[0] || 'S')}
               </div>
-              <h4 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>{topThree[0].name}</h4>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '12px 0 0', width: '100%' }}>
-                <span style={{ fontSize: 11.5, color: '#D97706', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+              <h4 style={{ margin: '0 0 4px', fontSize: 14.5, fontWeight: 750 }}>{topThree[0].name}</h4>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '10px 0 0', width: '100%' }}>
+                <span style={{ fontSize: 11, color: '#D97706', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   🏆 Batch Champion
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 800, color: 'white', background: 'var(--primary-color)', padding: '5px 12px', borderRadius: 20, boxShadow: '0 4px 10px rgba(108,60,240,0.2)', flexShrink: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: 'white', background: 'var(--primary-color)', padding: '4px 11px', borderRadius: 20, boxShadow: '0 4px 10px rgba(108,60,240,0.2)', flexShrink: 0 }}>
                   {activeTab === 'overall' ? `${topThree[0].overall_score} pts` : activeTab === 'mock' ? `${topThree[0].average_score}% Avg` : activeTab === 'tasks' ? `${topThree[0].completed_assignments} Tasks` : `${topThree[0].activity_points} pts`}
                 </span>
               </div>
@@ -222,9 +222,9 @@ const LeaderboardPage = ({ user, currentUid = null, leaderboard = null }) => {
               <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#FAF8F5', border: '2px solid #B45309', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 18, fontWeight: 800 }}>
                 {topThree[2].profile_pic ? <img src={topThree[2].profile_pic} alt="avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : (topThree[2].name?.[0] || 'S')}
               </div>
-              <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800 }}>{topThree[2].name}</h4>
-              <p style={{ margin: '0 0 10px', fontSize: 11.5, color: 'var(--text-secondary)', fontWeight: 700 }}>3rd Performer</p>
-              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--primary-color)', background: 'var(--primary-light)', padding: '5px 12px', borderRadius: 20 }}>
+              <h4 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 750 }}>{topThree[2].name}</h4>
+              <p style={{ margin: '0 0 8px', fontSize: 11, color: 'var(--text-secondary)', fontWeight: 700 }}>3rd Performer</p>
+              <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--primary-color)', background: 'var(--primary-light)', padding: '4px 11px', borderRadius: 20 }}>
                 {activeTab === 'overall' ? `${topThree[2].overall_score} pts` : activeTab === 'mock' ? `${topThree[2].average_score}% Avg` : activeTab === 'tasks' ? `${topThree[2].completed_assignments} Tasks` : `${topThree[2].activity_points} pts`}
               </span>
             </div>

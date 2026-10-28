@@ -1,0 +1,26 @@
+[
+  {
+    "id": "sub_001",
+    "assignmentId": "asg_001",
+    "assignmentTitle": "Machine Learning Model Pipeline",
+    "studentId": "student_1792668024758_4af415",
+    "studentName": "abdul kalam ",
+    "studentRoll": "LVX070137",
+    "batch_id": "doc_1792663077641_40688aea",
+    "batch_name": "lev-ai-05",
+    "fileUrl": "http://localhost:4000/uploads/submissions/abdul_kalam_ml_pipeline_solution.zip",
+    "fileName": "abdul_kalam_ml_pipeline_solution.zip",
+    "fileSize": "3.85 MB",
+    "fileType": "zip",
+    "submissionUrl": "https://github.com/levlox-student/ml-pipeline",
+    "notes": "Completed the pipeline with 94.2% test accuracy, cross-validation graphs, and serialized pickle model weights.",
+    "status": "Approved",
+    "grade": "A+",
+    "marks": 95,
+    "totalMarks": 100,
+    "reviewedBy": "Dr. Sarah Jenkins",
+    "feedback": "Outstanding data engineering pipeline! Clean feature encoding and thorough 5-fold cross-validation. Approved with honors.",
+    "submittedAt": "2026-10-21T18:20:00.000Z",
+    "reviewedAt": "2026-10-22T10:00:00.000Z"
+  }
+]

@@ -68,18 +68,43 @@ export const sendTraineeWelcomeEmail = async (studentData, tempPassword = "") =>
     let subject = interpolateEmailTemplate(welcomeTemplate.subject, variables);
     let body = interpolateEmailTemplate(welcomeTemplate.body, variables);
 
-    // Append activation link and instructions if not in template
-    if (!body.includes(activationLink)) {
-      body += `\n\n----------------------------------------\n`;
-      body += `ACCOUNT ACTIVATION REQUIRED:\n`;
-      body += `Click the secure link below to verify your email address and activate your account:\n`;
-      body += `${activationLink}\n\n`;
-      body += `Portal Login Page: ${loginLink}\n`;
-      body += `(This activation link expires in 48 hours.)\n`;
-      body += `----------------------------------------`;
+    // Try sending via backend SMTP service
+    let backendSuccess = false;
+    try {
+      const { sendBackendEmail } = await import("./apiService");
+      const htmlBody = `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h2 style="color: #4f46e5; margin-top: 0;">Welcome to Levlox Training Portal</h2>
+          <p>Dear <strong>${studentData.name || "Trainee"}</strong>,</p>
+          <p>Your enrollment has been registered successfully. Here are your program details:</p>
+          <ul style="background: #f8fafc; padding: 16px 32px; border-radius: 6px; list-style-type: square;">
+            <li><strong>Roll Number:</strong> ${studentData.rollNumber || studentData.id || "N/A"}</li>
+            <li><strong>Course:</strong> ${studentData.course || "Levlox Training Program"}</li>
+            <li><strong>Batch:</strong> ${studentData.batch_name || studentData.batch || "Regular Batch"}</li>
+          </ul>
+          <p>Please activate your account and verify your email by clicking the button below:</p>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${activationLink}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Activate My Account</a>
+          </div>
+          <p style="font-size: 13px; color: #64748b;">Or copy this link: <a href="${activationLink}">${activationLink}</a></p>
+          <p style="font-size: 13px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 16px;">This link expires in 48 hours. If you did not register, please ignore this email.</p>
+        </div>
+      `;
+      await sendBackendEmail({
+        to: emailAddr,
+        subject,
+        text: body,
+        html: htmlBody,
+        recipientUid: studentId,
+        recipientType: "student",
+        templateName: "studentWelcome",
+      });
+      backendSuccess = true;
+    } catch (backendErr) {
+      console.warn("[EmailService] Backend SMTP not available or failed:", backendErr.message);
     }
 
-    // Construct mailto URL for optional manual email client opening
+    // Construct mailto URL for fallback or manual email client opening
     const mailtoUrl = `mailto:${encodeURIComponent(emailAddr)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     if (studentData.openMailClient === true) {
       window.open(mailtoUrl, "_blank");
@@ -89,14 +114,15 @@ export const sendTraineeWelcomeEmail = async (studentData, tempPassword = "") =>
     await updateStudent(studentId, {
       verificationToken: token,
       verificationTokenExpiresAt: expiresAt,
-      emailDeliveryStatus: "Sent",
+      emailDeliveryStatus: backendSuccess ? "Sent" : "Ready",
       emailSentAt: new Date().toISOString(),
       verificationStatus: studentData.emailVerified ? "Verified" : "Pending",
     });
 
     return {
       success: true,
-      deliveryStatus: "Sent",
+      deliveryStatus: backendSuccess ? "Sent" : "Ready",
+      backendDelivered: backendSuccess,
       activationLink,
       mailtoUrl,
       token,
@@ -165,21 +191,55 @@ export const sendTrainerWelcomeEmail = async (trainerData, tempPassword = "") =>
     let subject = interpolateEmailTemplate(welcomeTemplate.subject, variables);
     let body = interpolateEmailTemplate(welcomeTemplate.body, variables);
 
+    let backendSuccess = false;
+    try {
+      const { sendBackendEmail } = await import("./apiService");
+      const htmlBody = `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h2 style="color: #4f46e5; margin-top: 0;">Welcome to Levlox Faculty Portal</h2>
+          <p>Dear Faculty Member <strong>${trainerData.name || "Trainer"}</strong>,</p>
+          <p>Your faculty profile has been created. Here are your credentials:</p>
+          <ul style="background: #f8fafc; padding: 16px 32px; border-radius: 6px; list-style-type: square;">
+            <li><strong>Trainer ID:</strong> ${trainerData.trainerId || trainerData.code || "N/A"}</li>
+            <li><strong>Login Email:</strong> ${emailAddr}</li>
+            <li><strong>Temporary Password:</strong> ${tempPassword || "Provided separately"}</li>
+          </ul>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${loginLink}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Access Faculty Portal</a>
+          </div>
+          <p style="font-size: 13px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 16px;">You will be prompted to set a permanent password upon first login.</p>
+        </div>
+      `;
+      await sendBackendEmail({
+        to: emailAddr,
+        subject,
+        text: body,
+        html: htmlBody,
+        recipientUid: trainerId,
+        recipientType: "trainer",
+        templateName: "trainerWelcome",
+      });
+      backendSuccess = true;
+    } catch (backendErr) {
+      console.warn("[EmailService] Backend SMTP not available or failed for trainer:", backendErr.message);
+    }
+
     const mailtoUrl = `mailto:${encodeURIComponent(emailAddr)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    if (trainerData.openMailClient !== false) {
+    if (trainerData.openMailClient === true) {
       window.open(mailtoUrl, "_blank");
     }
 
     if (trainerId) {
       await updateTrainer(trainerId, {
-        emailDeliveryStatus: "Sent",
+        emailDeliveryStatus: backendSuccess ? "Sent" : "Ready",
         emailSentAt: new Date().toISOString(),
       }).catch(() => null);
     }
 
     return {
       success: true,
-      deliveryStatus: "Sent",
+      deliveryStatus: backendSuccess ? "Sent" : "Ready",
+      backendDelivered: backendSuccess,
       subject,
       body,
       mailtoUrl,
@@ -190,9 +250,97 @@ export const sendTrainerWelcomeEmail = async (trainerData, tempPassword = "") =>
   }
 };
 
+/**
+ * Send email notification when student profile or credentials are updated.
+ */
+export const sendStudentProfileUpdatedEmail = async (studentData, newPassword = null) => {
+  const emailAddr = studentData.email;
+  if (!emailAddr) return;
+
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
+  const loginLink = `${origin}/login`;
+  const studentName = studentData.name || 'Student';
+
+  const subject = `Your Levlox Student Profile Has Been Updated`;
+  const htmlBody = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="color: #6c3cf0; margin: 0 0 6px;">Profile Details Updated</h2>
+        <p style="color: #64748b; font-size: 14px; margin: 0;">Levlox Student Training Portal</p>
+      </div>
+
+      <p style="font-size: 15px; color: #1e293b;">Dear <strong>${studentName}</strong>,</p>
+      <p style="font-size: 14px; color: #475569; line-height: 1.5;">
+        Your student profile details have been updated by administration. Below are your latest registered details:
+      </p>
+
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin: 20px 0;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #334155;">
+          <tr>
+            <td style="padding: 6px 0; color: #64748b; width: 140px;"><strong>Full Name:</strong></td>
+            <td style="padding: 6px 0; font-weight: 600;">${studentData.name || 'N/A'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;"><strong>Mobile Number:</strong></td>
+            <td style="padding: 6px 0; font-weight: 600;">${studentData.phone || 'N/A'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;"><strong>Email:</strong></td>
+            <td style="padding: 6px 0; font-weight: 600;">${studentData.email || 'N/A'}</td>
+          </tr>
+          ${studentData.course ? `
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;"><strong>Course:</strong></td>
+            <td style="padding: 6px 0; font-weight: 600;">${studentData.course}</td>
+          </tr>` : ''}
+          ${studentData.batch_name ? `
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;"><strong>Batch:</strong></td>
+            <td style="padding: 6px 0; font-weight: 600;">${studentData.batch_name}</td>
+          </tr>` : ''}
+        </table>
+      </div>
+
+      ${newPassword ? `
+      <div style="background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 8px; padding: 16px 20px; margin: 20px 0;">
+        <h4 style="color: #b45309; margin: 0 0 6px; font-size: 14px;">🔑 Password Updated</h4>
+        <p style="margin: 0 0 8px; font-size: 13.5px; color: #92400e;">Your account login password has been changed to:</p>
+        <div style="background: #ffffff; border: 1px dashed #f59e0b; padding: 10px 14px; border-radius: 6px; font-family: monospace; font-size: 16px; font-weight: 700; color: #b45309; display: inline-block;">
+          ${newPassword}
+        </div>
+        <p style="margin: 8px 0 0; font-size: 12.5px; color: #78350f;">Please use this new password along with your email or mobile number when signing in.</p>
+      </div>` : ''}
+
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="${loginLink}" style="background-color: #6c3cf0; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">Access Student Portal</a>
+      </div>
+
+      <p style="font-size: 12.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 16px; text-align: center;">
+        If you did not request this update, please contact administration at sales@levlox.in immediately.
+      </p>
+    </div>
+  `;
+
+  try {
+    const { sendBackendEmail } = await import("./apiService");
+    await sendBackendEmail({
+      to: emailAddr,
+      subject,
+      text: `Your student profile has been updated. Access the portal at: ${loginLink}`,
+      html: htmlBody,
+      recipientUid: studentData.id || studentData.uid,
+      recipientType: "student",
+      templateName: "studentProfileUpdated",
+    });
+  } catch (err) {
+    console.warn("[EmailService] Profile update email notification failed:", err.message);
+  }
+};
+
 export default {
   generateVerificationToken,
   sendTraineeWelcomeEmail,
   sendTrainerWelcomeEmail,
   resendVerificationEmail,
+  sendStudentProfileUpdatedEmail,
 };

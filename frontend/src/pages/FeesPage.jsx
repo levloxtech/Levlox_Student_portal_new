@@ -33,7 +33,7 @@ const StatCard = ({ label, value, sub, color, bg, icon, gradient }) => {
           {icon}
         </div>
       </div>
-      <p style={{ fontSize: 30, fontWeight: 900, margin: '0 0 5px', letterSpacing: -1, color: gradient ? '#fff' : color }}>{value}</p>
+      <p style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px', letterSpacing: -0.5, color: gradient ? '#fff' : color }}>{value}</p>
       {sub && <p style={{ fontSize: 12, color: gradient ? 'rgba(255,255,255,0.55)' : 'var(--text-secondary)', margin: 0 }}>{sub}</p>}
     </div>
   );
@@ -157,14 +157,14 @@ const FeesPage = ({ dashboardData, onPayFees, paying }) => {
       <div style={{ background: 'white', border: '1px solid var(--border-color)', borderRadius: 20, padding: 28, marginBottom: 24, boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div>
-            <h3 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <TrendingUp size={18} color="var(--primary-color)" /> Payment Progress
+            <h3 style={{ fontSize: 14.5, fontWeight: 750, margin: '0 0 3px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <TrendingUp size={16} color="var(--primary-color)" /> Payment Progress
             </h3>
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>Track your fee settlement status</p>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>Track your fee settlement status</p>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: 11, color: 'var(--text-secondary)', margin: '0 0 3px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>Paid</p>
-            <p style={{ fontSize: 28, fontWeight: 900, margin: 0, color: isPaid ? '#10B981' : 'var(--primary-color)', letterSpacing: -0.5 }}>{payPct}%</p>
+            <p style={{ fontSize: 10.5, color: 'var(--text-secondary)', margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>Paid</p>
+            <p style={{ fontSize: 22, fontWeight: 800, margin: 0, color: isPaid ? '#10B981' : 'var(--primary-color)', letterSpacing: -0.5 }}>{payPct}%</p>
           </div>
         </div>
 
@@ -197,11 +197,11 @@ const FeesPage = ({ dashboardData, onPayFees, paying }) => {
 
         {/* PAYMENT HISTORY ── Stripe table */}
         <div style={{ background: 'white', border: '1px solid var(--border-color)', borderRadius: 20, boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
-          <div style={{ padding: '22px 24px 0', marginBottom: 0 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <CreditCard size={17} color="var(--primary-color)" /> Payment History
+          <div style={{ padding: '20px 24px 0', marginBottom: 0 }}>
+            <h3 style={{ fontSize: 14.5, fontWeight: 750, margin: '0 0 3px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CreditCard size={16} color="var(--primary-color)" /> Payment History
             </h3>
-            <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '0 0 18px' }}>All transactions on your account</p>
+            <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', margin: '0 0 16px' }}>All transactions on your account</p>
           </div>
 
           {/* Table header */}

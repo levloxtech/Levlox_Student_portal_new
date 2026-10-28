@@ -29,13 +29,8 @@ import {
   increment,
   runTransaction,
 } from "firebase/firestore";
-import {
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject,
-} from "firebase/storage";
-import { db, storage } from "../firebase";
+import { db } from "../firebase";
+import { compressImage } from "../utils/imageCompressor";
 
 /**
  * Safety cap for list reads. Every collection query gets a bound so a growing
@@ -67,39 +62,119 @@ export const classifyFirestoreError = (error) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Generic Firestore Helpers
+// Generic Local API Helpers (Self-Hosted Storage & Database)
 // ─────────────────────────────────────────────────────────────────────────────
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+
+const getHeaders = () => {
+  const token = localStorage.getItem("levlox_auth_token");
+  const h = { "Content-Type": "application/json" };
+  if (token) h["Authorization"] = `Bearer ${token}`;
+  return h;
+};
 
 /** Fetch a single document by collection name and document ID */
 export const getDocument = async (collectionName, id) => {
+  if (!id) return null;
   try {
-    const snap = await getDoc(doc(db, collectionName, id));
-    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    const res = await fetch(`${API_BASE}/api/data/${collectionName}/${id}`, { headers: getHeaders() });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data ? { id: data.id || id, ...data } : null;
   } catch (error) {
-    console.error(`[Firestore] getDocument(${collectionName}/${id}):`, error);
-    throw error;
+    console.warn(`[LocalDB] getDocument(${collectionName}/${id}):`, error.message);
+    return null;
   }
+};
+
+const applyQueryConstraints = (items, constraints = []) => {
+  if (!Array.isArray(items) || !Array.isArray(constraints) || constraints.length === 0) {
+    return items;
+  }
+  let result = [...items];
+  for (const c of constraints) {
+    if (!c) continue;
+    const type = c.type;
+    if (type === 'where') {
+      const field = c._field?.segments?.[0] || c.field || (c._fieldPath ? String(c._fieldPath) : null);
+      const op = c._op || c.op || '==';
+      const val = c._value !== undefined ? c._value : c.value;
+      if (field) {
+        result = result.filter(item => {
+          const itemVal = item[field];
+          if (op === '==' || op === '===') {
+            return String(itemVal ?? '').trim().toLowerCase() === String(val ?? '').trim().toLowerCase();
+          }
+          if (op === '!=') {
+            return String(itemVal ?? '').trim().toLowerCase() !== String(val ?? '').trim().toLowerCase();
+          }
+          if (op === 'in') {
+            return Array.isArray(val) && val.map(v => String(v).trim().toLowerCase()).includes(String(itemVal ?? '').trim().toLowerCase());
+          }
+          if (op === 'array-contains') {
+            return Array.isArray(itemVal) && itemVal.map(v => String(v).trim().toLowerCase()).includes(String(val ?? '').trim().toLowerCase());
+          }
+          if (op === '>') return itemVal > val;
+          if (op === '>=') return itemVal >= val;
+          if (op === '<') return itemVal < val;
+          if (op === '<=') return itemVal <= val;
+          return true;
+        });
+      }
+    } else if (type === 'orderBy') {
+      const field = c._field?.segments?.[0] || c.field;
+      const dir = (c._direction || c.dir || 'asc').toLowerCase();
+      if (field) {
+        result.sort((a, b) => {
+          const valA = a[field] ?? '';
+          const valB = b[field] ?? '';
+          if (valA === valB) return 0;
+          return dir === 'desc'
+            ? (valA > valB ? -1 : 1)
+            : (valA > valB ? 1 : -1);
+        });
+      }
+    } else if (type === 'limit') {
+      const lim = c._limit !== undefined ? c._limit : c.limit;
+      if (typeof lim === 'number' && lim >= 0) {
+        result = result.slice(0, lim);
+      }
+    }
+  }
+  return result;
 };
 
 /** Fetch documents matching query constraints */
 export const getDocuments = async (collectionName, constraints = []) => {
   try {
-    const q = query(collection(db, collectionName), ...constraints);
-    const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const res = await fetch(`${API_BASE}/api/data/${collectionName}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    const items = data.map((d) => ({ id: d.id, ...d }));
+    return applyQueryConstraints(items, constraints);
   } catch (error) {
-    console.error(`[Firestore] getDocuments(${collectionName}):`, error);
-    throw error;
+    console.warn(`[LocalDB] getDocuments(${collectionName}):`, error.message);
+    return [];
   }
 };
 
 /** Set (create/overwrite) a document with a specific ID */
 export const setDocument = async (collectionName, id, data, merge = true) => {
   try {
-    await setDoc(doc(db, collectionName, id), { ...data, updatedAt: serverTimestamp() }, { merge });
-    return { id, ...data };
+    const method = merge ? 'PATCH' : 'PUT';
+    const res = await fetch(`${API_BASE}/api/data/${collectionName}/${id}`, {
+      method,
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const resData = await res.json();
+    return { id, ...data, ...resData };
   } catch (error) {
-    console.error(`[Firestore] setDocument(${collectionName}/${id}):`, error);
+    console.error(`[LocalDB] setDocument(${collectionName}/${id}):`, error);
     throw error;
   }
 };
@@ -107,63 +182,65 @@ export const setDocument = async (collectionName, id, data, merge = true) => {
 /** Add a document with an auto-generated ID */
 export const addDocument = async (collectionName, data) => {
   try {
-    const docRef = await addDoc(collection(db, collectionName), {
-      ...data,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+    const res = await fetch(`${API_BASE}/api/data/${collectionName}`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
     });
-    return { id: docRef.id, ...data };
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   } catch (error) {
-    console.error(`[Firestore] addDocument(${collectionName}):`, error);
+    console.error(`[LocalDB] addDocument(${collectionName}):`, error);
     throw error;
   }
 };
 
 /** Update specific fields of an existing document */
 export const updateDocumentFields = async (collectionName, id, data) => {
-  try {
-    await updateDoc(doc(db, collectionName, id), { ...data, updatedAt: serverTimestamp() });
-    return { id, ...data };
-  } catch (error) {
-    console.error(`[Firestore] updateDocumentFields(${collectionName}/${id}):`, error);
-    throw error;
-  }
+  return setDocument(collectionName, id, data, true);
 };
 
 /** Delete a document */
 export const deleteDocument = async (collectionName, id) => {
   try {
-    await deleteDoc(doc(db, collectionName, id));
-    return true;
+    const res = await fetch(`${API_BASE}/api/data/${collectionName}/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return res.ok;
   } catch (error) {
-    console.error(`[Firestore] deleteDocument(${collectionName}/${id}):`, error);
+    console.error(`[LocalDB] deleteDocument(${collectionName}/${id}):`, error);
     throw error;
   }
 };
 
-/** Subscribe to a collection with real-time updates */
+/** Subscribe to a collection with periodic polling fallback */
 export const subscribeToCollection = (collectionName, constraints = [], callback, onError) => {
-  const q = query(collection(db, collectionName), ...constraints);
-  return onSnapshot(
-    q,
-    (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-    (error) => {
-      console.error(`[Firestore] snapshot error in ${collectionName}:`, error);
-      if (onError) onError(classifyFirestoreError(error));
-    }
-  );
+  let active = true;
+  getDocuments(collectionName, constraints)
+    .then((docs) => { if (active && callback) callback(docs); })
+    .catch((err) => { if (active && onError) onError(err); });
+
+  const timer = setInterval(() => {
+    if (!active) return;
+    getDocuments(collectionName, constraints)
+      .then((docs) => { if (active && callback) callback(docs); })
+      .catch(() => { });
+  }, 10000);
+
+  return () => {
+    active = false;
+    clearInterval(timer);
+  };
 };
 
-/** Subscribe to a single document with real-time updates */
+/** Subscribe to a single document */
 export const subscribeToDocument = (collectionName, id, callback, onError) => {
-  return onSnapshot(
-    doc(db, collectionName, id),
-    (snap) => callback(snap.exists() ? { id: snap.id, ...snap.data() } : null),
-    (error) => {
-      console.error(`[Firestore] snapshot doc error ${collectionName}/${id}:`, error);
-      if (onError) onError(classifyFirestoreError(error));
-    }
-  );
+  let active = true;
+  getDocument(collectionName, id)
+    .then((doc) => { if (active && callback) callback(doc); })
+    .catch((err) => { if (active && onError) onError(err); });
+  return () => { active = false; };
 };
 
 /** Parallel batch fetch — accepts array of {collection, id} objects */
@@ -171,7 +248,7 @@ export const batchGet = async (requests) => {
   const results = await Promise.all(
     requests.map(({ collectionName, id }) => getDocument(collectionName, id))
   );
-  return results;
+  return results.filter(Boolean);
 };
 
 /** Parallel batch query — accepts array of {collection, constraints} objects */
@@ -179,26 +256,17 @@ export const batchQuery = async (queries) => {
   const results = await Promise.all(
     queries.map(({ collectionName, constraints }) => getDocuments(collectionName, constraints || []))
   );
-  return results;
+  return results.flat();
 };
 
 /** Get paginated documents with cursor */
 export const getPaginatedDocuments = async (collectionName, constraints = [], pageSize = 20, lastDoc = null) => {
-  try {
-    const paginationConstraints = lastDoc
-      ? [...constraints, startAfter(lastDoc), limit(pageSize)]
-      : [...constraints, limit(pageSize)];
-    const q = query(collection(db, collectionName), ...paginationConstraints);
-    const snap = await getDocs(q);
-    return {
-      docs: snap.docs.map((d) => ({ id: d.id, ...d.data() })),
-      lastDoc: snap.docs[snap.docs.length - 1] || null,
-      hasMore: snap.docs.length === pageSize,
-    };
-  } catch (error) {
-    console.error(`[Firestore] getPaginatedDocuments(${collectionName}):`, error);
-    throw error;
-  }
+  const docs = await getDocuments(collectionName, constraints);
+  return {
+    docs: docs.slice(0, pageSize),
+    lastDoc: docs[pageSize - 1] || null,
+    hasMore: docs.length > pageSize,
+  };
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -241,10 +309,17 @@ export const createStudent = (uid, data) => {
 export const listStudents = (constraints = []) =>
   getDocuments("students", [...constraints, limit(DEFAULT_LIST_LIMIT)]);
 
-/** Server-side count — one read instead of downloading the collection. */
+/** Server-side count — fetch from local database count API */
 export const getStudentCount = async () => {
-  const snap = await getCountFromServer(collection(db, "students"));
-  return snap.data().count;
+  try {
+    const res = await fetch(`${API_BASE}/api/data/students/count`, { headers: getHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      return data.count || 0;
+    }
+  } catch { }
+  const snap = await getDocuments("students");
+  return snap.length;
 };
 
 /**
@@ -345,6 +420,19 @@ export const updateRecordedClass = (id, data) => updateDocumentFields("recordedC
 export const deleteRecordedClass = (id) => deleteDocument("recordedClasses", id);
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PLAYLISTS (CUSTOM / MANUAL PLAYLISTS)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getPlaylists = (constraints = []) =>
+  getDocuments("playlists", [orderBy("createdAt", "desc"), ...constraints]);
+
+export const addPlaylist = (data) => addDocument("playlists", data);
+
+export const updatePlaylist = (id, data) => updateDocumentFields("playlists", id, data);
+
+export const deletePlaylist = (id) => deleteDocument("playlists", id);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ANNOUNCEMENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -371,7 +459,9 @@ export const getAttendanceForStudent = async (studentId, constraints = []) => {
       getDocuments("attendance", [where("studentId", "==", studentId), limit(DEFAULT_LIST_LIMIT)]).catch(() => []),
       getDocuments("attendance", [where("student_id", "==", studentId), limit(DEFAULT_LIST_LIMIT)]).catch(() => []),
     ]);
-    const merged = [...byStudentId, ...byStudent_id];
+    const merged = [...byStudentId, ...byStudent_id].filter(item => 
+      String(item.studentId || item.student_id) === String(studentId)
+    );
     const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
     unique.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     return unique;
@@ -388,15 +478,19 @@ export const getAttendanceSheet = (constraints = []) =>
 export const getAttendanceByBatchAndDate = async (batchId, date) => {
   if (!batchId || !date) return [];
   try {
-    const res = await getDocuments("attendance", [
-      where("batch_id", "==", batchId),
-      where("date", "==", date)
-    ]);
-    if (res.length > 0) return res;
-    return await getDocuments("attendance", [
-      where("batchId", "==", batchId),
-      where("date", "==", date)
-    ]);
+    const batch = await getDocument("batches", batchId);
+    const batchCode = batch?.code || batch?.batchId;
+    const batchName = batch?.name;
+
+    const allAtt = await getDocuments("attendance");
+    return allAtt.filter(r => {
+      if (r.date !== date) return false;
+      const bId = r.batch_id || r.batchId;
+      if (bId === batchId) return true;
+      if (batchCode && bId === batchCode) return true;
+      if (batchName && (r.batch_name === batchName || r.batchName === batchName)) return true;
+      return false;
+    });
   } catch (err) {
     console.warn('[Attendance] getAttendanceByBatchAndDate failed:', err);
     return [];
@@ -421,7 +515,11 @@ export const saveBatchAttendance = async (batchId, date, attendanceRecords = [],
     // Canonical document ID per student per batch per date
     const docId = `${batchId}_${date}_${rec.studentId}`;
     const docRef = doc(db, "attendance", docId);
-    
+
+    const isAuto = Boolean(rec.attendedLive) && status === 'Present';
+    const defaultMarkedBy = sheetMeta.markedBy || 'Trainer/Admin (Manual)';
+    const nowTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
     batch.set(docRef, {
       studentId: rec.studentId,
       student_id: rec.studentId,
@@ -435,6 +533,11 @@ export const saveBatchAttendance = async (batchId, date, attendanceRecords = [],
       batch_name: sheetMeta.batchName || '',
       date: date,
       status: status,
+      attendedLive: isAuto,
+      liveClassTitle: rec.liveClassTitle || '',
+      marked_by: isAuto ? (rec.marked_by || 'Auto-Attendance (Live Class)') : defaultMarkedBy,
+      attendance_mode: isAuto ? 'Auto' : 'Manual',
+      marked_time: rec.marked_time || nowTime,
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
     }, { merge: true });
@@ -499,7 +602,7 @@ export const generateNextId = async (entityKey = "student") => {
     await runTransaction(db, async (transaction) => {
       const sfDoc = await transaction.get(docRef);
       const defaultConfig = DEFAULT_ID_CONFIGS[entityKey] || { prefix: entityKey.toUpperCase(), nextNumber: 1000, padding: 4, separator: "" };
-      
+
       let config = defaultConfig;
       if (sfDoc.exists()) {
         config = { ...defaultConfig, ...sfDoc.data() };
@@ -643,9 +746,9 @@ export const unenrollStudent = (enrollmentId) => deleteDocument("enrollments", e
 export const getBatches = async () => {
   const batchList = await getDocuments("batches", [limit(DEFAULT_LIST_LIMIT)]);
   if (!batchList || batchList.length === 0) return [];
-  
+
   const allStudents = await getDocuments("students", [limit(DEFAULT_LIST_LIMIT)]).catch(() => []);
-  
+
   return batchList.map(b => {
     // Count students matching this batch either by student_ids array or s.batch_id
     const studentIdsSet = new Set(b.student_ids || []);
@@ -676,21 +779,22 @@ export const deleteBatch = (id) => deleteDocument("batches", id);
 export const getStudentsByBatch = async (batchId) => {
   if (!batchId) return [];
   const batch = await getDocument("batches", batchId);
-  const batchCode = batch?.code || batch?.batchId || batchId;
+  const batchCode = batch?.code || batch?.batchId;
+  const batchName = batch?.name;
+  const studentIds = Array.isArray(batch?.student_ids) ? batch.student_ids : [];
 
-  const [byBatchField, byBatchIdField, byCodeField, byStudentIds] = await Promise.all([
-    getDocuments("students", [where("batch_id", "==", batchId)]).catch(() => []),
-    getDocuments("students", [where("batchId", "==", batchId)]).catch(() => []),
-    batchCode !== batchId
-      ? getDocuments("students", [where("batch_id", "==", batchCode)]).catch(() => [])
-      : Promise.resolve([]),
-    batch?.student_ids && batch.student_ids.length > 0
-      ? getStudentsByIds(batch.student_ids).catch(() => [])
-      : Promise.resolve([])
-  ]);
-  const merged = [...byBatchField, ...byBatchIdField, ...byCodeField, ...byStudentIds];
+  const allStudents = await getDocuments("students");
+  const filtered = allStudents.filter(s => {
+    const sBatchId = s.batch_id || s.batchId;
+    if (sBatchId && sBatchId === batchId) return true;
+    if (batchCode && sBatchId && sBatchId === batchCode) return true;
+    if (batchName && (s.batch_name === batchName || s.batchName === batchName)) return true;
+    if (studentIds.includes(s.id) || studentIds.includes(s.uid)) return true;
+    return false;
+  });
+
   const uniqueMap = new Map();
-  merged.forEach(s => uniqueMap.set(s.id, s));
+  filtered.forEach(s => uniqueMap.set(s.id, s));
   return Array.from(uniqueMap.values());
 };
 
@@ -976,70 +1080,89 @@ export const addActivityPreset = (label, points) =>
 export const deleteActivityPreset = (id) => deleteDocument("activityPresets", id);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FIREBASE STORAGE
+// SELF-HOSTED LOCAL SERVER STORAGE (No Firebase Storage dependency)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Upload a file to Firebase Storage and return its download URL */
-export const uploadFile = async (path, file, metadata = {}) => {
+/** Upload a file to the self-hosted local server storage and return its URL */
+export const uploadFile = async (pathOrFolder, file, metadata = {}) => {
   try {
-    const storageRef = ref(storage, path);
-    const snapshot = await uploadBytes(storageRef, file, metadata);
-    const downloadUrl = await getDownloadURL(snapshot.ref);
-    return downloadUrl;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', typeof pathOrFolder === 'string' ? pathOrFolder.split('/')[0] : 'profiles');
+    formData.append('targetPath', typeof pathOrFolder === 'string' ? pathOrFolder : '');
+
+    const token = localStorage.getItem('levlox_auth_token');
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/api/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Upload failed with HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data.url || data.relativePath;
   } catch (error) {
-    console.error(`[Storage] uploadFile(${path}):`, error);
+    console.error(`[LocalStorage] uploadFile(${pathOrFolder}):`, error);
+    // Robust fallback: if a blob/file is available in memory
+    if (file instanceof Blob || file instanceof File) {
+      return URL.createObjectURL(file);
+    }
     throw error;
   }
 };
 
-/** Delete a file from Firebase Storage */
+/** Delete a file from local server storage */
 export const deleteFile = async (path) => {
   try {
-    await deleteObject(ref(storage, path));
-    return true;
+    const token = localStorage.getItem('levlox_auth_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/api/upload`, {
+      method: 'DELETE',
+      headers,
+      body: JSON.stringify({ path }),
+    });
+    return res.ok;
   } catch (error) {
-    console.error(`[Storage] deleteFile(${path}):`, error);
-    throw error;
+    console.warn(`[LocalStorage] deleteFile(${path}):`, error.message);
+    return false;
   }
 };
 
 /** Upload student profile image */
 export const uploadProfileImage = async (uid, file) => {
   if (!file) throw new Error("No image file provided.");
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-  if (file.type && !allowedTypes.includes(file.type.toLowerCase())) {
-    throw new Error("Only JPG, PNG, and WEBP image formats are supported.");
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error("Image file size exceeds the 5 MB limit.");
-  }
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-  const downloadUrl = await uploadFile(`studentProfiles/${uid}/profile.${ext}`, file, { contentType: file.type || 'image/jpeg' });
-  return downloadUrl;
+  // Automatically compress high-res image to lightweight high-quality JPEG
+  const compressed = await compressImage(file, 900, 0.85);
+  return uploadFile(`profiles/${uid}`, compressed, { contentType: 'image/jpeg' });
 };
 
 /** Upload assignment submission file */
 export const uploadSubmissionFile = async (assignmentId, studentId, file) => {
-  const ext = file.name.split(".").pop();
-  return uploadFile(`assignments/${assignmentId}/submissions/${studentId}.${ext}`, file, { contentType: file.type });
+  return uploadFile(`submissions/${assignmentId}`, file, { contentType: file.type });
 };
 
 /** Upload course thumbnail */
 export const uploadCourseThumbnail = async (courseId, file) => {
-  const ext = file.name.split(".").pop();
-  return uploadFile(`courses/${courseId}/thumbnail.${ext}`, file, { contentType: file.type });
+  return uploadFile(`courses/${courseId}`, file, { contentType: file.type });
 };
 
 /** Upload study material / notes */
 export const uploadStudyMaterial = async (docId, file) => {
-  const ext = file.name.split(".").pop();
-  return uploadFile(`notes/${docId}.${ext}`, file, { contentType: file.type });
+  return uploadFile(`learning/documents`, file, { contentType: file.type });
 };
 
 /** Upload student certificate */
 export const uploadCertificate = async (uid, certId, file) => {
-  const ext = file.name.split(".").pop();
-  return uploadFile(`certificates/${uid}/${certId}.${ext}`, file, { contentType: file.type });
+  return uploadFile(`certificates/${uid}`, file, { contentType: file.type });
 };
 
 /**
@@ -1059,7 +1182,7 @@ export const formatCurrency = (amount) => {
 export const getStudentFeeDetails = (student) => {
   const total = Number(student?.feesTotal) > 0 ? Number(student.feesTotal) : 20000;
   const isPaid = student?.feesStatus === "Paid";
-  
+
   let paid = 0;
   if (student?.feesPaidAmount !== undefined && student?.feesPaidAmount !== null) {
     paid = Number(student.feesPaidAmount);
@@ -1160,7 +1283,7 @@ export const updateEmailTemplates = async (templatesData) => {
 export const interpolateEmailTemplate = (templateStr = "", variables = {}) => {
   if (!templateStr) return "";
   let result = templateStr;
-  
+
   const replacements = {
     "{{studentName}}": variables.studentName || variables.name || "Student",
     "{{studentId}}": variables.studentId || variables.rollNumber || "N/A",

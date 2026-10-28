@@ -1,0 +1,56 @@
+[
+  {
+    "uid": "newstudent_levlox_com",
+    "email": "newstudent@levlox.com",
+    "phone": "",
+    "deletedAt": "2026-10-22T09:58:37.408Z",
+    "id": "newstudent_levlox_com",
+    "createdAt": "2026-10-22T09:58:37.410Z",
+    "updatedAt": "2026-10-22T09:58:37.410Z"
+  },
+  {
+    "uid": "rhariharasudhan0_gmail_com",
+    "email": "rhariharasudhan0@gmail.com",
+    "phone": "9585838139",
+    "deletedAt": "2026-10-22T09:58:40.269Z",
+    "id": "rhariharasudhan0_gmail_com",
+    "createdAt": "2026-10-22T09:58:40.275Z",
+    "updatedAt": "2026-10-22T09:58:40.275Z"
+  },
+  {
+    "uid": "9585838139_phone_levlox_invalid",
+    "email": "rhariharasudhan0@gmail.com",
+    "phone": "9585838139",
+    "deletedAt": "2026-10-22T09:58:40.286Z",
+    "id": "9585838139_phone_levlox_invalid",
+    "createdAt": "2026-10-22T09:58:40.288Z",
+    "updatedAt": "2026-10-22T09:58:40.288Z"
+  },
+  {
+    "uid": "abdulkalamazad09092002_gmail_com",
+    "email": "abdulkalamazad09092002@gmail.com",
+    "phone": "9489607785",
+    "deletedAt": "2026-10-22T11:19:41.298Z",
+    "id": "abdulkalamazad09092002_gmail_com",
+    "createdAt": "2026-10-22T09:58:43.138Z",
+    "updatedAt": "2026-10-22T11:19:41.494Z"
+  },
+  {
+    "uid": "9489607785_phone_levlox_invalid",
+    "email": "abdulkalamazad09092002@gmail.com",
+    "phone": "9489607785",
+    "deletedAt": "2026-10-22T11:19:41.499Z",
+    "id": "9489607785_phone_levlox_invalid",
+    "createdAt": "2026-10-22T09:58:43.150Z",
+    "updatedAt": "2026-10-22T11:19:41.500Z"
+  },
+  {
+    "uid": "kalam07_official_gmail_com",
+    "email": "kalam07.official@gmail.com",
+    "phone": "9489607785",
+    "deletedAt": "2026-10-22T09:58:45.977Z",
+    "id": "kalam07_official_gmail_com",
+    "createdAt": "2026-10-22T09:58:45.979Z",
+    "updatedAt": "2026-10-22T09:58:45.979Z"
+  }
+]

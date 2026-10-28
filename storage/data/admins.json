@@ -1,0 +1,22 @@
+[
+  {
+    "id": "super_admin_001",
+    "uid": "super_admin_001",
+    "name": "Super Admin",
+    "email": "admin@levlox.com",
+    "role": "admin",
+    "status": "active",
+    "createdAt": "2026-10-08T12:10:48.696Z",
+    "updatedAt": "2026-10-28T07:01:59.086Z"
+  },
+  {
+    "id": "super_admin_sales",
+    "uid": "super_admin_sales",
+    "name": "Levlox Admin",
+    "email": "sales@levlox.in",
+    "role": "admin",
+    "status": "active",
+    "createdAt": "2026-10-22T10:07:36.639Z",
+    "updatedAt": "2026-10-28T07:01:59.088Z"
+  }
+]

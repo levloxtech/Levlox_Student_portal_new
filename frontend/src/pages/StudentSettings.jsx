@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  User, Mail, Smartphone, Camera, CheckCircle, Save, Shield, Lock, Eye, EyeOff, TriangleAlert
+  User, Mail, Smartphone, Camera, CheckCircle, Save, Shield, Lock, Eye, EyeOff, TriangleAlert,
+  Calendar, MapPin, Users, UserCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { formatMobile } from '../services/phoneIdentity';
@@ -10,8 +11,7 @@ import {
   validatePasswordStrength,
   describeAuthError,
 } from '../services/authService';
-
-const MAX_AVATAR_BYTES = 3 * 1024 * 1024; // 3 MB
+import { compressImage } from '../utils/imageCompressor';
 
 const StudentSettings = ({ user, onProfileUpdate }) => {
   const { uid, userProfile, applyProfilePatch, refreshProfile } = useAuth();
@@ -27,6 +27,13 @@ const StudentSettings = ({ user, onProfileUpdate }) => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [profilePic, setProfilePic] = useState('');
+  const [dob, setDob] = useState('');
+  const [gender, setGender] = useState('');
+  const [city, setCity] = useState('');
+  const [location, setLocation] = useState('');
+  const [guardianName, setGuardianName] = useState('');
+  const [guardianPhone, setGuardianPhone] = useState('');
+  const [guardianRelation, setGuardianRelation] = useState('Guardian');
   const [pendingAvatar, setPendingAvatar] = useState(null);
 
   // Password fields
@@ -43,10 +50,17 @@ const StudentSettings = ({ user, onProfileUpdate }) => {
     setName(profile.name || '');
     setEmail(profile.email || '');
     setPhone(profile.phone || '');
-    setProfilePic(profile.profile_pic || '');
+    setProfilePic(profile.profile_pic || profile.profilePhotoUrl || '');
+    setDob(profile.dob || profile.date_of_birth || profile.dateOfBirth || '');
+    setGender(profile.gender || '');
+    setCity(profile.city || '');
+    setLocation(profile.current_location || profile.location || '');
+    setGuardianName(profile.guardian_name || profile.guardianName || '');
+    setGuardianPhone(profile.guardian_phone || profile.guardianPhone || profile.guardianContact || '');
+    setGuardianRelation(profile.guardian_relation || profile.guardianRelation || 'Guardian');
     setLoading(false);
     // Re-sync whenever the authoritative profile changes.
-  }, [profile.name, profile.email, profile.phone, profile.profile_pic]);
+  }, [profile.name, profile.email, profile.phone, profile.profile_pic, profile.dob, profile.gender, profile.city, profile.current_location]);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -54,22 +68,24 @@ const StudentSettings = ({ user, onProfileUpdate }) => {
   };
 
   /* ── Avatar selection (uploaded on save, not on pick) ── */
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setAccountError('Please choose an image file.');
-      return;
-    }
-    if (file.size > MAX_AVATAR_BYTES) {
-      setAccountError('Image is too large. Please choose a file under 3 MB.');
+      setAccountError('Please choose a valid image file (JPG, PNG, WEBP).');
       return;
     }
 
     setAccountError('');
-    setPendingAvatar(file);
-    setProfilePic(URL.createObjectURL(file)); // local preview only
+    try {
+      const compressed = await compressImage(file, 900, 0.85);
+      setPendingAvatar(compressed);
+      setProfilePic(URL.createObjectURL(compressed));
+    } catch {
+      setPendingAvatar(file);
+      setProfilePic(URL.createObjectURL(file));
+    }
   };
 
   /* ── Save account details to Firestore ── */
@@ -88,9 +104,19 @@ const StudentSettings = ({ user, onProfileUpdate }) => {
 
     setSavingAccount(true);
     try {
-      const patch = { name: name.trim() };
+      const patch = {
+        name: name.trim(),
+        dob: dob.trim(),
+        gender: gender.trim(),
+        city: city.trim(),
+        location: location.trim(),
+        current_location: location.trim(),
+        guardian_name: guardianName.trim(),
+        guardian_phone: guardianPhone.trim(),
+        guardian_relation: guardianRelation.trim(),
+      };
 
-      // Upload the avatar to Storage first; Firestore only stores the URL.
+      // Upload the avatar to self-hosted server local storage
       if (pendingAvatar) {
         const photoUrl = await uploadProfileImage(uid, pendingAvatar);
         patch.profile_pic = photoUrl;
@@ -217,8 +243,8 @@ const StudentSettings = ({ user, onProfileUpdate }) => {
 
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Student Settings</h2>
-        <p style={{ margin: '4px 0 0', fontSize: 13.5, color: 'var(--text-secondary)' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 750, margin: 0, color: 'var(--text-primary)', letterSpacing: -0.3 }}>Student Settings</h2>
+        <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
           Manage your account profile and password.
         </p>
       </div>
@@ -227,8 +253,8 @@ const StudentSettings = ({ user, onProfileUpdate }) => {
 
         {/* CARD 1: ACCOUNT DETAILS */}
         <div className="clickable-card-hover" style={cardStyle}>
-          <h3 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: 8, color: '#121118' }}>
-            <User size={18} color="var(--primary-color)" /> Account Details
+          <h3 style={{ fontSize: 14.5, fontWeight: 750, margin: '0 0 18px', display: 'flex', alignItems: 'center', gap: 8, color: '#121118' }}>
+            <User size={16} color="var(--primary-color)" /> Account Details
           </h3>
 
           {accountError && (
@@ -347,6 +373,122 @@ const StudentSettings = ({ user, onProfileUpdate }) => {
                 </div>
               </div>
 
+              {/* DOB & Gender */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Date of Birth</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={dob}
+                      onChange={e => setDob(e.target.value)}
+                      style={{ paddingLeft: 42 }}
+                    />
+                    <Calendar size={16} color="var(--text-secondary)" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)' }} />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Gender</label>
+                  <select
+                    className="form-select"
+                    value={gender}
+                    onChange={e => setGender(e.target.value)}
+                    style={{ height: 44, width: '100%', borderRadius: 10, border: '1.5px solid var(--border-color)', padding: '0 14px', background: '#FFF' }}
+                  >
+                    <option value="">-- Select Gender --</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* City & Location */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">City</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={city}
+                      onChange={e => setCity(e.target.value)}
+                      placeholder="e.g. Bangalore, Chennai"
+                      style={{ paddingLeft: 42 }}
+                    />
+                    <MapPin size={16} color="var(--text-secondary)" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)' }} />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Current Location / Address</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={location}
+                      onChange={e => setLocation(e.target.value)}
+                      placeholder="e.g. Indiranagar, Bangalore"
+                      style={{ paddingLeft: 42 }}
+                    />
+                    <MapPin size={16} color="var(--text-secondary)" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Guardian Info */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 0.9fr', gap: 14 }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Guardian Name</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={guardianName}
+                      onChange={e => setGuardianName(e.target.value)}
+                      placeholder="Parent / Guardian"
+                      style={{ paddingLeft: 42 }}
+                    />
+                    <Users size={16} color="var(--text-secondary)" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)' }} />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Guardian Contact</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      value={guardianPhone}
+                      onChange={e => setGuardianPhone(e.target.value)}
+                      placeholder="10-digit number"
+                      style={{ paddingLeft: 42 }}
+                    />
+                    <Smartphone size={16} color="var(--text-secondary)" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)' }} />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Relationship</label>
+                  <select
+                    className="form-select"
+                    value={guardianRelation}
+                    onChange={e => setGuardianRelation(e.target.value)}
+                    style={{ height: 44, width: '100%', borderRadius: 10, border: '1.5px solid var(--border-color)', padding: '0 14px', background: '#FFF' }}
+                  >
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
+                    <option value="Guardian">Guardian</option>
+                    <option value="Spouse">Spouse</option>
+                    <option value="Sibling">Sibling</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+
             </div>
 
             {/* Save Profile Button */}
@@ -363,10 +505,10 @@ const StudentSettings = ({ user, onProfileUpdate }) => {
 
         {/* CARD 2: SECURITY / PASSWORD */}
         <div className="clickable-card-hover" style={cardStyle}>
-          <h3 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: 8, color: '#121118' }}>
-            <Shield size={18} color="var(--primary-color)" /> Password & Security
+          <h3 style={{ fontSize: 14.5, fontWeight: 750, margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: 8, color: '#121118' }}>
+            <Shield size={16} color="var(--primary-color)" /> Password & Security
           </h3>
-          <p style={{ margin: '0 0 20px', fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          <p style={{ margin: '0 0 18px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
             Use at least 8 characters with an uppercase letter, a lowercase letter and a number.
           </p>
 

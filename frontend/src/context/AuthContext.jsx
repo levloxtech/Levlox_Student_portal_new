@@ -1,17 +1,25 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from '../firebase';
-import { getStudent, getAdmin, getDocument, getDocuments } from '../services/firebaseService';
-import { where } from 'firebase/firestore';
+import { getStudent, getAdmin, getDocument } from '../services/firebaseService';
 
 const AuthContext = createContext(null);
 
-/** Cache key for the last known profile — used only to avoid a blank first paint. */
-const PROFILE_CACHE_KEY = 'levlox_profile_cache';
+const TOKEN_KEY = 'levlox_auth_token';
+const USER_KEY = 'levlox_auth_user';
+const PROFILE_KEY = 'levlox_profile_cache';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
-const readCachedProfile = () => {
+const readSavedUser = () => {
   try {
-    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const readSavedProfile = () => {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -19,157 +27,142 @@ const readCachedProfile = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
-  const [userRole, setUserRole] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const initialUser = readSavedUser();
+  const initialProfile = readSavedProfile();
+
+  const [currentUser, setCurrentUser] = useState(initialUser);
+  const [userProfile, setUserProfile] = useState(initialProfile || initialUser);
+  const [userRole, setUserRole] = useState(initialUser?.role || null);
+  const [authLoading, setAuthLoading] = useState(!initialUser);
   const [authError, setAuthError] = useState(null);
 
-  // Tracks the uid whose profile is currently loaded, so refreshProfile and the
-  // auth listener never race each other into writing a mismatched profile.
-  const loadedUidRef = useRef(null);
+  const loadedUidRef = useRef(initialUser?.id || initialUser?.uid || null);
 
-  /** Resolve a signed-in Firebase user to their Firestore profile + role. */
-  const resolveProfile = useCallback(async (uid, email = null) => {
-    // Check admin, trainer, and student in parallel by UID
-    const [adminDoc, trainerDoc, studentDoc] = await Promise.all([
-      getAdmin(uid).catch(() => null),
-      getDocument('trainers', uid).catch(() => null),
-      getStudent(uid).catch(() => null),
-    ]);
-
-    if (adminDoc) return { profile: adminDoc, role: 'admin' };
-    if (trainerDoc) return { profile: trainerDoc, role: trainerDoc.role || 'trainer' };
-    if (studentDoc) return { profile: studentDoc, role: studentDoc.role || 'student' };
-
-    // Fallback: If UID lookup returned null, check collections by email
-    const userEmail = email || auth.currentUser?.email;
-    if (userEmail) {
-      const cleanEmail = userEmail.trim().toLowerCase();
-      const [trainerByEmail, studentByEmail, adminByEmail] = await Promise.all([
-        getDocuments('trainers', [where('email', '==', cleanEmail)]).catch(() => []),
-        getDocuments('students', [where('email', '==', cleanEmail)]).catch(() => []),
-        getDocuments('admins', [where('email', '==', cleanEmail)]).catch(() => []),
-      ]);
-
-      if (adminByEmail.length > 0) return { profile: adminByEmail[0], role: 'admin' };
-      if (trainerByEmail.length > 0) return { profile: trainerByEmail[0], role: trainerByEmail[0].role || 'trainer' };
-      if (studentByEmail.length > 0) return { profile: studentByEmail[0], role: studentByEmail[0].role || 'student' };
-    }
-
-    return { profile: null, role: null };
-  }, []);
-
+  // Validate session on mount
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      async (firebaseUser) => {
-        if (!firebaseUser) {
-          loadedUidRef.current = null;
-          setCurrentUser(null);
-          setUserProfile(null);
-          setUserRole(null);
-          setAuthError(null);
-          localStorage.removeItem(PROFILE_CACHE_KEY);
-          setAuthLoading(false);
-          return;
-        }
-
-        setCurrentUser(firebaseUser);
-
-        // Paint immediately from cache when it belongs to this same user; the
-        // authoritative read below still runs and overwrites it.
-        const cached = readCachedProfile();
-        if (cached?.uid === firebaseUser.uid) {
-          setUserProfile(cached.profile);
-          setUserRole(cached.role);
-        }
-
-        try {
-          const { profile, role } = await resolveProfile(firebaseUser.uid);
-
-          // A newer auth event may have landed while this awaited — ignore stale results.
-          if (auth.currentUser?.uid !== firebaseUser.uid) return;
-
-          loadedUidRef.current = firebaseUser.uid;
-          setUserProfile(profile);
-          setUserRole(role);
-          setAuthError(null);
-
-          if (profile && role) {
-            localStorage.setItem(
-              PROFILE_CACHE_KEY,
-              JSON.stringify({ uid: firebaseUser.uid, profile, role })
-            );
-          } else {
-            // Signed in to Firebase Auth but no matching Firestore record.
-            localStorage.removeItem(PROFILE_CACHE_KEY);
-            setAuthError('no_profile');
-          }
-        } catch (err) {
-          console.error('[AuthContext] Error loading user profile:', err);
-          setAuthError(err?.code || err?.message || 'profile_load_failed');
-        } finally {
-          setAuthLoading(false);
-        }
-      },
-      (err) => {
-        console.error('[AuthContext] Auth state error:', err);
-        setAuthError(err?.code || 'auth_state_error');
-        setAuthLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [resolveProfile]);
-
-  const logout = useCallback(async () => {
-    try {
-      await signOut(auth);
-    } catch (err) {
-      console.error('[AuthContext] logout error:', err);
-    } finally {
-      // Clear locally regardless — a failed network sign-out must not leave the
-      // UI showing a signed-in state.
-      loadedUidRef.current = null;
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
       setCurrentUser(null);
       setUserProfile(null);
       setUserRole(null);
-      localStorage.removeItem(PROFILE_CACHE_KEY);
+      setAuthLoading(false);
+      return;
+    }
+
+    // Verify token with backend
+    fetch(`${API_BASE}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Session expired');
+        return res.json();
+      })
+      .then((data) => {
+        if (data.user) {
+          const userObj = { ...data.user, uid: data.user.id || data.user.uid };
+          const profileObj = data.profile || userObj;
+          setCurrentUser(userObj);
+          setUserProfile(profileObj);
+          setUserRole(userObj.role);
+          localStorage.setItem(USER_KEY, JSON.stringify(userObj));
+          localStorage.setItem(PROFILE_KEY, JSON.stringify(profileObj));
+        }
+      })
+      .catch(() => {
+        // Clear invalid session
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+        localStorage.removeItem(PROFILE_KEY);
+        setCurrentUser(null);
+        setUserProfile(null);
+        setUserRole(null);
+      })
+      .finally(() => {
+        setAuthLoading(false);
+      });
+  }, []);
+
+  const loginWithCredentials = useCallback(async (identifier, password) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier, password }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Invalid email or password.');
+      }
+
+      const token = data.token;
+      const user = { ...data.user, uid: data.user.id || data.user.uid };
+      const profile = data.profile || user;
+
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+
+      loadedUidRef.current = user.uid;
+      setCurrentUser(user);
+      setUserProfile(profile);
+      setUserRole(user.role);
+
+      return { user, profile, role: user.role };
+    } catch (err) {
+      setAuthError(err.message);
+      throw err;
+    } finally {
+      setAuthLoading(false);
     }
   }, []);
 
-  const refreshProfile = useCallback(async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return null;
-    try {
-      const { profile, role } = await resolveProfile(uid);
-      if (auth.currentUser?.uid !== uid) return null;
+  const logout = useCallback(async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      fetch(`${API_BASE}/api/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
 
-      setUserProfile(profile);
-      setUserRole(role);
-      if (profile && role) {
-        localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ uid, profile, role }));
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(PROFILE_KEY);
+    loadedUidRef.current = null;
+    setCurrentUser(null);
+    setUserProfile(null);
+    setUserRole(null);
+    setAuthError(null);
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return null;
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.profile) {
+        setUserProfile(data.profile);
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(data.profile));
+        return data.profile;
       }
-      return profile;
-    } catch (err) {
-      console.error('[AuthContext] refreshProfile error:', err);
-      setAuthError(err?.code || 'profile_refresh_failed');
+      return null;
+    } catch {
       return null;
     }
-  }, [resolveProfile]);
+  }, []);
 
-  /** Merge fields into the in-memory profile after a successful Firestore write. */
   const applyProfilePatch = useCallback((patch) => {
     setUserProfile((prev) => {
       const next = { ...(prev || {}), ...patch };
-      const uid = auth.currentUser?.uid;
-      if (uid) {
-        setUserRole((role) => {
-          localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ uid, profile: next, role }));
-          return role;
-        });
-      }
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(next));
       return next;
     });
   }, []);
@@ -181,15 +174,16 @@ export const AuthProvider = ({ children }) => {
       userRole,
       authLoading,
       authError,
+      loginWithCredentials,
       logout,
       refreshProfile,
       applyProfilePatch,
       isAdmin: userRole === 'admin',
       isTrainer: userRole === 'trainer',
       isStudent: userRole === 'student',
-      uid: currentUser?.uid || null,
+      uid: currentUser?.uid || currentUser?.id || null,
     }),
-    [currentUser, userProfile, userRole, authLoading, authError, logout, refreshProfile, applyProfilePatch]
+    [currentUser, userProfile, userRole, authLoading, authError, loginWithCredentials, logout, refreshProfile, applyProfilePatch]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

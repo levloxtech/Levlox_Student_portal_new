@@ -1,0 +1,22 @@
+[
+  {
+    "id": "trainer_sarah_001",
+    "uid": "trainer_sarah_001",
+    "name": "Dr. Sarah Jenkins",
+    "fullName": "Dr. Sarah Jenkins",
+    "email": "trainer@levlox.com",
+    "phone": "9876543210",
+    "role": "trainer",
+    "status": "active",
+    "mustChangePassword": false,
+    "assigned_batch_ids": ["doc_1792663077641_40688aea"],
+    "assignedBatchIds": ["doc_1792663077641_40688aea"],
+    "assigned_course_ids": ["Fullstack Engineering"],
+    "profilePic": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80",
+    "profile_pic": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80",
+    "specialization": "Lead Machine Learning & AI Architect",
+    "bio": "Senior AI Trainer & Curriculum Specialist at Levlox.",
+    "createdAt": "2026-10-20T08:00:00.000Z",
+    "updatedAt": "2026-10-25T04:00:00.000Z"
+  }
+]
