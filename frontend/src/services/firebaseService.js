@@ -606,6 +606,25 @@ export const saveBatchAttendance = async (batchId, date, attendanceRecords = [],
   }, { merge: true });
 
   await batch.commit();
+
+  // Dynamically notify each student of their attendance status
+  const nowIso = new Date().toISOString();
+  attendanceRecords.forEach((rec) => {
+    const sId = rec.studentId || rec.student_id;
+    if (sId) {
+      addDocument("notifications", {
+        userId: sId,
+        title: `📅 Attendance Marked: ${rec.status || 'Present'}`,
+        message: `Your attendance for "${sheetMeta.batchName || 'batch'}" on ${date} was recorded as ${rec.status || 'Present'}.`,
+        type: 'attendance',
+        data: { batchId, date, status: rec.status || 'Present' },
+        link: '/student?tab=attendance-tab',
+        read: false,
+        createdAt: nowIso
+      }).catch(() => {});
+    }
+  });
+
   return { sheetDocId, presentCount, absentCount, percentage };
 };
 

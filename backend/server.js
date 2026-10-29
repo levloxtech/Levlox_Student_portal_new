@@ -1101,6 +1101,110 @@ app.post('/api/data/:collection', (req, res) => {
       }
     }
 
+    // Auto-notify students when a new playlist is created
+    if (collection === 'playlists') {
+      try {
+        const allStudents = localDb.loadCollection('students');
+        const notifs = localDb.loadCollection('notifications');
+        const nowIso = new Date().toISOString();
+        const isAll = created.access_type === 'all' || !created.batch_id;
+        const targetStudents = isAll
+          ? allStudents
+          : allStudents.filter(s => String(s.batch_id || s.batchId) === String(created.batch_id));
+
+        for (const s of targetStudents) {
+          const sId = s.id || s.uid;
+          if (!sId) continue;
+          notifs.unshift({
+            id: `notif_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+            userId: sId,
+            title: `🎥 New Playlist: ${created.name}`,
+            message: `A new course playlist "${created.name}" (${created.course_name || 'Curriculum'}) is now ready in your video library.`,
+            type: 'playlist',
+            data: { playlistId: created.id || created.uid, name: created.name },
+            link: '/student?tab=recorded-classes',
+            read: false,
+            createdAt: nowIso,
+            createdBy: created.created_by || 'Trainer'
+          });
+        }
+        localDb.saveCollection('notifications', notifs);
+        console.info(`[Notifications] Broadcasted playlist "${created.name}" to ${targetStudents.length} students.`);
+      } catch (e) {
+        console.warn('[LocalDb] Failed to broadcast playlist notification:', e.message);
+      }
+    }
+
+    // Auto-notify students when a new lesson is uploaded
+    if (collection === 'recordedClasses') {
+      try {
+        const allStudents = localDb.loadCollection('students');
+        const notifs = localDb.loadCollection('notifications');
+        const nowIso = new Date().toISOString();
+        const bId = created.batch_id || created.batchId;
+        const targetStudents = (bId && bId !== 'common')
+          ? allStudents.filter(s => String(s.batch_id || s.batchId) === String(bId))
+          : allStudents;
+
+        for (const s of targetStudents) {
+          const sId = s.id || s.uid;
+          if (!sId) continue;
+          notifs.unshift({
+            id: `notif_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+            userId: sId,
+            title: `🎬 New Lesson: ${created.title}`,
+            message: `New recording "${created.title}" (${created.module || created.course_title || 'Lesson'}) has been published.`,
+            type: 'recorded_class',
+            data: { lessonId: created.id || created.uid, title: created.title },
+            link: '/student?tab=recorded-classes',
+            read: false,
+            createdAt: nowIso,
+            createdBy: created.uploadedBy || 'Instructor'
+          });
+        }
+        localDb.saveCollection('notifications', notifs);
+        console.info(`[Notifications] Broadcasted new lesson "${created.title}" to ${targetStudents.length} students.`);
+      } catch (e) {
+        console.warn('[LocalDb] Failed to broadcast lesson notification:', e.message);
+      }
+    }
+
+    // Auto-notify students when an assignment is posted
+    if (collection === 'assignments') {
+      try {
+        const allStudents = localDb.loadCollection('students');
+        const notifs = localDb.loadCollection('notifications');
+        const nowIso = new Date().toISOString();
+        const rawBatchIds = created.batch_ids || (created.batch_id ? [created.batch_id] : (created.batchId ? [created.batchId] : []));
+        const targetBatchIds = new Set(rawBatchIds.filter(Boolean).map(String));
+        const isAll = targetBatchIds.size === 0 || targetBatchIds.has('all');
+        const targetStudents = isAll
+          ? allStudents
+          : allStudents.filter(s => targetBatchIds.has(String(s.batch_id || s.batchId)));
+
+        for (const s of targetStudents) {
+          const sId = s.id || s.uid;
+          if (!sId) continue;
+          notifs.unshift({
+            id: `notif_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+            userId: sId,
+            title: `📝 New Assignment: ${created.title}`,
+            message: `A new assignment "${created.title}" has been assigned. Due Date: ${created.dueDate || 'Check portal'}.`,
+            type: 'assignment',
+            data: { assignmentId: created.id || created.uid, title: created.title },
+            link: '/student?tab=assignments-tab',
+            read: false,
+            createdAt: nowIso,
+            createdBy: created.trainerName || 'Faculty'
+          });
+        }
+        localDb.saveCollection('notifications', notifs);
+        console.info(`[Notifications] Broadcasted assignment "${created.title}" to ${targetStudents.length} students.`);
+      } catch (e) {
+        console.warn('[LocalDb] Failed to broadcast assignment notification:', e.message);
+      }
+    }
+
     // Auto-notify admins and trainers when a student submits an assignment
     if (collection === 'submissions') {
       try {
@@ -1303,6 +1407,21 @@ app.patch('/api/data/:collection/:id', (req, res) => {
     }
 
     res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// Clear all notifications for a specific user
+app.delete('/api/notifications/user/:userId', (req, res) => {
+  try {
+    const { userId } = req.params;
+    let notifs = localDb.loadCollection('notifications');
+    const initialCount = notifs.length;
+    notifs = notifs.filter(n => String(n.userId) !== String(userId));
+    localDb.saveCollection('notifications', notifs);
+    res.json({ success: true, cleared: initialCount - notifs.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2172,6 +2291,56 @@ app.post('/api/messages/batch/:batchId', (req, res) => {
     const messages = localDb.loadCollection('messages');
     messages.push(newMessage);
     localDb.saveCollection('messages', messages);
+
+    // Broadcast chat notifications to all members of this cohort (students & trainers)
+    try {
+      const allStudents = localDb.loadCollection('students');
+      const allTrainers = localDb.loadCollection('trainers');
+      const notifs = localDb.loadCollection('notifications');
+      const nowIso = new Date().toISOString();
+
+      const targetUserIds = new Set();
+      // Match students enrolled in this batch
+      allStudents.filter(s => 
+        String(s.batch_id || s.batchId || '') === String(batchId) ||
+        (batch && (s.batch_name === batch.name || s.batch === batch.name))
+      ).forEach(s => targetUserIds.add(s.id || s.uid));
+
+      // Match trainer(s) assigned to this batch
+      if (batch && (batch.trainer_uid || batch.trainerId)) {
+        targetUserIds.add(batch.trainer_uid || batch.trainerId);
+      }
+      allTrainers.filter(t => (t.assigned_batch_ids || []).map(String).includes(String(batchId)))
+        .forEach(t => targetUserIds.add(t.id || t.uid));
+
+      // Exclude sender so they don't receive self-notifications
+      if (senderId) {
+        targetUserIds.delete(senderId);
+      }
+
+      const summaryText = text
+        ? (text.length > 55 ? text.slice(0, 52) + '...' : text)
+        : (mediaType ? `[Shared ${mediaType}]` : (sticker ? 'Sent a sticker' : 'New message'));
+
+      for (const uId of targetUserIds) {
+        if (!uId) continue;
+        notifs.unshift({
+          id: `notif_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+          userId: uId,
+          title: `💬 ${senderName} in ${batchName}`,
+          message: summaryText,
+          type: 'batch_chat',
+          data: { batchId, messageId: newMessage.id },
+          link: '/student?tab=chat',
+          read: false,
+          createdAt: nowIso,
+          createdBy: senderName
+        });
+      }
+      localDb.saveCollection('notifications', notifs);
+    } catch (e) {
+      console.warn('[Messages] Failed to dispatch chat notification:', e.message);
+    }
 
     res.status(201).json(newMessage);
   } catch (err) {

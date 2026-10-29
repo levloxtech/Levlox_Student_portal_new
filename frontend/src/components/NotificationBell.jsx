@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck, Video, Megaphone, Info, ExternalLink, X, Smartphone } from 'lucide-react';
-import { subscribeNotifications, markNotificationRead } from '../services/firebaseService';
+import { Bell, CheckCheck, Video, Megaphone, Info, ExternalLink, X, Smartphone, Trash2, MessageSquare, BookOpen, CalendarCheck, Film } from 'lucide-react';
+import { subscribeNotifications, markNotificationRead, deleteDocument } from '../services/firebaseService';
 import { showDeviceNotification, requestDeviceNotificationPermission } from '../utils/browserNotifications';
 
 /**
@@ -36,6 +36,9 @@ function formatTimeAgo(timestamp) {
  * @param {string} props.userId - Current logged-in user's UID
  * @param {string} [props.userRole] - Role of the user ('admin' | 'trainer' | 'student')
  */
+const isProd = import.meta.env.PROD;
+const API_BASE = isProd ? '' : (import.meta.env.VITE_API_URL || '');
+
 export default function NotificationBell({ userId, userRole = 'student' }) {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
@@ -145,22 +148,72 @@ export default function NotificationBell({ userId, userRole = 'student' }) {
     }
   };
 
+  const handleDeleteItem = async (notifId, e) => {
+    if (e) e.stopPropagation();
+    try {
+      setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+      await deleteDocument('notifications', notifId);
+    } catch (err) {
+      console.error('[NotificationBell] Delete notification failed:', err);
+    }
+  };
+
+  const handleClearAll = async (e) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm('Are you sure you want to clear all notifications?')) return;
+    try {
+      setNotifications([]);
+      await fetch(`${API_BASE}/api/notifications/user/${userId}`, { method: 'DELETE' }).catch(() => {});
+    } catch (err) {
+      console.error('[NotificationBell] Clear all notifications failed:', err);
+    }
+  };
+
   const handleItemClick = async (notif) => {
     if (!notif.read) {
       await handleMarkAsRead(notif.id);
     }
     setIsOpen(false);
 
-    // If it's a live class notification, always direct to the Live Classes portal tab
-    // NEVER open Google Meet / Zoom directly from the notification so the 5-min unlock rule cannot be bypassed!
     if (notif.type && (notif.type.startsWith('live_class') || notif.type.includes('live_class'))) {
-      if (userRole === 'student') {
-        navigate('/student/my-courses');
-      } else if (userRole === 'trainer') {
-        navigate('/trainer/live-classes');
-      } else {
-        navigate('/admin');
-      }
+      if (userRole === 'student') navigate('/student/my-courses');
+      else if (userRole === 'trainer') navigate('/trainer/live-classes');
+      else navigate('/admin');
+      return;
+    }
+
+    if (notif.type === 'batch_chat') {
+      if (userRole === 'student') navigate('/student?tab=chat');
+      else if (userRole === 'trainer') navigate('/trainer?tab=batch-chat');
+      else navigate('/admin?tab=chat');
+      return;
+    }
+
+    if (notif.type === 'playlist' || notif.type === 'recorded_class' || notif.type === 'live_recording') {
+      if (userRole === 'student') navigate('/student?tab=recorded-classes');
+      else if (userRole === 'trainer') navigate('/trainer?tab=recorded-classes');
+      else navigate('/admin?tab=recorded-classes');
+      return;
+    }
+
+    if (notif.type === 'assignment' || notif.type === 'submission_received' || notif.type === 'assignment_feedback') {
+      if (userRole === 'student') navigate('/student?tab=assignments-tab');
+      else if (userRole === 'trainer') navigate('/trainer?tab=assignments');
+      else navigate('/admin?tab=assignments');
+      return;
+    }
+
+    if (notif.type === 'attendance') {
+      if (userRole === 'student') navigate('/student?tab=attendance-tab');
+      else if (userRole === 'trainer') navigate('/trainer?tab=attendance');
+      else navigate('/admin?tab=attendance');
+      return;
+    }
+
+    if (notif.type === 'announcement') {
+      if (userRole === 'student') navigate('/student?tab=announcements-tab');
+      else if (userRole === 'trainer') navigate('/trainer?tab=announcements');
+      else navigate('/admin?tab=announcements');
       return;
     }
 
@@ -178,10 +231,24 @@ export default function NotificationBell({ userId, userRole = 'student' }) {
 
   const getNotifIcon = (type) => {
     switch (type) {
+      case 'batch_chat':
+        return <MessageSquare size={16} style={{ color: '#8b5cf6' }} />;
+      case 'playlist':
+      case 'recorded_class':
+      case 'live_recording':
+        return <Film size={16} style={{ color: '#ec4899' }} />;
+      case 'assignment':
+      case 'assignment_feedback':
+      case 'submission_received':
+        return <BookOpen size={16} style={{ color: '#f59e0b' }} />;
+      case 'attendance':
+        return <CalendarCheck size={16} style={{ color: '#10b981' }} />;
       case 'live_class':
+      case 'live_class_5min':
+      case 'live_class_10min':
         return <Video size={16} style={{ color: '#0284c7' }} />;
       case 'announcement':
-        return <Megaphone size={16} style={{ color: '#f59e0b' }} />;
+        return <Megaphone size={16} style={{ color: '#ef4444' }} />;
       default:
         return <Info size={16} style={{ color: '#6366f1' }} />;
     }
@@ -287,29 +354,54 @@ export default function NotificationBell({ userId, userRole = 'student' }) {
               )}
             </div>
 
-            {unreadCount > 0 && (
-              <button
-                type="button"
-                onClick={handleMarkAllRead}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--primary-color, #4f46e5)',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '4px 6px',
-                  borderRadius: '4px',
-                }}
-                title="Mark all as read"
-              >
-                <CheckCheck size={14} />
-                Mark all read
-              </button>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleMarkAllRead}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--primary-color, #4f46e5)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 6px',
+                    borderRadius: '4px',
+                  }}
+                  title="Mark all as read"
+                >
+                  <CheckCheck size={14} />
+                  Read all
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#ef4444',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 6px',
+                    borderRadius: '4px',
+                  }}
+                  title="Clear all notifications"
+                >
+                  <Trash2 size={13} />
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Mobile / Device Notification Permission Banner */}
@@ -521,15 +613,37 @@ export default function NotificationBell({ userId, userRole = 'student' }) {
                     ) : null}
                   </div>
 
-                  {!notif.read && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    {!notif.read && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleMarkAsRead(notif.id, e)}
+                        title="Mark as read"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#94a3b8',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '4px',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = '#4f46e5')}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+                      >
+                        <CheckCheck size={14} />
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={(e) => handleMarkAsRead(notif.id, e)}
-                      title="Mark as read"
+                      onClick={(e) => handleDeleteItem(notif.id, e)}
+                      title="Clear this notification"
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#94a3b8',
+                        color: '#cbd5e1',
                         cursor: 'pointer',
                         padding: '4px',
                         display: 'flex',
@@ -537,12 +651,12 @@ export default function NotificationBell({ userId, userRole = 'student' }) {
                         justifyContent: 'center',
                         borderRadius: '4px',
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = '#4f46e5')}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = '#cbd5e1')}
                     >
-                      <CheckCheck size={14} />
+                      <X size={14} />
                     </button>
-                  )}
+                  </div>
                 </div>
               ))
             )}
