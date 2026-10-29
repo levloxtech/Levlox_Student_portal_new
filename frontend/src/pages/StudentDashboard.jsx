@@ -47,6 +47,7 @@ import {
 } from '../components/Glass3DIcons';
 import { useAuth } from '../context/AuthContext';
 import {
+  getDocuments,
   getEnrollmentsForStudent,
   getCourses,
   getUpcomingLiveClasses,
@@ -354,7 +355,7 @@ const StudentDashboard = () => {
     }
   }, [user?.mustChangePassword]);
 
-  // CORE — what the dashboard shell and the primary cards need.
+  // CORE — what the dashboard shell and the primary cards need (live dynamic database sync).
   const {
     data: coreData,
     isPending: coreLoading,
@@ -363,7 +364,8 @@ const StudentDashboard = () => {
   } = useQuery({
     queryKey: ['studentDashboardCore', uid],
     queryFn: async () => {
-      const [enrollments, courses, liveClasses, announcements, attendanceRecords] = await Promise.all([
+      const [allStudents, enrollments, courses, liveClasses, announcements, attendanceRecords] = await Promise.all([
+        getDocuments("students").catch(() => []),
         getEnrollmentsForStudent(uid).catch(() => []),
         getCourses().catch(() => []),
         getLiveClasses().catch(() => []),
@@ -371,19 +373,40 @@ const StudentDashboard = () => {
         getAttendanceForStudent(uid).catch(() => []),
       ]);
 
-      const enrolledCourseIds = new Set((enrollments || []).map(e => e.courseId));
+      const studentDoc = (allStudents || []).find(s => 
+        s.id === uid || 
+        s.uid === uid || 
+        (userProfile?.rollNumber && s.rollNumber === userProfile.rollNumber) ||
+        (user?.rollNumber && s.rollNumber === user.rollNumber) ||
+        (userProfile?.email && s.email === userProfile.email)
+      ) || null;
+
+      const studentCourseName = studentDoc?.course || studentDoc?.course_name || userProfile?.course || user?.course;
+      const enrolledCourseIds = new Set((enrollments || []).map(e => e.courseId || e.course_id));
+
+      const enrolledCourses = (courses || []).filter(c => {
+        if (enrolledCourseIds.has(c.id) || enrolledCourseIds.has(c.uid)) return true;
+        if (studentCourseName) {
+          const cName = String(c.name || c.title || '').trim().toLowerCase();
+          const sName = String(studentCourseName).trim().toLowerCase();
+          if (cName === sName || cName.includes(sName) || sName.includes(cName)) return true;
+        }
+        return false;
+      });
+
       return {
+        studentDoc,
         courses: courses || [],
-        enrolledCourses: (courses || []).filter(c => enrolledCourseIds.has(c.id)),
+        enrolledCourses: enrolledCourses.length > 0 ? enrolledCourses : (courses || []).slice(0, 1),
         allLiveClasses: liveClasses || [],
         announcements: announcements || [],
         attendanceRecords: attendanceRecords || [],
       };
     },
     enabled: !!uid,
-    staleTime: 1000 * 30, // 30 seconds
+    staleTime: 1000 * 15,
     gcTime: 1000 * 60 * 10,
-    refetchInterval: 60000, // auto-refresh dashboard, live classes, notice board every 1 min
+    refetchInterval: 30000,
     refetchOnWindowFocus: true,
   });
 
@@ -449,8 +472,6 @@ const StudentDashboard = () => {
     queryClient.invalidateQueries({ queryKey: ['studentAttendance'] });
     queryClient.invalidateQueries({ queryKey: ['studentDashboardCore'] });
   }, [activeTab, queryClient]);
-
-  const isPaid = user?.feesStatus === 'Paid';
 
   // Real-time ticker to auto-unlock live classes 5 minutes before scheduled start and auto-close after 1 hour
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -562,9 +583,21 @@ const StudentDashboard = () => {
     };
   };
 
-  // Student batch identifier
-  const studentBatchId = user?.batch_id || user?.batchId || userProfile?.batch_id || userProfile?.batchId || '';
-  const studentBatchName = (user?.batch_name || user?.batchName || userProfile?.batch_name || userProfile?.batchName || '').trim().toLowerCase();
+  // Student live document, cohort & course identifier
+  const studentDoc = coreData?.studentDoc || null;
+  const currentStudent = studentDoc || userProfile || user || EMPTY_PROFILE;
+
+  const studentBatchId = studentDoc?.batch_id || studentDoc?.batchId || user?.batch_id || user?.batchId || userProfile?.batch_id || userProfile?.batchId || '';
+  const studentBatchName = (studentDoc?.batch || studentDoc?.batch_name || user?.batch_name || user?.batchName || userProfile?.batch_name || userProfile?.batchName || '').trim().toLowerCase();
+  const studentCourseName = studentDoc?.course || studentDoc?.course_name || user?.course || userProfile?.course || 'Data Science & AI';
+
+  // Live dynamic fee calculations from database
+  const dynamicFeesTotal = Number(studentDoc?.feesTotal ?? user?.feesTotal ?? userProfile?.feesTotal ?? 25000);
+  const dynamicFeesPaid = Number(studentDoc?.feesPaidAmount ?? user?.feesPaidAmount ?? userProfile?.feesPaidAmount ?? 0);
+  const dynamicFeesRemaining = Number(studentDoc?.feesRemainingAmount ?? Math.max(0, dynamicFeesTotal - dynamicFeesPaid));
+  const dynamicFeesStatus = studentDoc?.feesStatus || user?.feesStatus || userProfile?.feesStatus || (dynamicFeesRemaining === 0 ? 'Paid' : (dynamicFeesPaid > 0 ? 'Partially Paid' : 'Pending Payment'));
+  const isPaid = dynamicFeesStatus === 'Paid';
+  const isPartial = dynamicFeesStatus === 'Partially Paid';
 
   // Helper to parse class date/time into timestamp for sorting
   const getClassTimestamp = (item) => {
@@ -664,7 +697,7 @@ const StudentDashboard = () => {
     });
 
     return {
-      student: user || EMPTY_PROFILE,
+      student: currentStudent,
       courses: coreData?.courses || [],
       enrolledCourses: coreData?.enrolledCourses || [],
       announcements: coreData?.announcements || [],
@@ -728,7 +761,7 @@ const StudentDashboard = () => {
     data: batchAssignments = [],
     refetch: refetchBatchAssignments 
   } = useQuery({
-    queryKey: ['studentBatchAssignments', studentBatchId, studentBatchName],
+    queryKey: ['studentBatchAssignments', studentBatchId, studentBatchName, studentCourseName],
     queryFn: async () => {
       const allAsg = await getAssignments().catch(() => []);
       if (!allAsg || allAsg.length === 0) return [];
@@ -736,9 +769,11 @@ const StudentDashboard = () => {
         if (!a) return false;
         const bId = String(a.batch_id || a.batchId || '').trim();
         const bName = String(a.batch_name || a.batchName || '').trim().toLowerCase();
+        const cTitle = String(a.course_name || a.course || a.course_title || '').trim().toLowerCase();
         if (bId === 'all' || !bId) return true;
         if (studentBatchId && bId === String(studentBatchId).trim()) return true;
         if (studentBatchName && bName && bName === studentBatchName) return true;
+        if (studentCourseName && cTitle && cTitle === studentCourseName.toLowerCase()) return true;
         return false;
       });
     },
@@ -1364,7 +1399,7 @@ const StudentDashboard = () => {
 
                 <h1 className="levlox-banner-title">
                   {greeting()},<br />
-                  <span className="levlox-banner-name">{profileName || user.name || 'Abdul Kalam'}</span> <span className="levlox-wave">👋</span>
+                  <span className="levlox-banner-name">{profileName || currentStudent?.name || user.name || 'Student'}</span> <span className="levlox-wave">👋</span>
                 </h1>
 
                 <p className="levlox-banner-sub">
@@ -1378,8 +1413,8 @@ const StudentDashboard = () => {
                       <GraduationCap size={19} color="#172033" strokeWidth={2.2} />
                     </div>
                     <div>
-                      <div className="levlox-meta-main">{profileCourse || user.course || 'Fullstack Engineering'}</div>
-                      <div className="levlox-meta-tag">Current Batch &bull; {user?.batch_name || userProfile?.batch_name || 'Active'}</div>
+                      <div className="levlox-meta-main">{studentCourseName}</div>
+                      <div className="levlox-meta-tag">Current Batch &bull; {studentDoc?.batch || studentDoc?.batch_name || user?.batch_name || userProfile?.batch_name || 'Active'}</div>
                     </div>
                   </div>
 
@@ -1528,18 +1563,31 @@ const StudentDashboard = () => {
 
             {/* RECENTLY VIEWED VIDEOS & FEE STATUS HIGHLIGHT ROW */}
             {(() => {
+              const allRecordings = rawRecordings || [];
+              const relevantRecordings = allRecordings.filter(r => {
+                if (!r) return false;
+                if (r.visibility === 'everyone') return true;
+                const rbId = String(r.batch_id || r.batchId || '').trim().toLowerCase();
+                if (studentBatchId && rbId === String(studentBatchId).trim().toLowerCase()) return true;
+                if (studentBatchName && r.batch_name && String(r.batch_name).trim().toLowerCase() === studentBatchName.toLowerCase()) return true;
+                return !rbId || rbId === 'all';
+              });
+
               const primaryRecent = (recentlyViewedVideos && recentlyViewedVideos.length > 0)
                 ? recentlyViewedVideos[0]
-                : {
-                    id: 'lesson_py_01',
-                    title: 'Lesson 1: Python Architecture & Core Syntax',
-                    courseTitle: inProgressCourse?.title || courses?.[0]?.title || 'Python Basic - Advanced Python',
-                    category: inProgressCourse?.category || 'Full Stack Development',
-                    thumbnail: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=600&auto=format&fit=crop&q=80',
-                    duration: '45 mins',
-                    percentage: 65,
-                    video_url: 'https://www.youtube.com/watch?v=rfscVS0vtbw',
-                  };
+                : (relevantRecordings.length > 0
+                    ? {
+                        id: relevantRecordings[0].id || relevantRecordings[0].uid,
+                        title: relevantRecordings[0].title,
+                        courseTitle: relevantRecordings[0].course_title || relevantRecordings[0].course_name || studentCourseName,
+                        category: relevantRecordings[0].module || 'Core Lecture',
+                        thumbnail: relevantRecordings[0].thumbnail || getResolvedThumbnail(relevantRecordings[0].video_url),
+                        duration: relevantRecordings[0].duration || '1h 30m',
+                        percentage: 0,
+                        video_url: relevantRecordings[0].video_url,
+                      }
+                    : null
+                  );
 
               return (
                 <div style={{ display: 'grid', gridTemplateColumns: '1.45fr 1fr', gap: 20, marginBottom: 22 }}>
@@ -1555,143 +1603,160 @@ const StudentDashboard = () => {
                       </button>
                     </div>
 
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 16,
-                      background: '#F8FAFD',
-                      padding: '12px 14px',
-                      borderRadius: 14,
-                      border: '1px solid #EEF2F8',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                    }}>
-                      {/* Video Thumbnail with Play Button Overlay */}
-                      <div
-                        onClick={() => setDashboardActiveVideo(primaryRecent)}
-                        style={{
-                          width: 110,
-                          height: 68,
-                          borderRadius: 10,
-                          overflow: 'hidden',
-                          position: 'relative',
-                          background: '#0F172A',
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                          boxShadow: '0 3px 10px rgba(0,0,0,0.1)'
-                        }}
-                        title="Click to resume video"
-                      >
-                        <img 
-                          src={primaryRecent.thumbnail || 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=600&auto=format&fit=crop&q=80'} 
-                          alt={primaryRecent.title}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.88 }} 
-                        />
-                        <div style={{
-                          position: 'absolute',
-                          inset: 0,
-                          background: 'rgba(0,0,0,0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
+                    {primaryRecent ? (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 16,
+                        background: '#F8FAFD',
+                        padding: '12px 14px',
+                        borderRadius: 14,
+                        border: '1px solid #EEF2F8',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                      }}>
+                        {/* Video Thumbnail with Play Button Overlay */}
+                        <div
+                          onClick={() => setDashboardActiveVideo(primaryRecent)}
+                          style={{
+                            width: 110,
+                            height: 68,
+                            borderRadius: 10,
+                            overflow: 'hidden',
+                            position: 'relative',
+                            background: '#0F172A',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            boxShadow: '0 3px 10px rgba(0,0,0,0.1)'
+                          }}
+                          title="Click to resume video"
+                        >
+                          <img 
+                            src={primaryRecent.thumbnail || 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=600&auto=format&fit=crop&q=80'} 
+                            alt={primaryRecent.title}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.88 }} 
+                          />
                           <div style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: '50%',
-                            background: '#4568F5',
+                            position: 'absolute',
+                            inset: 0,
+                            background: 'rgba(0,0,0,0.3)',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 2px 8px rgba(69, 104, 245, 0.6)'
+                            justifyContent: 'center'
                           }}>
-                            <Play size={13} fill="#FFFFFF" color="#FFFFFF" style={{ marginLeft: 2 }} />
+                            <div style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: '50%',
+                              background: '#4568F5',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 8px rgba(69, 104, 245, 0.6)'
+                            }}>
+                              <Play size={13} fill="#FFFFFF" color="#FFFFFF" style={{ marginLeft: 2 }} />
+                            </div>
+                          </div>
+                          <span style={{
+                            position: 'absolute',
+                            bottom: 4,
+                            right: 4,
+                            background: 'rgba(0,0,0,0.75)',
+                            color: '#FFFFFF',
+                            fontSize: 9.5,
+                            fontWeight: 700,
+                            padding: '1px 5px',
+                            borderRadius: 4
+                          }}>
+                            {primaryRecent.duration || '45m'}
+                          </span>
+                        </div>
+
+                        {/* Video Details */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                            <span style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              background: '#EEF2FF',
+                              color: '#4F46E5',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {primaryRecent.courseTitle || studentCourseName}
+                            </span>
+                            <span style={{ fontSize: 11, color: '#94A3B8' }}>&bull;</span>
+                            <span style={{ fontSize: 11, color: '#64748B', whiteSpace: 'nowrap' }}>
+                              {primaryRecent.percentage ? `${primaryRecent.percentage}% completed` : 'Up next'}
+                            </span>
+                          </div>
+
+                          <h4 style={{
+                            margin: '0 0 6px',
+                            fontSize: 13.5,
+                            fontWeight: 750,
+                            color: '#172033',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {primaryRecent.title}
+                          </h4>
+
+                          <div style={{ width: '100%', height: 5, background: '#E2E8F0', borderRadius: 999, overflow: 'hidden' }}>
+                            <div style={{
+                              width: `${Math.min(100, Math.max(10, primaryRecent.percentage || 20))}%`,
+                              height: '100%',
+                              background: 'linear-gradient(90deg, #4568F5, #6366F1)',
+                              borderRadius: 999
+                            }} />
                           </div>
                         </div>
-                        <span style={{
-                          position: 'absolute',
-                          bottom: 4,
-                          right: 4,
-                          background: 'rgba(0,0,0,0.75)',
-                          color: '#FFFFFF',
-                          fontSize: 9.5,
-                          fontWeight: 700,
-                          padding: '1px 5px',
-                          borderRadius: 4
-                        }}>
-                          {primaryRecent.duration || '45m'}
-                        </span>
-                      </div>
 
-                      {/* Video Details */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                          <span style={{
-                            fontSize: 10,
+                        {/* Action Button */}
+                        <button
+                          onClick={() => setDashboardActiveVideo(primaryRecent)}
+                          style={{
+                            background: '#4568F5',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            padding: '8px 15px',
+                            borderRadius: 8,
+                            fontSize: 12,
                             fontWeight: 700,
-                            textTransform: 'uppercase',
-                            padding: '1px 6px',
-                            borderRadius: 4,
-                            background: '#EEF2FF',
-                            color: '#4F46E5',
-                            whiteSpace: 'nowrap'
-                          }}>
-                            {primaryRecent.courseTitle || 'Course Lesson'}
-                          </span>
-                          <span style={{ fontSize: 11, color: '#94A3B8' }}>&bull;</span>
-                          <span style={{ fontSize: 11, color: '#64748B', whiteSpace: 'nowrap' }}>
-                            {primaryRecent.percentage ? `${primaryRecent.percentage}% completed` : 'Recently watched'}
-                          </span>
-                        </div>
-
-                        <h4 style={{
-                          margin: '0 0 6px',
-                          fontSize: 13.5,
-                          fontWeight: 750,
-                          color: '#172033',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          {primaryRecent.title}
-                        </h4>
-
-                        <div style={{ width: '100%', height: 5, background: '#E2E8F0', borderRadius: 999, overflow: 'hidden' }}>
-                          <div style={{
-                            width: `${Math.min(100, Math.max(10, primaryRecent.percentage || 20))}%`,
-                            height: '100%',
-                            background: 'linear-gradient(90deg, #4568F5, #6366F1)',
-                            borderRadius: 999
-                          }} />
-                        </div>
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            boxShadow: '0 2px 8px rgba(69, 104, 245, 0.3)'
+                          }}
+                        >
+                          <Play size={12} fill="#FFFFFF" /> Resume
+                        </button>
                       </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '24px 16px', color: '#64748B', background: '#F8FAFD', borderRadius: 12 }}>
+                        <PlayCircle size={28} color="#94A3B8" style={{ marginBottom: 6 }} />
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>No video lessons posted for your batch yet.</p>
+                      </div>
+                    )}
 
-                      {/* Action Button */}
-                      <button
-                        onClick={() => setDashboardActiveVideo(primaryRecent)}
-                        style={{
-                          background: '#4568F5',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          padding: '8px 15px',
-                          borderRadius: 8,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          boxShadow: '0 2px 8px rgba(69, 104, 245, 0.3)'
-                        }}
-                      >
-                        <Play size={12} fill="#FFFFFF" /> Resume
-                      </button>
-                    </div>
-
-                    {/* Chips for other recent videos if available */}
-                    {recentlyViewedVideos && recentlyViewedVideos.length > 1 && (
+                    {/* Chips for other recent or available batch videos */}
+                    {((recentlyViewedVideos && recentlyViewedVideos.length > 1) || relevantRecordings.length > 1) && (
                       <div style={{ display: 'flex', gap: 8, marginTop: 10, overflowX: 'auto', paddingBottom: 2 }}>
-                        {recentlyViewedVideos.slice(1, 4).map((v, vi) => (
+                        {(recentlyViewedVideos && recentlyViewedVideos.length > 1 
+                          ? recentlyViewedVideos.slice(1, 5) 
+                          : relevantRecordings.slice(1, 5).map(r => ({
+                              id: r.id || r.uid,
+                              title: r.title,
+                              percentage: 0,
+                              video_url: r.video_url,
+                              thumbnail: r.thumbnail || getResolvedThumbnail(r.video_url),
+                              courseTitle: r.course_title || studentCourseName
+                            }))
+                        ).map((v, vi) => (
                           <div
                             key={v.id || vi}
                             onClick={() => setDashboardActiveVideo(v)}
@@ -1714,14 +1779,14 @@ const StudentDashboard = () => {
                           >
                             <PlayCircle size={12} color="#4568F5" />
                             <span style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.title}</span>
-                            <span style={{ fontSize: 10, color: '#94A3B8' }}>({v.percentage || 0}%)</span>
+                            {v.percentage > 0 && <span style={{ fontSize: 10, color: '#94A3B8' }}>({v.percentage}%)</span>}
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
 
-                  {/* Fee & Enrollment Quick Ledger */}
+                  {/* Fee & Enrollment Quick Ledger (100% Dynamic from Database) */}
                   <div className="srms-card" style={{ padding: '18px 20px' }}>
                     <div className="srms-card-header" style={{ marginBottom: 12 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1731,33 +1796,37 @@ const StudentDashboard = () => {
                       <span 
                         className="srms-badge" 
                         style={{ 
-                          background: isPaid ? '#ECFDF5' : '#FFFBEB', 
-                          color: isPaid ? '#059669' : '#D97706', 
-                          border: `1px solid ${isPaid ? '#A7F3D0' : '#FDE68A'}` 
+                          background: isPaid ? '#ECFDF5' : (isPartial ? '#FFFBEB' : '#FEF2F2'), 
+                          color: isPaid ? '#059669' : (isPartial ? '#D97706' : '#DC2626'), 
+                          border: `1px solid ${isPaid ? '#A7F3D0' : (isPartial ? '#FDE68A' : '#FECACA')}` 
                         }}
                       >
-                        {user?.feesStatus || 'Pending Payment'}
+                        {dynamicFeesStatus}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFD', padding: '12px 14px', borderRadius: 12, border: '1px solid #EEF2F8' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, background: '#F8FAFD', padding: '12px 14px', borderRadius: 12, border: '1px solid #EEF2F8' }}>
                       <div>
                         <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Total Fee</span>
                         <p style={{ margin: '2px 0 0', fontSize: 16, fontWeight: 800, color: '#172033' }}>
-                          ₹{(user?.feesTotal || 20000).toLocaleString('en-IN')}
+                          ₹{dynamicFeesTotal.toLocaleString('en-IN')}
                         </p>
                       </div>
                       <div>
                         <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Paid</span>
                         <p style={{ margin: '2px 0 0', fontSize: 16, fontWeight: 800, color: '#10B981' }}>
-                          ₹{(user?.feesPaidAmount || 0).toLocaleString('en-IN')}
+                          ₹{dynamicFeesPaid.toLocaleString('en-IN')}
                         </p>
                       </div>
                       <div>
-                        <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Status</span>
-                        <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 700, color: isPaid ? '#10B981' : '#F59E0B' }}>
-                          {isPaid ? 'Active' : 'Verification'}
+                        <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Due Balance</span>
+                        <p style={{ margin: '2px 0 0', fontSize: 15, fontWeight: 800, color: dynamicFeesRemaining > 0 ? '#DC2626' : '#10B981' }}>
+                          {dynamicFeesRemaining > 0 ? `₹${dynamicFeesRemaining.toLocaleString('en-IN')}` : 'Nil (Clear)'}
                         </p>
                       </div>
+                    </div>
+                    <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: '#64748B', borderTop: '1px dashed #E2E8F0', paddingTop: 8 }}>
+                      <span>Batch: <strong style={{ color: '#1E293B' }}>{studentDoc?.batch || studentDoc?.batch_name || user?.batch_name || userProfile?.batch_name || 'Assigned Cohort'}</strong></span>
+                      <span>Course: <strong style={{ color: '#2563EB' }}>{studentCourseName}</strong></span>
                     </div>
                   </div>
                 </div>
@@ -1780,7 +1849,7 @@ const StudentDashboard = () => {
                 {
                   icon: GraduationCap,
                   label: 'Courses Enrolled',
-                  value: totalCoursesCount,
+                  value: enrolledCourses.length || 1,
                   subtext: `${inProgressCoursesCount} In Progress`,
                   bg: '#3B82F6',
                   iconColor: '#FFFFFF',
