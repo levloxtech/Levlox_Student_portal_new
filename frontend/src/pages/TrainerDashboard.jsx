@@ -64,7 +64,7 @@ import AcademiaCourseViewer from '../components/AcademiaCourseViewer';
 import TrainerAssignmentsView from '../components/TrainerAssignmentsView';
 import BatchChatPage from './BatchChatPage';
 import { uploadUniversalFile, getDownloadUrl } from '../services/apiService';
-import { getGoogleDriveFileId, getResolvedThumbnail } from '../utils/videoUtils';
+import { getGoogleDriveFileId, getYouTubeVideoId, getResolvedThumbnail } from '../utils/videoUtils';
 import { addDaysToDate, getDaysBetween, formatReadableDate, formatLocalDate } from '../utils/batchUtils';
 
 const PLAYLIST_CARD_THEMES = [
@@ -888,7 +888,9 @@ const TrainerDashboard = () => {
       const isCommon = recBatchId === 'common' || !recBatchId;
       const batchObj = batches.find(b => b.id === recBatchId);
       const isDrive = Boolean(getGoogleDriveFileId(recVideoUrl));
+      const isYouTube = Boolean(getYouTubeVideoId(recVideoUrl));
       const finalThumb = recThumbnailUrl || getResolvedThumbnail(recVideoUrl, recThumbnailUrl);
+      const finalSourceType = isDrive ? 'drive' : (isYouTube ? 'youtube' : 'link');
       const finalBatchId = isCommon ? 'common' : recBatchId;
       const finalBatchName = isCommon ? 'Common Playlist (All Students)' : (batchObj?.name || 'General Batch');
       const finalCourseName = recCourseName || (isCommon ? 'Levlox Common Curriculum' : (batchObj?.course_name || 'Course Training'));
@@ -908,7 +910,7 @@ const TrainerDashboard = () => {
         thumbnail: finalThumb,
         duration: recDuration || '1h 30m',
         description: recDescription,
-        video_source_type: isDrive ? 'drive' : 'link',
+        video_source_type: finalSourceType,
         visibility: 'everyone',
         uploadedBy: userProfile?.fullName || 'Trainer',
         created_at: new Date().toISOString()
@@ -2960,6 +2962,16 @@ const TrainerDashboard = () => {
             <div>
               <label className="form-label">Video URL (Google Drive, YouTube or Direct MP4) *</label>
               <input type="url" className="form-input" value={recVideoUrl} onChange={e => setRecVideoUrl(e.target.value)} placeholder="https://drive.google.com/... or https://youtube.com/..." required />
+              {getYouTubeVideoId(recVideoUrl) && (
+                <div style={{ marginTop: 6, fontSize: 12, color: '#991B1B', background: '#FEF2F2', padding: '6px 10px', borderRadius: 6, border: '1px solid #FECACA' }}>
+                  ✓ <strong>YouTube Detected (ID: {getYouTubeVideoId(recVideoUrl)}):</strong> Dynamic playback active. <em>(Set to Unlisted or Public on YouTube)</em>
+                </div>
+              )}
+              {getGoogleDriveFileId(recVideoUrl) && (
+                <div style={{ marginTop: 6, fontSize: 12, color: '#065F46', background: '#ECFDF5', padding: '6px 10px', borderRadius: 6, border: '1px solid #A7F3D0' }}>
+                  ✓ <strong>Google Drive Verified (ID: {getGoogleDriveFileId(recVideoUrl)}):</strong> Anti-download DRM protection active.
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

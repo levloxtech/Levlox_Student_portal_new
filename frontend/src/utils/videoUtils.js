@@ -13,35 +13,55 @@ export const getGoogleDriveFileId = (url) => {
   const trimmed = url.trim();
 
   // Pattern 1: https://drive.google.com/file/d/{FILE_ID}/view...
-  const matchFileD = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/i);
+  const matchFileD = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/i);
   if (matchFileD && matchFileD[1]) return matchFileD[1];
 
   // Pattern 2: https://drive.google.com/open?id={FILE_ID} or /uc?id={FILE_ID}
-  const matchIdParam = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/i);
+  const matchIdParam = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{10,})/i);
   if (matchIdParam && matchIdParam[1]) return matchIdParam[1];
 
   // Pattern 3: https://drive.google.com/file/u/{user_number}/d/{FILE_ID}/...
-  const matchUserD = trimmed.match(/\/file\/u\/\d+\/d\/([a-zA-Z0-9_-]+)/i);
+  const matchUserD = trimmed.match(/\/file\/u\/\d+\/d\/([a-zA-Z0-9_-]{10,})/i);
   if (matchUserD && matchUserD[1]) return matchUserD[1];
+
+  // Pattern 4: https://drive.google.com/open?id={FILE_ID}
+  const matchOpen = trimmed.match(/open\?id=([a-zA-Z0-9_-]{10,})/i);
+  if (matchOpen && matchOpen[1]) return matchOpen[1];
 
   return null;
 };
 
 /**
- * Extract YouTube video ID from various YouTube URL formats.
+ * Extract YouTube video ID from various YouTube URL formats
+ * (Public, Unlisted, Shorts, Live, Embedded, Mobile).
  */
 export const getYouTubeVideoId = (url) => {
   if (!url || typeof url !== 'string') return null;
   const trimmed = url.trim();
 
-  const matchShort = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]+)/i);
+  // Pattern 1: youtu.be/{ID}
+  const matchShort = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]{6,15})/i);
   if (matchShort && matchShort[1]) return matchShort[1];
 
-  const matchWatch = trimmed.match(/[?&]v=([a-zA-Z0-9_-]+)/i);
+  // Pattern 2: ?v={ID} or &v={ID}
+  const matchWatch = trimmed.match(/[?&]v=([a-zA-Z0-9_-]{6,15})/i);
   if (matchWatch && matchWatch[1]) return matchWatch[1];
 
-  const matchEmbed = trimmed.match(/\/embed\/([a-zA-Z0-9_-]+)/i);
+  // Pattern 3: /embed/{ID}
+  const matchEmbed = trimmed.match(/\/embed\/([a-zA-Z0-9_-]{6,15})/i);
   if (matchEmbed && matchEmbed[1]) return matchEmbed[1];
+
+  // Pattern 4: /shorts/{ID}
+  const matchShorts = trimmed.match(/\/shorts\/([a-zA-Z0-9_-]{6,15})/i);
+  if (matchShorts && matchShorts[1]) return matchShorts[1];
+
+  // Pattern 5: /live/{ID}
+  const matchLive = trimmed.match(/\/live\/([a-zA-Z0-9_-]{6,15})/i);
+  if (matchLive && matchLive[1]) return matchLive[1];
+
+  // Pattern 6: /v/{ID}
+  const matchV = trimmed.match(/\/v\/([a-zA-Z0-9_-]{6,15})/i);
+  if (matchV && matchV[1]) return matchV[1];
 
   return null;
 };
@@ -51,10 +71,11 @@ export const getYouTubeVideoId = (url) => {
  */
 export const getVideoSourceType = (url) => {
   if (!url) return 'none';
-  if (getGoogleDriveFileId(url)) return 'drive';
-  if (getYouTubeVideoId(url)) return 'youtube';
-  if (url.includes('/uploads/') || url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) return 'direct';
-  if (url.includes('vimeo.com')) return 'vimeo';
+  const trimmed = typeof url === 'string' ? url.trim() : '';
+  if (getGoogleDriveFileId(trimmed)) return 'drive';
+  if (getYouTubeVideoId(trimmed)) return 'youtube';
+  if (trimmed.includes('/uploads/') || trimmed.match(/\.(mp4|webm|ogg|mov|mkv|m4v)(\?.*)?$/i)) return 'direct';
+  if (trimmed.includes('vimeo.com')) return 'vimeo';
   return 'link';
 };
 
@@ -65,16 +86,16 @@ export const getEmbedVideoUrl = (rawUrl) => {
   if (!rawUrl || typeof rawUrl !== 'string') return '';
   const url = rawUrl.trim();
 
-  // 1. Google Drive Link
+  // 1. Google Drive Link -> Preview player
   const driveId = getGoogleDriveFileId(url);
   if (driveId) {
     return `https://drive.google.com/file/d/${driveId}/preview`;
   }
 
-  // 2. YouTube Link
+  // 2. YouTube Link -> Embed player (privacy-enhanced mode with modest branding)
   const ytId = getYouTubeVideoId(url);
   if (ytId) {
-    return `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&showinfo=0&controls=1`;
+    return `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&showinfo=0&controls=1&enablejsapi=1`;
   }
 
   // 3. Vimeo Link

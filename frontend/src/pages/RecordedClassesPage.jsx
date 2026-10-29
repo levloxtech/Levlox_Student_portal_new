@@ -309,11 +309,6 @@ const RecordedClassesPage = ({
     }));
   }, [selectedCourse, recordingsList]);
 
-  // Handle Join Session
-  const handleJoinLiveSession = () => {
-    window.open('https://meet.google.com/qqa-xrei-mwy', '_blank', 'noopener,noreferrer');
-  };
-
   // Currently Learning primary course (Python Basic - Advanced Python)
   const currentlyLearningCourse = useMemo(() => {
     return coursesList.find(c => c.id === 'course_py_101') || DEFAULT_COURSES[0];
@@ -409,20 +404,19 @@ const RecordedClassesPage = ({
           </p>
         </div>
 
-        {/* Center: 3D Illustration */}
+        {/* Right: 3D Illustration */}
         <div style={{
-          flex: '1 1 200px',
           display: 'flex',
-          justifyContent: 'center',
+          justifyContent: 'flex-end',
           alignItems: 'center',
           zIndex: 1,
-          minHeight: 160
+          paddingRight: 10
         }}>
           <img 
             src={workspace3D} 
             alt="Levlox 3D Learning Space"
             style={{
-              maxHeight: 175,
+              maxHeight: 185,
               width: 'auto',
               objectFit: 'contain',
               filter: 'drop-shadow(0 14px 24px rgba(37, 99, 235, 0.15))',
@@ -430,98 +424,6 @@ const RecordedClassesPage = ({
               pointerEvents: 'none'
             }} 
           />
-        </div>
-
-        {/* Right Column: Next Live Session Card */}
-        <div style={{
-          background: '#FFFFFF',
-          borderRadius: 16,
-          border: '1px solid #E2E8F0',
-          padding: '18px 20px',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
-          width: 310,
-          flexShrink: 0,
-          zIndex: 2,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12
-        }}>
-          {/* Card Top: Live Badge */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{
-                width: 22,
-                height: 22,
-                borderRadius: 6,
-                background: '#EFF6FF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#2563EB'
-              }}>
-                <Sparkles size={13} />
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 750, color: '#1E293B' }}>
-                Next Live Session
-              </span>
-            </div>
-
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5,
-              background: '#FEE2E2',
-              color: '#DC2626',
-              padding: '3px 9px',
-              borderRadius: 999,
-              fontSize: 11,
-              fontWeight: 800
-            }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#EF4444', animation: 'pulse 1.5s infinite' }} />
-              Live
-            </div>
-          </div>
-
-          {/* Time & Session Title */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#64748B', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-              <Calendar size={13} color="#2563EB" />
-              <span>Today, 10:00 AM - 11:00 AM</span>
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.2px' }}>
-              Python Basics - Advanced
-            </div>
-            <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-              Trainer: <span style={{ fontWeight: 600, color: '#334155' }}>Mr. Ravi Kumar</span>
-            </div>
-          </div>
-
-          {/* Join Session Button */}
-          <button
-            onClick={handleJoinLiveSession}
-            style={{
-              width: '100%',
-              padding: '10px 16px',
-              background: '#2563EB',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-              transition: 'background 0.2s, transform 0.15s'
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#1D4ED8'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#2563EB'; }}
-          >
-            <span>Join Session</span>
-            <ArrowRight size={14} />
-          </button>
         </div>
       </div>
 

@@ -148,10 +148,11 @@ const AttendancePage = ({ dashboardData }) => {
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
   const [selectedDateStr, setSelectedDateStr] = useState(todayStr);
   const [hoveredDay, setHoveredDay] = useState(null);
-  const { uid, authLoading } = useAuth();
+  const { uid, userProfile, authLoading } = useAuth();
 
-  const student = dashboardData?.student || {};
+  const student = dashboardData?.student || userProfile || {};
   const attendance = student.attendance || {};
+  const studentIdentifier = student.id || student.uid || uid;
 
   const {
     data: fetchedHistory,
@@ -159,14 +160,14 @@ const AttendancePage = ({ dashboardData }) => {
     error: historyError,
     refetch: refetchHistory,
   } = useQuery({
-    queryKey: ['studentAttendance', uid],
-    queryFn: () => getAttendanceForStudent(uid),
-    enabled: Boolean(uid),
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
+    queryKey: ['studentAttendance', studentIdentifier],
+    queryFn: () => getAttendanceForStudent(studentIdentifier, student),
+    enabled: Boolean(studentIdentifier),
+    staleTime: 1000 * 60 * 2,
+    refetchOnWindowFocus: true,
   });
 
-  const historyLoading = authLoading || (Boolean(uid) && historyFetching);
+  const historyLoading = authLoading || (Boolean(studentIdentifier) && historyFetching);
 
   const history = fetchedHistory?.length
     ? fetchedHistory
@@ -176,7 +177,10 @@ const AttendancePage = ({ dashboardData }) => {
   const attendanceMap = useMemo(() => {
     const map = {};
     history.forEach(item => {
-      if (item.date) map[item.date] = item;
+      if (item.date) {
+        const dateKey = String(item.date).split('T')[0];
+        map[dateKey] = item;
+      }
     });
     return map;
   }, [history]);

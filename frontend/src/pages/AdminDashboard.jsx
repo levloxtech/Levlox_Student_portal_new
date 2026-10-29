@@ -108,7 +108,7 @@ import {
   formatLocalDate
 } from '../utils/batchUtils';
 import SecureVideoPlayer from '../components/SecureVideoPlayer';
-import { getGoogleDriveFileId, getResolvedThumbnail, parseDurationToSeconds, formatSecondsToDisplay } from '../utils/videoUtils';
+import { getGoogleDriveFileId, getYouTubeVideoId, getResolvedThumbnail, parseDurationToSeconds, formatSecondsToDisplay } from '../utils/videoUtils';
 
 const PLAYLIST_CARD_THEMES = [
   {
@@ -2027,6 +2027,7 @@ const AdminDashboard = () => {
   const [recStudyMaterials, setRecStudyMaterials] = useState([]); // Array of { name, url, type }
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [uploadingMaterial, setUploadingMaterial] = useState(false);
+  const [showModalVideoPreview, setShowModalVideoPreview] = useState(false);
 
   // Temp form fields to add a study material
   const [newMaterialName, setNewMaterialName] = useState('');
@@ -4048,6 +4049,8 @@ const AdminDashboard = () => {
     e.preventDefault();
     const isEditing = !!editingRecordedClass;
     const isDrive = Boolean(getGoogleDriveFileId(recVideoUrl));
+    const isYouTube = Boolean(getYouTubeVideoId(recVideoUrl));
+    const finalSourceType = isDrive ? 'drive' : (isYouTube ? 'youtube' : videoSourceType);
     const finalThumbnail = recThumbnailUrl || getResolvedThumbnail(recVideoUrl, recThumbnailUrl);
     let targetPlaylistId = selectedBatchId;
     let targetPlaylistName = '';
@@ -4091,7 +4094,7 @@ const AdminDashboard = () => {
       batchName: targetBatchName,
       sort_order: recSortOrder ? parseInt(recSortOrder) : 999,
       duration: recDuration || '1h 30m',
-      video_source_type: isDrive ? 'drive' : videoSourceType,
+      video_source_type: finalSourceType,
       study_materials: recStudyMaterials,
     };
     try {
@@ -4105,6 +4108,7 @@ const AdminDashboard = () => {
       setRecThumbnailUrl(''); setRecLessonDescription(''); setRecNotesUrl('');
       setRecAssignment(''); setRecVisibility('everyone'); setRecSortOrder('');
       setRecDuration('1h 30m'); setVideoSourceType('link'); setRecStudyMaterials([]);
+      setShowModalVideoPreview(false);
       setEditingRecordedClass(null);
       setShowRecordedClassModal(false);
       await refetchAdminData();
@@ -10459,13 +10463,73 @@ const AdminDashboard = () => {
                               }
                             }
                           }} 
-                          placeholder="https://drive.google.com/file/d/... or YouTube link" 
+                          placeholder="Paste YouTube Link (Public/Unlisted) or Google Drive Link or MP4 URL" 
                           required
                         />
+                        {/* Dynamic Verification Banners */}
+                        {getYouTubeVideoId(recVideoUrl) && (
+                          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 12, color: '#991B1B', background: '#FEF2F2', padding: '8px 12px', borderRadius: 8, border: '1px solid #FECACA' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <Video size={16} color="#DC2626" />
+                              <span>
+                                <strong>YouTube Video Detected (ID: {getYouTubeVideoId(recVideoUrl)}):</strong> Dynamic playback & HD thumbnail ready. <span style={{ opacity: 0.9 }}>(For privacy, set video to <strong>Unlisted</strong> in YouTube Studio)</span>
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowModalVideoPreview(!showModalVideoPreview)}
+                              style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                            >
+                              <PlayCircle size={13} />
+                              {showModalVideoPreview ? 'Hide Preview' : 'Test Preview'}
+                            </button>
+                          </div>
+                        )}
                         {getGoogleDriveFileId(recVideoUrl) && (
-                          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#059669', background: '#ECFDF5', padding: '6px 10px', borderRadius: 6, border: '1px solid #A7F3D0' }}>
-                            <CheckCircle size={14} />
-                            <span><strong>Google Drive link verified:</strong> Video will stream securely inside the portal with anti-download protection.</span>
+                          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 12, color: '#065F46', background: '#ECFDF5', padding: '8px 12px', borderRadius: 8, border: '1px solid #A7F3D0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <CheckCircle size={16} color="#059669" />
+                              <span>
+                                <strong>Google Drive Verified (ID: {getGoogleDriveFileId(recVideoUrl)}):</strong> Protected stream active with anti-download DRM shield. <span style={{ opacity: 0.9 }}>(Ensure file sharing is 'Anyone with link can view')</span>
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowModalVideoPreview(!showModalVideoPreview)}
+                              style={{ background: '#059669', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                            >
+                              <PlayCircle size={13} />
+                              {showModalVideoPreview ? 'Hide Preview' : 'Test Preview'}
+                            </button>
+                          </div>
+                        )}
+                        {recVideoUrl && !getYouTubeVideoId(recVideoUrl) && !getGoogleDriveFileId(recVideoUrl) && (
+                          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 12, color: '#1E40AF', background: '#EFF6FF', padding: '8px 12px', borderRadius: 8, border: '1px solid #BFDBFE' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <Globe size={16} color="#2563EB" />
+                              <span><strong>Web Video / Direct Stream Link:</strong> Will play directly in player.</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowModalVideoPreview(!showModalVideoPreview)}
+                              style={{ background: '#2563EB', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                            >
+                              <PlayCircle size={13} />
+                              {showModalVideoPreview ? 'Hide Preview' : 'Test Preview'}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Inline Test Video Player */}
+                        {showModalVideoPreview && recVideoUrl && (
+                          <div style={{ marginTop: 12, borderRadius: 12, overflow: 'hidden', border: '2px solid #E2E8F0', height: 260, background: '#000' }}>
+                            <SecureVideoPlayer
+                              videoUrl={recVideoUrl}
+                              title={recTitle || 'Preview Lesson'}
+                              watermarkText="Levlox Instructor Test"
+                              autoPlay={true}
+                              height="260px"
+                            />
                           </div>
                         )}
                       </div>

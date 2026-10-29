@@ -455,14 +455,47 @@ export const subscribeAnnouncements = (callback, onError) =>
 export const getAttendanceForStudent = async (studentId, constraints = []) => {
   if (!studentId) return [];
   try {
-    const [byStudentId, byStudent_id] = await Promise.all([
-      getDocuments("attendance", [where("studentId", "==", studentId), limit(DEFAULT_LIST_LIMIT)]).catch(() => []),
-      getDocuments("attendance", [where("student_id", "==", studentId), limit(DEFAULT_LIST_LIMIT)]).catch(() => []),
-    ]);
-    const merged = [...byStudentId, ...byStudent_id].filter(item => 
-      String(item.studentId || item.student_id) === String(studentId)
-    );
-    const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
+    const allAtt = await getDocuments("attendance");
+    if (!Array.isArray(allAtt)) return [];
+
+    const idSet = new Set();
+    const addVal = (val) => {
+      if (val !== undefined && val !== null && String(val).trim()) {
+        idSet.add(String(val).trim().toLowerCase());
+      }
+    };
+
+    if (typeof studentId === 'string' || typeof studentId === 'number') {
+      addVal(studentId);
+    } else if (studentId && typeof studentId === 'object') {
+      addVal(studentId.id);
+      addVal(studentId.uid);
+      addVal(studentId.rollNumber);
+      addVal(studentId.roll_number);
+      addVal(studentId.email);
+    }
+
+    if (constraints && typeof constraints === 'object' && !Array.isArray(constraints)) {
+      addVal(constraints.id);
+      addVal(constraints.uid);
+      addVal(constraints.rollNumber);
+      addVal(constraints.roll_number);
+      addVal(constraints.email);
+    }
+
+    const matched = allAtt.filter(item => {
+      const sId = String(item.studentId || item.student_id || '').trim().toLowerCase();
+      const rNum = String(item.rollNumber || item.roll_number || '').trim().toLowerCase();
+      const sEmail = String(item.email || item.studentEmail || item.student_email || '').trim().toLowerCase();
+      const uId = String(item.uid || item.id || '').trim().toLowerCase();
+
+      return (sId && idSet.has(sId)) || 
+             (rNum && idSet.has(rNum)) || 
+             (sEmail && idSet.has(sEmail)) || 
+             (uId && idSet.has(uId));
+    });
+
+    const unique = Array.from(new Map(matched.map(item => [item.id || `${item.batchId}_${item.date}`, item])).values());
     unique.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     return unique;
   } catch (error) {
