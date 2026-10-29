@@ -32,7 +32,7 @@ export const getTrainerBatches = async (trainerUid, assignedBatchIds = []) => {
     const trainerEmail = (trainerDoc?.email || '').trim().toLowerCase();
     const trainerCode = (trainerDoc?.trainerId || trainerDoc?.code || '').trim().toLowerCase();
 
-    const matchedBatches = allBatches.filter(b => {
+    let matchedBatches = allBatches.filter(b => {
       const bId = String(b.id || b.uid || '');
       const isOwner = String(b.trainer_uid || '') === String(trainerUid);
       const isAssigned = assignedSet.has(bId);
@@ -42,9 +42,12 @@ export const getTrainerBatches = async (trainerUid, assignedBatchIds = []) => {
       return isOwner || isAssigned || isNameMatch || isEmailMatch || isCodeMatch;
     });
 
+    // If no batches explicitly assigned, provide full curriculum batch access
+    const finalBatches = (matchedBatches.length > 0) ? matchedBatches : allBatches;
+
     // Enrich with accurate student counts
     const allStudents = await getDocuments("students").catch(() => []);
-    return matchedBatches.map(b => {
+    return finalBatches.map(b => {
       const bId = String(b.id || b.uid || '');
       const bCode = String(b.code || b.batchId || '');
       const bName = String(b.name || '');
@@ -179,24 +182,12 @@ export const createTrainerLiveClass = async (trainerUid, trainerName, data) => {
 
 /**
  * Fetch recorded classes for assigned courses/batches.
+ * Returns full academy recorded classes library so trainers have complete parity with admin.
  */
 export const getTrainerRecordedClasses = async (assignedBatchIds = [], assignedCourseIds = []) => {
   try {
     const list = await getDocuments("recordedClasses");
-    if (!assignedBatchIds.length && !assignedCourseIds.length) return list;
-
-    const batchSet = new Set((assignedBatchIds || []).map(String));
-    const courseSet = new Set((assignedCourseIds || []).map(String));
-
-    return list.filter(item => {
-      const bId = String(item.batch_id || item.batchId || '');
-      const cId = String(item.course_id || item.courseId || '');
-      // If the recording has no specific batch assigned, it's global for all batches
-      if (!bId && !cId) return true;
-      const bMatch = bId ? batchSet.has(bId) : false;
-      const cMatch = cId ? courseSet.has(cId) : false;
-      return bMatch || cMatch;
-    });
+    return list || [];
   } catch (err) {
     console.error("[trainerService] getTrainerRecordedClasses error:", err);
     return [];

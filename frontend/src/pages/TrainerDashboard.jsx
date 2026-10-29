@@ -8,11 +8,12 @@ import {
   PlayCircle, Clock3, Trophy, Key, ChevronDown, X, Download, 
   FileText, FileSpreadsheet, User, Mail, Phone, Lock, EyeOff, 
   Camera, Save, Shield, Menu, Calendar as CalendarIcon, Check, CheckSquare,
-  AlertCircle, ChevronLeft, ChevronRight, ExternalLink, Trash2, UploadCloud, Play, MessageSquare,
+  AlertCircle, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, ExternalLink, Trash2, UploadCloud, Play, MessageSquare,
   Copy, Sparkles, Layers as LayersIcon, ArrowUpRight, Wallet as WalletIcon, CheckCheck, Globe,
   Activity
 } from 'lucide-react';
 import CustomModal from '../components/Modal';
+import FilterBar from '../components/FilterBar';
 import NotificationBell from '../components/NotificationBell';
 import levloxLogo from '../assets/levlox-logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -66,7 +67,7 @@ import AcademiaCourseViewer from '../components/AcademiaCourseViewer';
 import TrainerAssignmentsView from '../components/TrainerAssignmentsView';
 import BatchChatPage from './BatchChatPage';
 import { uploadUniversalFile, getDownloadUrl } from '../services/apiService';
-import { getGoogleDriveFileId, getYouTubeVideoId, getResolvedThumbnail } from '../utils/videoUtils';
+import { getGoogleDriveFileId, getYouTubeVideoId, getResolvedThumbnail, parseDurationToSeconds, formatSecondsToDisplay } from '../utils/videoUtils';
 import { addDaysToDate, getDaysBetween, formatReadableDate, formatLocalDate } from '../utils/batchUtils';
 
 const PLAYLIST_CARD_THEMES = [
@@ -325,6 +326,14 @@ const TrainerDashboard = () => {
     refetchOnWindowFocus: true,
   });
 
+  const { data: customPlaylists = [], isLoading: playlistsLoading, refetch: refetchPlaylists } = useQuery({
+    queryKey: ['trainerPlaylists'],
+    queryFn: () => getPlaylists(),
+    staleTime: 1000 * 30,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
+  });
+
   const { data: announcements = [], isLoading: announcementsLoading, refetch: refetchAnnouncements } = useQuery({
     queryKey: ['trainerAnnouncements', effectiveBatchIds],
     queryFn: () => getTrainerAnnouncements(effectiveBatchIds),
@@ -347,6 +356,7 @@ const TrainerDashboard = () => {
     refetchStudents();
     refetchLive();
     refetchRecorded();
+    refetchPlaylists();
     refetchAnnouncements();
     refetchSheets();
     queryClient.invalidateQueries({ queryKey: ['trainerAssignmentsData'] });
@@ -958,95 +968,359 @@ const TrainerDashboard = () => {
     }
   };
 
-  // ─── 6. RECORDED CLASSES & PLAYLISTS ─────────────────────────────────────
-  const [showRecordedModal, setShowRecordedModal] = useState(false);
-  const [trainerRecordedBatchFilter, setTrainerRecordedBatchFilter] = useState('');
-  const [previewVideo, setPreviewVideo] = useState(null);
+  // ─── 6. RECORDED CLASSES & PLAYLISTS (ADMIN-PARITY SYSTEM) ─────────────────
+  const [recordedSearchQuery, setRecordedSearchQuery] = useState('');
+  const [recordedCourseFilter, setRecordedCourseFilter] = useState('');
+  const [recordedBatchFilter, setRecordedBatchFilter] = useState('');
+  const [recordedVisibilityFilter, setRecordedVisibilityFilter] = useState('');
+  const [recordedDateFilter, setRecordedDateFilter] = useState('All');
+  const [recordedStartDateFilter, setRecordedStartDateFilter] = useState('');
+  const [recordedEndDateFilter, setRecordedEndDateFilter] = useState('');
+  const [selectedPlaylistBatch, setSelectedPlaylistBatch] = useState(null);
+
+  const [showRecordedClassModal, setShowRecordedClassModal] = useState(false);
+  const [editingRecordedClass, setEditingRecordedClass] = useState(null);
   const [recTitle, setRecTitle] = useState('');
-  const [recCourseName, setRecCourseName] = useState('');
-  const [recModule, setRecModule] = useState('Module 1 - Fundamentals');
-  const [recBatchId, setRecBatchId] = useState('');
+  const [recModule, setRecModule] = useState('Module 1 - Python Basics');
+  const [recCourseTitle, setRecCourseTitle] = useState('');
   const [recVideoUrl, setRecVideoUrl] = useState('');
   const [recThumbnailUrl, setRecThumbnailUrl] = useState('');
+  const [recLessonDescription, setRecLessonDescription] = useState('');
+  const [recNotesUrl, setRecNotesUrl] = useState('');
+  const [recAssignment, setRecAssignment] = useState('');
+  const [recVisibility, setRecVisibility] = useState('everyone');
+  const [recSortOrder, setRecSortOrder] = useState('');
   const [recDuration, setRecDuration] = useState('1h 30m');
-  const [recDescription, setRecDescription] = useState('');
-  const [savingRecorded, setSavingRecorded] = useState(false);
+  const [selectedBatchId, setSelectedBatchId] = useState('');
+  const [videoSourceType, setVideoSourceType] = useState('link');
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [showModalVideoPreview, setShowModalVideoPreview] = useState(false);
+  const [recStudyMaterials, setRecStudyMaterials] = useState([]);
+  const [previewRecordedClass, setPreviewRecordedClass] = useState(null);
 
-  const filteredRecordedClasses = useMemo(() => {
-    return recordedClasses.filter(rc => {
-      if (!trainerRecordedBatchFilter) return true;
-      const bId = String(rc.batch_id || rc.batchId || '').trim();
-      return bId === String(trainerRecordedBatchFilter).trim();
+  // Custom Playlist Modal state
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [editingPlaylist, setEditingPlaylist] = useState(null);
+  const [playlistFormName, setPlaylistFormName] = useState('');
+  const [playlistFormCourse, setPlaylistFormCourse] = useState('');
+  const [playlistFormDescription, setPlaylistFormDescription] = useState('');
+  const [playlistFormThumbnail, setPlaylistFormThumbnail] = useState('');
+  const [playlistThumbnailType, setPlaylistThumbnailType] = useState('url');
+  const [playlistUploadingThumb, setPlaylistUploadingThumb] = useState(false);
+  const [playlistFormAccess, setPlaylistFormAccess] = useState('all');
+  const [playlistFormBatchId, setPlaylistFormBatchId] = useState('');
+
+  const filterByDateRange = (dateStr, dateFilterType, customStart, customEnd) => {
+    if (!dateStr || dateFilterType === 'All') return true;
+    try {
+      const itemDate = new Date(dateStr);
+      if (isNaN(itemDate.getTime())) return true;
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+      if (dateFilterType === 'Today') {
+        return itemDate >= startOfToday && itemDate <= endOfToday;
+      } else if (dateFilterType === 'This Week') {
+        const firstDayOfWeek = new Date(now);
+        firstDayOfWeek.setDate(firstDayOfWeek.getDate() - firstDayOfWeek.getDay());
+        firstDayOfWeek.setHours(0, 0, 0, 0);
+        const lastDayOfWeek = new Date(firstDayOfWeek);
+        lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 7);
+        lastDayOfWeek.setHours(23, 59, 59, 999);
+        return itemDate >= firstDayOfWeek && itemDate <= lastDayOfWeek;
+      } else if (dateFilterType === 'This Month') {
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        return itemDate >= firstDayOfMonth && itemDate <= lastDayOfMonth;
+      } else if (dateFilterType === 'Custom' && customStart && customEnd) {
+        const s = new Date(customStart);
+        const e = new Date(customEnd);
+        e.setHours(23, 59, 59);
+        return itemDate >= s && itemDate <= e;
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  };
+
+  const filteredRecorded = useMemo(() => {
+    return (recordedClasses || []).filter(c => {
+      const query = (recordedSearchQuery || '').toLowerCase().trim();
+      const matchesSearch = !query || 
+        (c.title || '').toLowerCase().includes(query) ||
+        (c.module || '').toLowerCase().includes(query) ||
+        (c.course_title || c.course_name || '').toLowerCase().includes(query);
+      const matchesCourse = !recordedCourseFilter || (c.course_title || c.course_name) === recordedCourseFilter;
+      const matchesBatch = !recordedBatchFilter || String(c.batch_id || c.batchId) === String(recordedBatchFilter);
+      const matchesVisibility = !recordedVisibilityFilter || c.visibility === recordedVisibilityFilter;
+      const matchesDate = filterByDateRange(c.created_at || c.createdAt || c.date, recordedDateFilter, recordedStartDateFilter, recordedEndDateFilter);
+      return matchesSearch && matchesCourse && matchesBatch && matchesVisibility && matchesDate;
     });
-  }, [recordedClasses, trainerRecordedBatchFilter]);
+  }, [recordedClasses, recordedSearchQuery, recordedCourseFilter, recordedBatchFilter, recordedVisibilityFilter, recordedDateFilter, recordedStartDateFilter, recordedEndDateFilter]);
 
-  const handleAddRecordedClass = async (e) => {
+  const exportRecordedClassesToCSV = () => {
+    const headers = ['Lesson Title', 'Module', 'Course Title', 'Duration', 'Visibility', 'Video URL'];
+    const rows = filteredRecorded.map(c => [
+      `"${(c.title || '').replace(/"/g, '""')}"`,
+      `"${(c.module || '').replace(/"/g, '""')}"`,
+      `"${(c.course_title || c.course_name || '').replace(/"/g, '""')}"`,
+      `"${c.duration || ''}"`,
+      `"${c.visibility || 'everyone'}"`,
+      `"${c.video_url || ''}"`
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'recorded_classes_export.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportRecordedClassesToExcel = () => {
+    const headers = ['Lesson Title', 'Module', 'Course Title', 'Duration', 'Visibility', 'Video URL'];
+    const rows = filteredRecorded.map(c => [
+      c.title || '',
+      c.module || '',
+      c.course_title || c.course_name || '',
+      c.duration || '',
+      c.visibility || 'everyone',
+      c.video_url || ''
+    ]);
+    const content = [headers.join('\t'), ...rows.map(r => r.join('\t'))].join('\n');
+    const blob = new Blob([content], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'recorded_classes_export.xls');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportRecordedClassesToPDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    let rowsHtml = '';
+    filteredRecorded.forEach(c => {
+      rowsHtml += `
+        <tr>
+          <td>${c.title || ''}</td>
+          <td>${c.module || ''}</td>
+          <td>${c.course_title || c.course_name || ''}</td>
+          <td>${c.duration || ''}</td>
+          <td>${c.visibility || 'everyone'}</td>
+        </tr>
+      `;
+    });
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Recorded Classes Report</title>
+          <style>
+             body { font-family: sans-serif; padding: 20px; }
+             h1 { color: #6366F1; }
+             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+             th, td { border: 1px solid #E5E7EB; padding: 10px; text-align: left; }
+             th { background-color: #F9FAFB; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h1>Recorded Classes Library</h1>
+          <p>Generated on ${new Date().toLocaleDateString()}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Lesson Title</th>
+                <th>Module</th>
+                <th>Course</th>
+                <th>Duration</th>
+                <th>Visibility</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const handleSaveRecordedClass = async (e) => {
     e.preventDefault();
-    if (!recTitle || !recVideoUrl) {
-      alert('Title and Video URL are required.');
+    if (!recTitle.trim() || !recVideoUrl.trim()) {
+      showToast('Lesson title and video source are required.');
       return;
     }
-    setSavingRecorded(true);
-    try {
-      const isCommon = recBatchId === 'common' || !recBatchId;
-      const batchObj = batches.find(b => b.id === recBatchId);
-      const isDrive = Boolean(getGoogleDriveFileId(recVideoUrl));
-      const isYouTube = Boolean(getYouTubeVideoId(recVideoUrl));
-      const finalThumb = recThumbnailUrl || getResolvedThumbnail(recVideoUrl, recThumbnailUrl);
-      const finalSourceType = isDrive ? 'drive' : (isYouTube ? 'youtube' : 'link');
-      const finalBatchId = isCommon ? 'common' : recBatchId;
-      const finalBatchName = isCommon ? 'Common Playlist (All Students)' : (batchObj?.name || 'General Batch');
-      const finalCourseName = recCourseName || (isCommon ? 'Levlox Common Curriculum' : (batchObj?.course_name || 'Course Training'));
+    const isEditing = !!editingRecordedClass;
+    const isDrive = Boolean(getGoogleDriveFileId(recVideoUrl));
+    const isYouTube = Boolean(getYouTubeVideoId(recVideoUrl));
+    const finalSourceType = isDrive ? 'drive' : (isYouTube ? 'youtube' : videoSourceType);
+    const finalThumbnail = recThumbnailUrl || getResolvedThumbnail(recVideoUrl, recThumbnailUrl);
 
-      await createTrainerRecordedClass({
-        title: recTitle,
-        module: recModule || 'General Class',
-        course_title: finalCourseName,
-        course_name: finalCourseName,
-        playlist_id: finalBatchId,
-        playlist_name: finalBatchName,
-        batch_id: finalBatchId,
-        batchId: finalBatchId,
-        batch_name: finalBatchName,
-        batchName: finalBatchName,
-        video_url: recVideoUrl,
-        thumbnail: finalThumb,
-        duration: recDuration || '1h 30m',
-        description: recDescription,
-        video_source_type: finalSourceType,
-        visibility: 'everyone',
-        uploadedBy: userProfile?.fullName || 'Trainer',
-        created_at: new Date().toISOString()
-      });
-      showToast('Recorded Lesson added successfully ✓');
-      refetchRecorded();
-      setShowRecordedModal(false);
+    let targetPlaylistId = selectedBatchId;
+    let targetPlaylistName = '';
+    let targetBatchId = '';
+    let targetBatchName = '';
+    let finalCourseTitle = recCourseTitle;
+
+    if (String(selectedBatchId).startsWith('playlist:')) {
+      const plId = selectedBatchId.replace('playlist:', '');
+      const plObj = customPlaylists.find(p => p.id === plId || p.uid === plId);
+      targetPlaylistId = plId;
+      targetPlaylistName = plObj?.name || 'Custom Playlist';
+      targetBatchId = plObj?.batch_id || '';
+      targetBatchName = plObj?.batch_name || '';
+      finalCourseTitle = plObj?.course_name || recCourseTitle || 'General Curriculum';
+    } else {
+      const rawBId = String(selectedBatchId).replace('batch:', '');
+      const foundBatch = batches.find(b => b.id === rawBId || b.uid === rawBId);
+      targetPlaylistId = rawBId;
+      targetPlaylistName = foundBatch ? `Batch: ${foundBatch.name}` : 'Batch Playlist';
+      targetBatchId = rawBId;
+      targetBatchName = foundBatch?.name || '';
+      finalCourseTitle = recCourseTitle || foundBatch?.course_name || 'General Course';
+    }
+
+    const payload = {
+      title: recTitle.trim(),
+      module: recModule.trim() || 'General Lesson',
+      video_url: recVideoUrl.trim(),
+      thumbnail: finalThumbnail,
+      description: recLessonDescription.trim(),
+      notes_url: recNotesUrl.trim(),
+      assignment: recAssignment.trim(),
+      visibility: recVisibility,
+      course_title: finalCourseTitle,
+      playlist_id: targetPlaylistId,
+      playlist_name: targetPlaylistName,
+      batch_id: targetBatchId,
+      batch_name: targetBatchName,
+      batchId: targetBatchId,
+      batchName: targetBatchName,
+      sort_order: recSortOrder ? parseInt(recSortOrder) : 999,
+      duration: recDuration || '1h 30m',
+      video_source_type: finalSourceType,
+      study_materials: recStudyMaterials,
+      uploadedBy: userProfile?.fullName || userProfile?.name || 'Trainer',
+      trainer_uid: trainerUid,
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      const recId = editingRecordedClass?.id || editingRecordedClass?.uid || editingRecordedClass?._id;
+      if (isEditing && recId) {
+        await updateDocumentFields('recordedClasses', recId, payload);
+        showToast('Lesson updated successfully ✓');
+      } else {
+        payload.createdAt = new Date().toISOString();
+        await createTrainerRecordedClass(payload);
+        showToast('New LMS Lesson posted successfully ✓');
+      }
       setRecTitle('');
+      setRecModule('Module 1 - Python Basics');
       setRecVideoUrl('');
       setRecThumbnailUrl('');
-      setRecDescription('');
+      setRecLessonDescription('');
+      setRecNotesUrl('');
+      setRecAssignment('');
+      setRecVisibility('everyone');
+      setRecSortOrder('');
+      setRecDuration('1h 30m');
+      setVideoSourceType('link');
+      setRecStudyMaterials([]);
+      setShowModalVideoPreview(false);
+      setEditingRecordedClass(null);
+      setShowRecordedClassModal(false);
+      refetchRecorded();
     } catch (err) {
       console.error(err);
-      alert(classifyFirestoreError(err).message);
-    } finally {
-      setSavingRecorded(false);
+      showToast(classifyFirestoreError(err).message);
+    }
+  };
+
+  const handleSavePlaylist = async (e) => {
+    e.preventDefault();
+    if (!playlistFormName.trim()) {
+      showToast('Playlist name is required.');
+      return;
+    }
+    const isEditing = !!editingPlaylist;
+    const targetBatch = batches.find(b => b.id === playlistFormBatchId);
+    const payload = {
+      name: playlistFormName.trim(),
+      course_name: playlistFormCourse.trim() || 'General Curriculum',
+      description: playlistFormDescription.trim(),
+      thumbnail: playlistFormThumbnail.trim(),
+      access_type: playlistFormAccess,
+      batch_id: playlistFormAccess === 'batch' ? playlistFormBatchId : '',
+      batch_name: playlistFormAccess === 'batch' ? (targetBatch?.name || '') : 'All Students',
+      batch_code: playlistFormAccess === 'batch' ? (targetBatch?.code || targetBatch?.batchId || '') : '',
+      created_by: userProfile?.fullName || 'Trainer',
+      trainer_uid: trainerUid,
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      if (isEditing) {
+        await updatePlaylist(editingPlaylist.id || editingPlaylist.uid, payload);
+      } else {
+        payload.createdAt = new Date().toISOString();
+        await addPlaylist(payload);
+      }
+      setShowPlaylistModal(false);
+      setEditingPlaylist(null);
+      setPlaylistFormName('');
+      setPlaylistFormCourse('');
+      setPlaylistFormDescription('');
+      setPlaylistFormThumbnail('');
+      setPlaylistThumbnailType('url');
+      setPlaylistFormAccess('all');
+      setPlaylistFormBatchId('');
+      refetchPlaylists();
+      showToast(isEditing ? 'Playlist updated successfully ✓' : 'New playlist created successfully ✓');
+    } catch (err) {
+      console.error(err);
+      showToast(classifyFirestoreError(err).message);
+    }
+  };
+
+  const handleDeletePlaylist = async (playlistId) => {
+    if (!playlistId) return;
+    if (!window.confirm('Are you sure you want to permanently delete this custom playlist? It will be removed for all students.')) return;
+    try {
+      await deletePlaylist(playlistId);
+      if (selectedPlaylistBatch?.id === playlistId || selectedPlaylistBatch?.uid === playlistId) {
+        setSelectedPlaylistBatch(null);
+      }
+      setShowPlaylistModal(false);
+      setEditingPlaylist(null);
+      refetchPlaylists();
+      showToast('Playlist deleted successfully ✓');
+    } catch (err) {
+      console.error(err);
+      showToast(classifyFirestoreError(err).message);
     }
   };
 
   const handleDeleteRecordedClass = async (id) => {
     if (!id) return;
-    if (!window.confirm('Are you sure you want to delete this recorded lesson?')) return;
+    if (!window.confirm('Are you sure you want to permanently delete this recorded lesson?')) return;
     try {
       await deleteDocument('recordedClasses', id);
       showToast('Recorded lesson deleted successfully ✓');
       refetchRecorded();
     } catch (err) {
       console.error(err);
-      alert(classifyFirestoreError(err).message);
+      showToast(classifyFirestoreError(err).message);
     }
   };
 
-  // ─── 7. ANNOUNCEMENTS ───────────────────────────────────────────────────
+    // ─── 7. ANNOUNCEMENTS ───────────────────────────────────────────────────
   const [showAnnModal, setShowAnnModal] = useState(false);
   const [annTitle, setAnnTitle] = useState('');
   const [annMessage, setAnnMessage] = useState('');
@@ -2284,62 +2558,896 @@ const TrainerDashboard = () => {
           </div>
         )}
 
-        {/* ─── TAB 7: RECORDED CLASSES ──────────────────────────────────────── */}
+        {/* ─── TAB 7: RECORDED CLASSES (ADMIN-PARITY TWO-LEVEL SYSTEM) ───────── */}
         {activeTab === 'recorded-classes' && (
-          <div className="animate-fade-in">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div>
-                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Recorded Video Library</h2>
-                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
-                  Upload, organize, and manage recorded video lectures and playlists
-                </p>
-              </div>
-              <button className="btn btn-primary" onClick={() => setShowRecordedModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                <Plus size={16} /> Add Recorded Lesson
-              </button>
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+            <FilterBar
+              searchPlaceholder="Search Recorded Class"
+              searchValue={recordedSearchQuery}
+              onSearchChange={(val) => setRecordedSearchQuery(val)}
+              filters={[
+                {
+                  label: 'Course',
+                  value: recordedCourseFilter,
+                  onChange: (val) => setRecordedCourseFilter(val),
+                  options: Array.from(new Set(recordedClasses.map(c => c.course_title || c.course_name))).filter(Boolean).map(c => ({ value: c, label: c }))
+                },
+                {
+                  label: 'Batch',
+                  value: recordedBatchFilter,
+                  onChange: (val) => setRecordedBatchFilter(val),
+                  options: batches.map(b => ({ value: b.id, label: b.name }))
+                },
+                {
+                  label: 'Status',
+                  value: recordedVisibilityFilter,
+                  onChange: (val) => setRecordedVisibilityFilter(val),
+                  options: [
+                    { value: 'everyone', label: 'Everyone' },
+                    { value: 'paid', label: 'Paid Only' }
+                  ]
+                }
+              ]}
+              showDateFilter={true}
+              activeQuickFilter={recordedDateFilter}
+              onQuickFilterChange={(pill) => setRecordedDateFilter(pill)}
+              startDateValue={recordedStartDateFilter}
+              endDateValue={recordedEndDateFilter}
+              onStartDateChange={(val) => setRecordedStartDateFilter(val)}
+              onEndDateChange={(val) => setRecordedEndDateFilter(val)}
+              onExportCSV={exportRecordedClassesToCSV}
+              onExportExcel={exportRecordedClassesToExcel}
+              onExportPDF={exportRecordedClassesToPDF}
+              actionLabel="+ Add Recorded Class"
+              onActionClick={() => {
+                setEditingRecordedClass(null);
+                const targetBId = recordedBatchFilter || (batches[0]?.id || '');
+                setSelectedBatchId(targetBId ? `batch:${targetBId}` : '');
+                const foundBatch = batches.find(b => b.id === targetBId);
+                if (foundBatch && foundBatch.course_name) {
+                  setRecCourseTitle(foundBatch.course_name);
+                }
+                setShowRecordedClassModal(true);
+              }}
+            />
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
-              {filteredRecordedClasses.map((rc, idx) => {
-                const theme = PLAYLIST_CARD_THEMES[idx % PLAYLIST_CARD_THEMES.length];
-                return (
-                  <div key={rc.id} style={{ background: theme.bg, border: `1.5px solid ${theme.border}`, borderRadius: 18, padding: 20, boxShadow: theme.shadow, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                        <span style={{ fontSize: 11, fontWeight: 800, background: theme.tagBg, color: theme.tagColor, padding: '3px 8px', borderRadius: 6 }}>
-                          {rc.module || 'Lecture'}
-                        </span>
-                        <span style={{ fontSize: 11, color: theme.tagColor, fontWeight: 700 }}>
-                          ⏱ {rc.duration || '1h 30m'}
-                        </span>
-                      </div>
-
-                      <h3 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 6px', color: '#1E293B' }}>{rc.title}</h3>
-                      <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '0 0 14px' }}>
-                        Batch: <strong>{rc.batch_name || rc.batchName || 'Common Playlist'}</strong>
-                      </p>
+            {/* ─── TWO-LEVEL PLAYLIST CONTAINER SYSTEM ─── */}
+            {!selectedPlaylistBatch ? (
+              /* LEVEL 1: PLAYLIST CONTAINERS DIRECTORY */
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: '520px',
+                width: '100%',
+                gap: '24px',
+                background: 'linear-gradient(135deg, rgba(240, 249, 255, 0.65) 0%, rgba(245, 243, 255, 0.75) 45%, rgba(254, 243, 199, 0.35) 80%, rgba(236, 253, 245, 0.65) 100%)',
+                backdropFilter: 'blur(30px)',
+                WebkitBackdropFilter: 'blur(30px)',
+                border: '1px solid rgba(255, 255, 255, 0.9)',
+                borderRadius: 28,
+                padding: '26px 28px',
+                boxShadow: '0 20px 45px -10px rgba(99, 102, 241, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02)',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                  <div>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(8px)', padding: '4px 12px', borderRadius: 999, border: '1px solid rgba(255, 255, 255, 0.95)', marginBottom: 6 }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6366F1' }} />
+                      <span style={{ fontSize: 11, fontWeight: 750, color: '#4F46E5', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Curriculum & Recording Studio</span>
                     </div>
+                    <h4 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 4px', color: '#0F172A', letterSpacing: '-0.3px' }}>
+                      Course Playlists & Recording Containers
+                    </h4>
+                    <p style={{ fontSize: '13px', color: '#64748B', margin: 0, fontWeight: 500 }}>
+                      Automatic batch curriculum playlists and custom curated playlists with audience controls.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => {
+                        setEditingPlaylist(null);
+                        setPlaylistFormName('');
+                        setPlaylistFormCourse('');
+                        setPlaylistFormDescription('');
+                        setPlaylistFormThumbnail('');
+                        setPlaylistThumbnailType('url');
+                        setPlaylistFormAccess('all');
+                        setPlaylistFormBatchId('');
+                        setShowPlaylistModal(true);
+                      }}
+                      style={{
+                        borderRadius: 999,
+                        padding: '8px 18px',
+                        fontWeight: 750,
+                        fontSize: '13px',
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        backdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(203, 213, 225, 0.85)',
+                        color: '#0F172A',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <Plus size={15} /> Create Playlist
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => {
+                        setEditingRecordedClass(null);
+                        setSelectedBatchId(batches[0] ? `batch:${batches[0].id}` : '');
+                        setShowRecordedClassModal(true);
+                      }}
+                      style={{
+                        borderRadius: 999,
+                        padding: '8px 18px',
+                        fontWeight: 750,
+                        fontSize: '13px',
+                        background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <Plus size={15} /> Upload Video
+                    </button>
+                  </div>
+                </div>
 
-                    <div style={{ display: 'flex', gap: 8, borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 14 }}>
-                      <button className="btn btn-primary btn-sm" onClick={() => setPreviewVideo(rc)} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                        <Play size={14} /> Watch Lesson
-                      </button>
-                      <button className="btn btn-outline btn-sm" onClick={() => handleDeleteRecordedClass(rc.id)} style={{ color: '#EF4444' }}>
-                        <Trash2 size={14} />
-                      </button>
+                {/* PLAYLIST CONTAINERS GRID */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '22px' }}>
+                  
+                  {/* SECTION A: AUTOMATIC BATCH PLAYLISTS */}
+                  {batches.map((batch, idx) => {
+                    const bId = String(batch.id || batch.uid);
+                    const batchRecordings = (recordedClasses || []).filter(r => String(r.batch_id || r.batchId) === bId || String(r.playlist_id) === bId);
+                    const batchDurationSec = batchRecordings.reduce((acc, r) => acc + parseDurationToSeconds(r.duration), 0);
+                    const batchThumb = batch.thumbnail || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=700&auto=format&fit=crop&q=80';
+                    const theme = PLAYLIST_CARD_THEMES[idx % PLAYLIST_CARD_THEMES.length];
+
+                    return (
+                      <div
+                        key={`batch-${bId}`}
+                        style={{
+                          background: theme.bg,
+                          border: `1.5px solid ${theme.border}`,
+                          borderRadius: 24,
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          boxShadow: theme.shadow,
+                          transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+                          position: 'relative',
+                          backdropFilter: 'blur(20px)',
+                          WebkitBackdropFilter: 'blur(20px)',
+                        }}
+                        className="clickable-card-hover"
+                      >
+                        {/* Top Banner with Inset & Image Clarity */}
+                        <div style={{ padding: '12px 12px 0 12px' }}>
+                          <div style={{
+                            height: 145,
+                            position: 'relative',
+                            borderRadius: 18,
+                            overflow: 'hidden',
+                            background: '#0F172A',
+                            boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+                          }}>
+                            <img
+                              src={batchThumb}
+                              alt={batch.name}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                transition: 'transform 0.3s ease',
+                              }}
+                            />
+                            <div style={{
+                              position: 'absolute',
+                              inset: 0,
+                              background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.05) 50%, rgba(15, 23, 42, 0.65) 100%)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              padding: '12px 14px',
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{
+                                  fontSize: 11,
+                                  fontWeight: 750,
+                                  background: 'rgba(255, 255, 255, 0.88)',
+                                  backdropFilter: 'blur(10px)',
+                                  WebkitBackdropFilter: 'blur(10px)',
+                                  color: '#0F172A',
+                                  padding: '4px 12px',
+                                  borderRadius: 999,
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                }}>
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: theme.accent }} />
+                                  {batch.course_name || 'Curriculum Track'}
+                                </span>
+
+                                <span style={{
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  background: 'rgba(99, 102, 241, 0.9)',
+                                  backdropFilter: 'blur(8px)',
+                                  color: '#FFFFFF',
+                                  padding: '4px 10px',
+                                  borderRadius: 999,
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                                }}>
+                                  🎓 Batch
+                                </span>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: 10,
+                                  background: '#FFFFFF',
+                                  boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                  overflow: 'hidden',
+                                }}>
+                                  <img
+                                    src={batchThumb}
+                                    alt=""
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                  />
+                                </div>
+                                <h5 style={{
+                                  fontSize: '16px',
+                                  fontWeight: '800',
+                                  margin: 0,
+                                  color: '#FFFFFF',
+                                  textShadow: '0 2px 6px rgba(0,0,0,0.7)',
+                                  letterSpacing: '-0.2px',
+                                  lineHeight: 1.2,
+                                }}>
+                                  Batch: {batch.name}
+                                </h5>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Lower Body */}
+                        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12.5px', color: '#475569' }}>
+                              <span style={{ fontWeight: 600 }}>Instructor:</span>
+                              <strong style={{ color: '#0F172A', fontWeight: 750 }}>{batch.trainer_name || userProfile?.fullName || 'Instructor'}</strong>
+                            </div>
+                            <span style={{
+                              fontSize: '11px',
+                              fontWeight: 750,
+                              background: theme.tagBg,
+                              color: theme.tagColor,
+                              padding: '2px 8px',
+                              borderRadius: 6,
+                            }}>
+                              {batch.code || batch.batchId || 'BAT'}
+                            </span>
+                          </div>
+
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: 10,
+                            background: 'rgba(255, 255, 255, 0.75)',
+                            backdropFilter: 'blur(10px)',
+                            WebkitBackdropFilter: 'blur(10px)',
+                            border: '1px solid rgba(255, 255, 255, 0.9)',
+                            padding: '10px 14px',
+                            borderRadius: 14,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                          }}>
+                            <div>
+                              <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Videos</div>
+                              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginTop: 1 }}>
+                                {batchRecordings.length} Lessons
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Duration</div>
+                              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginTop: 1 }}>
+                                {formatSecondsToDisplay(batchDurationSec)}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 4 }}>
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={() => {
+                                setSelectedBatchId(`batch:${bId}`);
+                                if (batch.course_name) setRecCourseTitle(batch.course_name);
+                                setShowRecordedClassModal(true);
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '9px 12px',
+                                fontSize: '12px',
+                                borderRadius: 999,
+                                fontWeight: 750,
+                                background: 'rgba(255, 255, 255, 0.85)',
+                                border: '1px solid rgba(203, 213, 225, 0.8)',
+                                color: '#1E293B',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 5,
+                              }}
+                            >
+                              <Plus size={13} /> Add Video
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              onClick={() => setSelectedPlaylistBatch({ ...batch, isCustom: false })}
+                              style={{
+                                flex: 1.3,
+                                padding: '9px 14px',
+                                fontSize: '12px',
+                                borderRadius: 999,
+                                fontWeight: 750,
+                                background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <span>Open Playlist</span>
+                              <ArrowRight size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* SECTION B: CUSTOM PLAYLISTS */}
+                  {customPlaylists.map((playlist, idx) => {
+                    const plId = String(playlist.id || playlist.uid);
+                    const plRecordings = (recordedClasses || []).filter(r => String(r.playlist_id) === plId || String(r.batch_id) === plId);
+                    const plDurationSec = plRecordings.reduce((acc, r) => acc + parseDurationToSeconds(r.duration), 0);
+                    const isAll = playlist.access_type === 'all' || !playlist.batch_id;
+                    const customThumb = playlist.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=700&auto=format&fit=crop&q=80';
+                    const theme = PLAYLIST_CARD_THEMES[(batches.length + idx) % PLAYLIST_CARD_THEMES.length];
+
+                    return (
+                      <div
+                        key={`custom-${plId}`}
+                        style={{
+                          background: theme.bg,
+                          border: `1.5px solid ${theme.border}`,
+                          borderRadius: 24,
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          boxShadow: theme.shadow,
+                          transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+                          position: 'relative',
+                          backdropFilter: 'blur(20px)',
+                          WebkitBackdropFilter: 'blur(20px)',
+                        }}
+                        className="clickable-card-hover"
+                      >
+                        <div style={{ padding: '12px 12px 0 12px' }}>
+                          <div style={{
+                            height: 145,
+                            position: 'relative',
+                            borderRadius: 18,
+                            overflow: 'hidden',
+                            background: '#0F172A',
+                            boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+                          }}>
+                            <img
+                              src={customThumb}
+                              alt={playlist.name}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                transition: 'transform 0.3s ease',
+                              }}
+                            />
+                            <div style={{
+                              position: 'absolute',
+                              inset: 0,
+                              background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.05) 50%, rgba(15, 23, 42, 0.65) 100%)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              padding: '12px 14px',
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{
+                                  fontSize: 11,
+                                  fontWeight: 750,
+                                  background: 'rgba(255, 255, 255, 0.88)',
+                                  backdropFilter: 'blur(10px)',
+                                  WebkitBackdropFilter: 'blur(10px)',
+                                  color: '#0F172A',
+                                  padding: '4px 12px',
+                                  borderRadius: 999,
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                }}>
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: theme.accent }} />
+                                  {playlist.course_name || 'Curriculum Track'}
+                                </span>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{
+                                    fontSize: 11,
+                                    fontWeight: 800,
+                                    background: isAll ? 'rgba(16, 185, 129, 0.9)' : 'rgba(124, 58, 237, 0.9)',
+                                    backdropFilter: 'blur(8px)',
+                                    color: '#FFFFFF',
+                                    padding: '4px 10px',
+                                    borderRadius: 999,
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                                  }}>
+                                    {isAll ? '🌐 All' : `🔒 ${playlist.batch_name || 'Cohort'}`}
+                                  </span>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingPlaylist(playlist);
+                                      setPlaylistFormName(playlist.name || '');
+                                      setPlaylistFormCourse(playlist.course_name || '');
+                                      setPlaylistFormDescription(playlist.description || '');
+                                      setPlaylistFormThumbnail(playlist.thumbnail || '');
+                                      setPlaylistThumbnailType(playlist.thumbnail ? 'url' : 'url');
+                                      setPlaylistFormAccess(playlist.access_type || 'all');
+                                      setPlaylistFormBatchId(playlist.batch_id || '');
+                                      setShowPlaylistModal(true);
+                                    }}
+                                    style={{
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: '50%',
+                                      background: 'rgba(255, 255, 255, 0.88)',
+                                      backdropFilter: 'blur(6px)',
+                                      border: 'none',
+                                      color: '#1E293B',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                                    }}
+                                    title="Edit Playlist"
+                                  >
+                                    <Pencil size={12} />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePlaylist(plId);
+                                    }}
+                                    style={{
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: '50%',
+                                      background: '#EF4444',
+                                      border: 'none',
+                                      color: '#FFFFFF',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                                    }}
+                                    title="Delete Playlist"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: 10,
+                                  background: '#FFFFFF',
+                                  boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                  overflow: 'hidden',
+                                }}>
+                                  <img
+                                    src={customThumb}
+                                    alt=""
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                  />
+                                </div>
+                                <h5 style={{
+                                  fontSize: '16px',
+                                  fontWeight: '800',
+                                  margin: 0,
+                                  color: '#FFFFFF',
+                                  textShadow: '0 2px 6px rgba(0,0,0,0.7)',
+                                  letterSpacing: '-0.2px',
+                                  lineHeight: 1.2,
+                                }}>
+                                  {playlist.name}
+                                </h5>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12.5px', color: '#475569' }}>
+                              <span style={{ fontWeight: 600 }}>Access:</span>
+                              <strong style={{ color: '#0F172A', fontWeight: 750 }}>{isAll ? 'All Portal Trainees' : (playlist.batch_name || 'Cohort')}</strong>
+                            </div>
+                          </div>
+
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: 10,
+                            background: 'rgba(255, 255, 255, 0.75)',
+                            backdropFilter: 'blur(10px)',
+                            WebkitBackdropFilter: 'blur(10px)',
+                            border: '1px solid rgba(255, 255, 255, 0.9)',
+                            padding: '10px 14px',
+                            borderRadius: 14,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                          }}>
+                            <div>
+                              <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Videos</div>
+                              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginTop: 1 }}>
+                                {plRecordings.length} Lessons
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Duration</div>
+                              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginTop: 1 }}>
+                                {formatSecondsToDisplay(plDurationSec)}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 4 }}>
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={() => {
+                                setSelectedBatchId(`playlist:${plId}`);
+                                if (playlist.course_name) setRecCourseTitle(playlist.course_name);
+                                setShowRecordedClassModal(true);
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '9px 12px',
+                                fontSize: '12px',
+                                borderRadius: 999,
+                                fontWeight: 750,
+                                background: 'rgba(255, 255, 255, 0.85)',
+                                border: '1px solid rgba(203, 213, 225, 0.8)',
+                                color: '#1E293B',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 5,
+                              }}
+                            >
+                              <Plus size={13} /> Add Video
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              onClick={() => setSelectedPlaylistBatch({ ...playlist, isCustom: true })}
+                              style={{
+                                flex: 1.3,
+                                padding: '9px 14px',
+                                fontSize: '12px',
+                                borderRadius: 999,
+                                fontWeight: 750,
+                                background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <span>Open Playlist</span>
+                              <ArrowRight size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* LEVEL 2: DRILL-DOWN VIDEOS WITH TOPICS INSIDE SELECTED PLAYLIST */
+              <div className="dashboard-card-section" style={{ display: 'flex', flexDirection: 'column', minHeight: '500px', width: '100%', gap: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, borderBottom: '1.5px solid #F1F5F9', paddingBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPlaylistBatch(null)}
+                      style={{
+                        background: '#F1F5F9',
+                        border: 'none',
+                        borderRadius: 999,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: '#334155',
+                      }}
+                    >
+                      <ArrowLeft size={15} />
+                      Back to All Playlists
+                    </button>
+                    <div>
+                      <h4 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 2px', color: '#1E293B' }}>
+                        {selectedPlaylistBatch.name}
+                      </h4>
+                      <span style={{ fontSize: '12.5px', color: '#64748B' }}>
+                        {selectedPlaylistBatch.course_name || 'Course Curriculum'} • {selectedPlaylistBatch.isCustom ? 'Custom Playlist' : 'Batch Cohort'}
+                      </span>
                     </div>
                   </div>
-                );
-              })}
-              {filteredRecordedClasses.length === 0 && (
-                <div style={{ gridColumn: '1 / -1', padding: 40, textAlign: 'center', background: '#FFF', borderRadius: 16, border: '1px solid var(--border-color)' }}>
-                  <PlayCircle size={48} color="var(--primary-color)" style={{ margin: '0 auto 12px' }} />
-                  <h3 style={{ margin: 0, fontWeight: 800 }}>No Recorded Lessons Yet</h3>
-                  <p style={{ color: 'var(--text-secondary)', margin: '6px 0 16px' }}>Attach lecture videos to batches for student self-paced study.</p>
-                  <button className="btn btn-primary" onClick={() => setShowRecordedModal(true)}>Add Recorded Lesson</button>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    {selectedPlaylistBatch.isCustom && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingPlaylist(selectedPlaylistBatch);
+                            setPlaylistFormName(selectedPlaylistBatch.name || '');
+                            setPlaylistFormCourse(selectedPlaylistBatch.course_name || '');
+                            setPlaylistFormDescription(selectedPlaylistBatch.description || '');
+                            setPlaylistFormThumbnail(selectedPlaylistBatch.thumbnail || '');
+                            setPlaylistThumbnailType(selectedPlaylistBatch.thumbnail ? 'url' : 'url');
+                            setPlaylistFormAccess(selectedPlaylistBatch.access_type || 'all');
+                            setPlaylistFormBatchId(selectedPlaylistBatch.batch_id || '');
+                            setShowPlaylistModal(true);
+                          }}
+                          className="btn btn-outline"
+                          style={{ borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: '13px' }}
+                        >
+                          <Pencil size={14} /> Edit Playlist
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePlaylist(selectedPlaylistBatch.id || selectedPlaylistBatch.uid)}
+                          style={{
+                            background: '#FEE2E2',
+                            color: '#DC2626',
+                            border: '1px solid #FECACA',
+                            borderRadius: 999,
+                            padding: '8px 16px',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <Trash2 size={14} /> Delete Playlist
+                        </button>
+                      </>
+                    )}
+
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => {
+                        const targetVal = selectedPlaylistBatch.isCustom ? `playlist:${selectedPlaylistBatch.id}` : `batch:${selectedPlaylistBatch.id}`;
+                        setSelectedBatchId(targetVal);
+                        if (selectedPlaylistBatch.course_name) setRecCourseTitle(selectedPlaylistBatch.course_name);
+                        setShowRecordedClassModal(true);
+                      }}
+                      style={{ borderRadius: 999, padding: '8px 18px', fontWeight: 700 }}
+                    >
+                      <Plus size={15} /> Add Lesson to this Playlist
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
+
+                {/* Filter and List for this Playlist */}
+                {(() => {
+                  const targetId = String(selectedPlaylistBatch.id || selectedPlaylistBatch.uid);
+                  const isCustom = selectedPlaylistBatch.isCustom;
+                  const playlistLessons = (recordedClasses || []).filter(r => {
+                    if (isCustom) {
+                      return String(r.playlist_id) === targetId || String(r.batch_id) === targetId;
+                    }
+                    return String(r.batch_id || r.batchId) === targetId || String(r.playlist_id) === targetId;
+                  });
+
+                  const playlistTotalDuration = playlistLessons.reduce((acc, r) => acc + parseDurationToSeconds(r.duration), 0);
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', background: '#F8FAFC', padding: '12px 18px', borderRadius: 14, fontSize: '13px' }}>
+                        <span style={{ fontWeight: 700, color: '#1E293B' }}>
+                          Playlist Overview:
+                        </span>
+                        <span style={{ background: '#FFFFFF', padding: '4px 10px', borderRadius: 8, border: '1px solid #E2E8F0', fontWeight: 650, color: '#334155' }}>
+                          📚 {playlistLessons.length} Lessons Total
+                        </span>
+                        <span style={{ background: '#FFFFFF', padding: '4px 10px', borderRadius: 8, border: '1px solid #E2E8F0', fontWeight: 650, color: '#334155' }}>
+                          ⏱ {formatSecondsToDisplay(playlistTotalDuration)} Total Duration
+                        </span>
+                        {playlistLessons.length > 0 && (
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{
+                              marginLeft: 'auto',
+                              borderRadius: 999,
+                              padding: '6px 16px',
+                              fontSize: 12.5,
+                              fontWeight: 750,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                            }}
+                            onClick={() => setPreviewRecordedClass(playlistLessons[0])}
+                          >
+                            <PlayCircle size={14} />
+                            <span>Open Course Player</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {playlistLessons.length === 0 ? (
+                        <div style={{ padding: '60px 20px', textAlign: 'center', background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0' }}>
+                          <PlayCircle size={44} color="#94A3B8" style={{ margin: '0 auto 12px', opacity: 0.6 }} />
+                          <h5 style={{ fontSize: '16px', fontWeight: '800', color: '#1E293B', margin: '0 0 6px' }}>No Lessons in this Playlist Yet</h5>
+                          <p style={{ fontSize: '13px', color: '#64748B', maxWidth: 360, margin: '0 auto 16px' }}>
+                            Upload Google Drive video links to populate this playlist with topics and recordings.
+                          </p>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => {
+                              const targetVal = selectedPlaylistBatch.isCustom ? `playlist:${selectedPlaylistBatch.id}` : `batch:${selectedPlaylistBatch.id}`;
+                              setSelectedBatchId(targetVal);
+                              if (selectedPlaylistBatch.course_name) setRecCourseTitle(selectedPlaylistBatch.course_name);
+                              setShowRecordedClassModal(true);
+                            }}
+                            style={{ borderRadius: 999 }}
+                          >
+                            <Plus size={14} /> Upload First Lesson
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {playlistLessons.map((item, idx) => (
+                            <div key={item.id || idx} style={{ background: '#FFFFFF', border: '1.5px solid #F1F5F9', borderRadius: 14, padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                              <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--primary-light)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, flexShrink: 0 }}>
+                                  {item.sort_order || idx + 1}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                                    <div>
+                                      <h5 style={{ fontWeight: '800', fontSize: '15px', margin: '0 0 4px', color: '#1E293B' }}>{item.title}</h5>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: '12px', color: '#64748B' }}>
+                                        <span style={{ fontWeight: 700, color: 'var(--primary-color)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: 6 }}>
+                                          Topic: {item.module || 'Core Curriculum'}
+                                        </span>
+                                        <span>·</span>
+                                        <span>⏱ Duration: <strong style={{ color: '#334155' }}>{item.duration || '1h 30m'}</strong></span>
+                                        <span>·</span>
+                                        <span>{item.course_title || selectedPlaylistBatch.course_name}</span>
+                                      </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                                      <button 
+                                        type="button"
+                                        className="btn btn-outline" 
+                                        style={{ padding: '5px 14px', fontSize: 12, height: '32px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', color: 'var(--primary-color)', borderColor: 'var(--primary-color)', backgroundColor: 'var(--primary-light)', gap: 5 }}
+                                        onClick={() => setPreviewRecordedClass(item)}
+                                        title="Preview Video in Portal"
+                                      >
+                                        <PlayCircle size={14} />
+                                        Watch
+                                      </button>
+                                      <button 
+                                        type="button"
+                                        className="btn btn-outline" 
+                                        style={{ padding: '5px 14px', fontSize: 12, height: '32px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: '600', color: '#1E293B', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' }}
+                                        onClick={() => {
+                                          setEditingRecordedClass(item);
+                                          setRecTitle(item.title || '');
+                                          setRecModule(item.module || '');
+                                          setRecCourseTitle(item.course_title || '');
+                                          setRecVideoUrl(item.video_url || '');
+                                          setRecThumbnailUrl(item.thumbnail || '');
+                                          setRecLessonDescription(item.description || '');
+                                          setRecNotesUrl(item.notes_url || '');
+                                          setRecAssignment(item.assignment || '');
+                                          setRecVisibility(item.visibility || 'everyone');
+                                          setRecSortOrder(item.sort_order?.toString() || '');
+                                          setSelectedBatchId(item.playlist_id ? `playlist:${item.playlist_id}` : (item.batch_id ? `batch:${item.batch_id}` : ''));
+                                          setRecDuration(item.duration || '1h 30m');
+                                          setVideoSourceType(item.video_source_type || 'link');
+                                          setRecStudyMaterials(item.study_materials || []);
+                                          setShowRecordedClassModal(true);
+                                        }}
+                                      >
+                                        Edit
+                                      </button>
+                                      <button 
+                                        type="button" 
+                                        className="btn btn-danger" 
+                                        style={{ width: '32px', height: '32px', padding: 0, borderRadius: '50%', backgroundColor: '#EF4444', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 'none' }} 
+                                        onClick={() => handleDeleteRecordedClass(item.id || item.uid || item._id)}
+                                        title="Delete Recording"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         )}
 
@@ -3280,59 +4388,572 @@ const TrainerDashboard = () => {
         </CustomModal>
       )}
 
-      {/* ─── MODAL 6: ADD RECORDED LESSON ──────────────────────────────────── */}
-      {showRecordedModal && (
-        <CustomModal isOpen={showRecordedModal} onClose={() => setShowRecordedModal(false)} title="Upload / Add Recorded Class">
-          <form onSubmit={handleAddRecordedClass} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div>
-              <label className="form-label">Lecture Title *</label>
-              <input type="text" className="form-input" value={recTitle} onChange={e => setRecTitle(e.target.value)} placeholder="e.g. Masterclass: Neural Networks from Scratch" required />
-            </div>
-
-            <div>
-              <label className="form-label">Video URL (Google Drive, YouTube or Direct MP4) *</label>
-              <input type="url" className="form-input" value={recVideoUrl} onChange={e => setRecVideoUrl(e.target.value)} placeholder="https://drive.google.com/... or https://youtube.com/..." required />
-              {getYouTubeVideoId(recVideoUrl) && (
-                <div style={{ marginTop: 6, fontSize: 12, color: '#991B1B', background: '#FEF2F2', padding: '6px 10px', borderRadius: 6, border: '1px solid #FECACA' }}>
-                  ✓ <strong>YouTube Detected (ID: {getYouTubeVideoId(recVideoUrl)}):</strong> Dynamic playback active. <em>(Set to Unlisted or Public on YouTube)</em>
-                </div>
-              )}
-              {getGoogleDriveFileId(recVideoUrl) && (
-                <div style={{ marginTop: 6, fontSize: 12, color: '#065F46', background: '#ECFDF5', padding: '6px 10px', borderRadius: 6, border: '1px solid #A7F3D0' }}>
-                  ✓ <strong>Google Drive Verified (ID: {getGoogleDriveFileId(recVideoUrl)}):</strong> Anti-download DRM protection active.
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label className="form-label">Module / Topic</label>
-                <input type="text" className="form-input" value={recModule} onChange={e => setRecModule(e.target.value)} />
-              </div>
-              <div>
-                <label className="form-label">Duration</label>
-                <input type="text" className="form-input" value={recDuration} onChange={e => setRecDuration(e.target.value)} placeholder="1h 30m" />
-              </div>
-            </div>
-
-            <div>
-              <label className="form-label">Attach to Batch</label>
-              <select className="form-select" value={recBatchId} onChange={e => setRecBatchId(e.target.value)}>
-                <option value="common">Common Playlist (All Batches)</option>
-                {batches.map(b => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
-              <button type="button" className="btn btn-outline" onClick={() => setShowRecordedModal(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={savingRecorded}>
-                <Save size={14} /> {savingRecorded ? 'Saving...' : 'Add Recorded Class'}
+      {/* ─── MODAL 6: CUSTOM PLAYLIST MODAL ─────────────────────────────── */}
+      {showPlaylistModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: 540 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">
+                {editingPlaylist ? 'Edit Custom Playlist' : 'Create Custom Playlist'}
+              </h3>
+              <button 
+                className="modal-close-red" 
+                onClick={() => {
+                  setShowPlaylistModal(false);
+                  setEditingPlaylist(null);
+                  setPlaylistFormName('');
+                  setPlaylistFormCourse('');
+                  setPlaylistFormDescription('');
+                  setPlaylistFormAccess('all');
+                  setPlaylistFormBatchId('');
+                }} 
+                aria-label="Close modal"
+              >
+                <X size={18} />
               </button>
             </div>
-          </form>
-        </CustomModal>
+            <form onSubmit={handleSavePlaylist}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="form-group">
+                  <label className="form-label">Playlist Name *</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={playlistFormName}
+                    onChange={(e) => setPlaylistFormName(e.target.value)}
+                    placeholder="e.g. Interview Preparation & Mock Interviews"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Course / Category Name</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={playlistFormCourse}
+                    onChange={(e) => setPlaylistFormCourse(e.target.value)}
+                    placeholder="e.g. Career & Placements, Fullstack Engineering"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Playlist Description</label>
+                  <textarea
+                    className="form-input"
+                    rows="3"
+                    value={playlistFormDescription}
+                    onChange={(e) => setPlaylistFormDescription(e.target.value)}
+                    placeholder="Describe what students will learn in this custom playlist..."
+                  />
+                </div>
+
+                <div className="form-group">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <label className="form-label" style={{ margin: 0 }}>Playlist Thumbnail (Cover Banner)</label>
+                    <span style={{ fontSize: 11, color: '#64748B' }}>Shown with transparent overlay</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 16, marginBottom: 8, marginTop: 4 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="playlistThumbType"
+                        value="url"
+                        checked={playlistThumbnailType === 'url'}
+                        onChange={() => setPlaylistThumbnailType('url')}
+                      />
+                      <span>Image URL / Link</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="playlistThumbType"
+                        value="upload"
+                        checked={playlistThumbnailType === 'upload'}
+                        onChange={() => setPlaylistThumbnailType('upload')}
+                      />
+                      <span>Upload Image File</span>
+                    </label>
+                  </div>
+
+                  {playlistThumbnailType === 'url' ? (
+                    <input
+                      type="url"
+                      className="form-input"
+                      value={playlistFormThumbnail}
+                      onChange={(e) => setPlaylistFormThumbnail(e.target.value)}
+                      placeholder="https://images.unsplash.com/... or image link"
+                    />
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="form-input"
+                        onChange={async (e) => {
+                          const file = e.target.files[0];
+                          if (!file) return;
+                          try {
+                            setPlaylistUploadingThumb(true);
+                            const res = await uploadUniversalFile(file, 'playlists');
+                            if (res && res.url) setPlaylistFormThumbnail(res.url);
+                          } catch (err) {
+                            showToast(err.message);
+                          } finally {
+                            setPlaylistUploadingThumb(false);
+                          }
+                        }}
+                      />
+                      {playlistUploadingThumb && (
+                        <span style={{ fontSize: 12, color: 'var(--primary-color)', fontWeight: 600 }}>
+                          Uploading thumbnail to local storage...
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {playlistFormThumbnail && (
+                    <div style={{
+                      marginTop: 10,
+                      borderRadius: 16,
+                      overflow: 'hidden',
+                      position: 'relative',
+                      height: 110,
+                      background: `linear-gradient(180deg, rgba(15, 23, 42, 0.25) 0%, rgba(15, 23, 42, 0.88) 100%), url(${playlistFormThumbnail}) center / cover no-repeat`,
+                      border: '1px solid rgba(226, 232, 240, 0.8)',
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      color: '#FFFFFF',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          background: 'rgba(255, 255, 255, 0.25)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          padding: '3px 9px',
+                          borderRadius: 999,
+                          letterSpacing: '0.4px',
+                          textTransform: 'uppercase',
+                        }}>
+                          Transparent Cover Preview
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setPlaylistFormThumbnail('')}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.85)',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: 999,
+                            padding: '3px 9px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.6)' }}>
+                          {playlistFormName || 'Your Playlist Title'}
+                        </div>
+                        <div style={{ fontSize: 11.5, opacity: 0.9, marginTop: 1 }}>
+                          {playlistFormCourse || 'Curriculum Track'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Audience & Access Level</label>
+                  <div style={{ display: 'flex', gap: 16, marginTop: 4 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="playlistAccess"
+                        value="all"
+                        checked={playlistFormAccess === 'all'}
+                        onChange={() => setPlaylistFormAccess('all')}
+                      />
+                      <span>🌐 All Students (Portal-Wide Access)</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="playlistAccess"
+                        value="batch"
+                        checked={playlistFormAccess === 'batch'}
+                        onChange={() => setPlaylistFormAccess('batch')}
+                      />
+                      <span>Cohort / Specific Batch</span>
+                    </label>
+                  </div>
+                </div>
+
+                {playlistFormAccess === 'batch' && (
+                  <div className="form-group">
+                    <label className="form-label">Select Target Batch *</label>
+                    <select
+                      className="form-select"
+                      value={playlistFormBatchId}
+                      onChange={(e) => setPlaylistFormBatchId(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Choose Batch --</option>
+                      {batches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name} ({b.course_name || b.code})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 14, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowPlaylistModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                >
+                  <Save size={14} /> {editingPlaylist ? 'Save Changes' : 'Create Playlist'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL 6B: FULL LMS LESSON UPLOAD & EDIT MODAL ─────────────────── */}
+      {showRecordedClassModal && (
+        <div className="modal-overlay">
+          <div className="modal-content modal-lg">
+            <div className="modal-header">
+              <h3 className="modal-title">
+                {editingRecordedClass ? 'Edit Lesson' : 'Upload New Lesson'}
+              </h3>
+              <button className="modal-close-red" onClick={() => {
+                setShowRecordedClassModal(false);
+                setEditingRecordedClass(null);
+                setRecTitle(''); setRecModule('Module 1 - Python Basics'); setRecVideoUrl(''); setRecThumbnailUrl(''); setRecLessonDescription(''); setRecNotesUrl(''); setRecAssignment(''); setRecVisibility('everyone'); setRecSortOrder(''); setRecDuration('1h 30m'); setVideoSourceType('link'); setRecStudyMaterials([]);
+              }} aria-label="Close modal"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleSaveRecordedClass}>
+              <div className="modal-body">
+                <div className="modal-form-grid">
+                  <div className="form-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <label className="form-label" htmlFor="recBatchSelect" style={{ margin: 0 }}>Target Playlist / Batch *</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowPlaylistModal(true)}
+                        style={{ background: 'none', border: 'none', color: 'var(--primary-color)', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                      >
+                        + New Playlist
+                      </button>
+                    </div>
+                    <select 
+                      id="recBatchSelect" 
+                      className="form-select" 
+                      value={selectedBatchId} 
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedBatchId(val);
+                        if (val.startsWith('playlist:')) {
+                          const plId = val.replace('playlist:', '');
+                          const plObj = customPlaylists.find(p => p.id === plId || p.uid === plId);
+                          if (plObj && plObj.course_name) setRecCourseTitle(plObj.course_name);
+                        } else {
+                          const rawBId = val.replace('batch:', '');
+                          const foundB = batches.find(b => b.id === rawBId || b.uid === rawBId);
+                          if (foundB && foundB.course_name) {
+                            setRecCourseTitle(foundB.course_name);
+                          }
+                        }
+                      }} 
+                      required
+                    >
+                      <option value="">-- Choose Target Playlist --</option>
+                      <optgroup label="Automatic Batch Playlists">
+                        {batches.map(b => (
+                          <option key={b.id} value={`batch:${b.id}`}>Batch: {b.name} ({b.course_name || b.code})</option>
+                        ))}
+                      </optgroup>
+                      {customPlaylists.length > 0 && (
+                        <optgroup label="Custom / Manual Playlists">
+                          {customPlaylists.map(p => (
+                            <option key={p.id} value={`playlist:${p.id}`}>Playlist: {p.name} ({p.course_name || 'General'})</option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="recCourseTitle">Course Name</label>
+                    <input id="recCourseTitle" type="text" className="form-input" value={recCourseTitle} onChange={(e) => setRecCourseTitle(e.target.value)} placeholder="e.g. Python Full Stack" required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="recModule">Module Section</label>
+                    <input id="recModule" type="text" className="form-input" value={recModule} onChange={(e) => setRecModule(e.target.value)} placeholder="e.g. Module 1 - Python Basics" required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="recTitle">Lesson Title</label>
+                    <input id="recTitle" type="text" className="form-input" value={recTitle} onChange={(e) => setRecTitle(e.target.value)} placeholder="e.g. Variables & Data Types" required />
+                  </div>
+
+                  {/* Video Source Type */}
+                  <div className="form-group grid-col-span-2">
+                    <label className="form-label">Video Source</label>
+                    <div style={{ display: 'flex', gap: '16px', marginTop: '6px', marginBottom: '8px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                        <input type="radio" name="videoSourceType" value="link" checked={videoSourceType === 'link'} onChange={() => setVideoSourceType('link')} />
+                        Google Drive Link / External Link
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                        <input type="radio" name="videoSourceType" value="upload" checked={videoSourceType === 'upload'} onChange={() => setVideoSourceType('upload')} />
+                        Upload Video File
+                      </label>
+                    </div>
+
+                    {videoSourceType === 'link' ? (
+                      <div>
+                        <input 
+                          id="recVideoUrl" 
+                          type="url" 
+                          className="form-input" 
+                          value={recVideoUrl} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setRecVideoUrl(val);
+                            if (!recThumbnailUrl) {
+                              const autoThumb = getResolvedThumbnail(val, '');
+                              if (autoThumb && !autoThumb.includes('unsplash')) {
+                                setRecThumbnailUrl(autoThumb);
+                              }
+                            }
+                          }} 
+                          placeholder="Paste YouTube Link (Public/Unlisted) or Google Drive Link or MP4 URL" 
+                          required
+                        />
+                        {/* Dynamic Verification Banners */}
+                        {getYouTubeVideoId(recVideoUrl) && (
+                          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 12, color: '#991B1B', background: '#FEF2F2', padding: '8px 12px', borderRadius: 8, border: '1px solid #FECACA' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <Video size={16} color="#DC2626" />
+                              <span>
+                                <strong>YouTube Video Detected (ID: {getYouTubeVideoId(recVideoUrl)}):</strong> Dynamic playback & HD thumbnail ready. <span style={{ opacity: 0.9 }}>(For privacy, set video to <strong>Unlisted</strong> in YouTube Studio)</span>
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowModalVideoPreview(!showModalVideoPreview)}
+                              style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                            >
+                              <PlayCircle size={13} />
+                              {showModalVideoPreview ? 'Hide Preview' : 'Test Preview'}
+                            </button>
+                          </div>
+                        )}
+                        {getGoogleDriveFileId(recVideoUrl) && (
+                          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 12, color: '#065F46', background: '#ECFDF5', padding: '8px 12px', borderRadius: 8, border: '1px solid #A7F3D0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <CheckCircle size={16} color="#059669" />
+                              <span>
+                                <strong>Google Drive Verified (ID: {getGoogleDriveFileId(recVideoUrl)}):</strong> Protected stream active with anti-download DRM shield. <span style={{ opacity: 0.9 }}>(Ensure file sharing is 'Anyone with link can view')</span>
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowModalVideoPreview(!showModalVideoPreview)}
+                              style={{ background: '#059669', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                            >
+                              <PlayCircle size={13} />
+                              {showModalVideoPreview ? 'Hide Preview' : 'Test Preview'}
+                            </button>
+                          </div>
+                        )}
+                        {recVideoUrl && !getYouTubeVideoId(recVideoUrl) && !getGoogleDriveFileId(recVideoUrl) && (
+                          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 12, color: '#1E40AF', background: '#EFF6FF', padding: '8px 12px', borderRadius: 8, border: '1px solid #BFDBFE' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <Globe size={16} color="#2563EB" />
+                              <span><strong>Web Video / Direct Stream Link:</strong> Will play directly in player.</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowModalVideoPreview(!showModalVideoPreview)}
+                              style={{ background: '#2563EB', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                            >
+                              <PlayCircle size={13} />
+                              {showModalVideoPreview ? 'Hide Preview' : 'Test Preview'}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Inline Test Video Player */}
+                        {showModalVideoPreview && recVideoUrl && (
+                          <div style={{ marginTop: 12, borderRadius: 12, overflow: 'hidden', border: '2px solid #E2E8F0', height: 260, background: '#000' }}>
+                            <SecureVideoPlayer
+                              videoUrl={recVideoUrl}
+                              title={recTitle || 'Preview Lesson'}
+                              watermarkText="Levlox Instructor Test"
+                              autoPlay={true}
+                              height="260px"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <input 
+                          type="file" 
+                          accept="video/*" 
+                          className="form-input" 
+                          onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            setUploadingVideo(true);
+                            try {
+                              const res = await uploadUniversalFile(file, 'recorded-classes');
+                              if (res && res.url) {
+                                setRecVideoUrl(res.url);
+                              }
+                            } catch (err) {
+                              showToast(err.message || 'Video upload failed');
+                            } finally {
+                              setUploadingVideo(false);
+                            }
+                          }} 
+                        />
+                        {uploadingVideo && <span style={{ fontSize: 12, color: 'var(--primary-color)' }}>Uploading video file... Please wait.</span>}
+                        {recVideoUrl && !uploadingVideo && (
+                          <span style={{ fontSize: 11, color: '#059669', wordBreak: 'break-all' }}>✓ Video ready: {recVideoUrl}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="recThumbnailUrl">Thumbnail Image URL</label>
+                    <input 
+                      id="recThumbnailUrl" 
+                      type="url" 
+                      className="form-input" 
+                      value={recThumbnailUrl} 
+                      onChange={(e) => setRecThumbnailUrl(e.target.value)} 
+                      placeholder="Custom thumbnail URL (optional, auto-generated if blank)" 
+                    />
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                      Leave empty to auto-use Google Drive / YouTube video thumbnail
+                    </span>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="recDuration">Duration</label>
+                    <input id="recDuration" type="text" className="form-input" value={recDuration} onChange={(e) => setRecDuration(e.target.value)} placeholder="e.g. 1h 15m" />
+                  </div>
+
+                  <div className="form-group grid-col-span-2">
+                    <label className="form-label" htmlFor="recLessonDescription">Lesson Description</label>
+                    <textarea id="recLessonDescription" className="form-input" style={{ height: 60, resize: 'none' }} value={recLessonDescription} onChange={(e) => setRecLessonDescription(e.target.value)} placeholder="Brief overview of what students will learn..." />
+                  </div>
+
+                  {/* Multiple Study Materials Manager */}
+                  <div className="form-group grid-col-span-2" style={{ background: 'var(--bg-secondary)', padding: 14, borderRadius: 12, border: '1px solid var(--border-color)' }}>
+                    <label className="form-label" style={{ fontWeight: 800 }}>Study Materials Manager</label>
+                    {recStudyMaterials.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, marginTop: 6 }}>
+                        {recStudyMaterials.map((mat, index) => (
+                          <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-light)' }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
+                              📄 {mat.name} ({mat.type?.toUpperCase()})
+                            </span>
+                            <button 
+                              type="button" 
+                              style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
+                              onClick={() => setRecStudyMaterials(prev => prev.filter((_, i) => i !== index))}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <input 
+                        type="file" 
+                        id="recMaterialFile" 
+                        style={{ display: 'none' }} 
+                        onChange={async (e) => {
+                          const file = e.target.files[0];
+                          if (!file) return;
+                          try {
+                            const res = await uploadUniversalFile(file, 'study-materials');
+                            if (res && res.url) {
+                              setRecStudyMaterials(prev => [
+                                ...prev,
+                                {
+                                  name: res.originalName || file.name,
+                                  url: res.url,
+                                  type: res.fileType || 'pdf',
+                                  size: res.sizeDisplay || '1.2 MB'
+                                }
+                              ]);
+                              showToast('Study material attached ✓');
+                            }
+                          } catch (err) {
+                            showToast('Material upload failed: ' + err.message);
+                          }
+                          e.target.value = '';
+                        }} 
+                      />
+                      <button 
+                        type="button" 
+                        className="btn btn-outline" 
+                        style={{ fontSize: 12, padding: '6px 14px', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                        onClick={() => document.getElementById('recMaterialFile').click()}
+                      >
+                        <UploadCloud size={14} /> Attach PDF / Resource File
+                      </button>
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>PDF, slides, source code archives, datasets</span>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="recVisibility">Audience Access</label>
+                    <select id="recVisibility" className="form-select" value={recVisibility} onChange={(e) => setRecVisibility(e.target.value)}>
+                      <option value="everyone">Everyone (Open Access)</option>
+                      <option value="paid">Paid Students Only (VIP Protected)</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="recSortOrder">Curriculum Order #</label>
+                    <input id="recSortOrder" type="number" className="form-input" value={recSortOrder} onChange={(e) => setRecSortOrder(e.target.value)} placeholder="e.g. 1, 2, 3..." />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => {
+                  setShowRecordedClassModal(false);
+                  setEditingRecordedClass(null);
+                }}>Cancel</button>
+                <button type="submit" className="btn btn-primary">
+                  <Save size={14} /> {editingRecordedClass ? 'Update Lesson' : 'Upload Lesson'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* ─── MODAL 7: BROADCAST ANNOUNCEMENT ───────────────────────────────── */}
@@ -3385,18 +5006,31 @@ const TrainerDashboard = () => {
         </CustomModal>
       )}
 
-      {/* ─── MODAL 8: SECURE VIDEO PLAYER PREVIEW ──────────────────────────── */}
-      {previewVideo && (
-        <CustomModal isOpen={!!previewVideo} onClose={() => setPreviewVideo(null)} title={previewVideo.title || 'Video Player'}>
-          <div style={{ width: '100%', borderRadius: 12, overflow: 'hidden' }}>
-            <SecureVideoPlayer
-              videoUrl={previewVideo.video_url || previewVideo.videoUrl}
-              title={previewVideo.title}
-              onClose={() => setPreviewVideo(null)}
-            />
-          </div>
-        </CustomModal>
-      )}
+      {/* ─── FULL COURSE ACADEMIA VIEWER PLAYER MODAL ────────────────────── */}
+      {previewRecordedClass && (() => {
+        const targetId = String(selectedPlaylistBatch?.id || previewRecordedClass.playlist_id || previewRecordedClass.batch_id || 'preview_playlist');
+        const isCustom = selectedPlaylistBatch?.isCustom;
+        const currentLessons = (selectedPlaylistBatch)
+          ? (recordedClasses || []).filter(r => isCustom ? (String(r.playlist_id) === targetId || String(r.batch_id) === targetId) : (String(r.batch_id || r.batchId) === targetId || String(r.playlist_id) === targetId))
+          : (recordedClasses || []).filter(r => String(r.playlist_id || r.batch_id) === targetId);
+
+        const playerPlaylist = {
+          id: targetId,
+          name: selectedPlaylistBatch?.name || previewRecordedClass.course_title || 'Course Recordings',
+          title: selectedPlaylistBatch?.name || previewRecordedClass.title,
+          course_name: previewRecordedClass.course_title || selectedPlaylistBatch?.course_name,
+          description: selectedPlaylistBatch?.description || previewRecordedClass.description || '',
+          lessons: currentLessons.length > 0 ? currentLessons : [previewRecordedClass],
+          study_materials: selectedPlaylistBatch?.study_materials || previewRecordedClass?.study_materials || []
+        };
+        return (
+          <AcademiaCourseViewer
+            playlist={playerPlaylist}
+            onClose={() => setPreviewRecordedClass(null)}
+            initialLessonId={previewRecordedClass.id}
+          />
+        );
+      })()}
     </div>
   );
 };
