@@ -602,8 +602,17 @@ const AdminDashboard = () => {
     }
     if (statusVal) filtered = filtered.filter(s => s.status === statusVal);
     if (feesVal) filtered = filtered.filter(s => s.feesStatus === feesVal);
-    if (courseVal) filtered = filtered.filter(s => s.course === courseVal);
-    if (batchVal) filtered = filtered.filter(s => s.batch_id === batchVal);
+    if (courseVal) {
+      filtered = filtered.filter(s => 
+        String(s.course || s.course_name || '').toLowerCase() === String(courseVal).toLowerCase()
+      );
+    }
+    if (batchVal) {
+      filtered = filtered.filter(s => 
+        String(s.batch_id || s.batchId || '') === String(batchVal) || 
+        String(s.batch_name || s.batch || '') === String(batchVal)
+      );
+    }
     return filtered;
   }, [
     allStudents, activeTab, searchQuery, statusFilter, feesFilter, courseFilter, batchFilter,
@@ -679,6 +688,8 @@ const AdminDashboard = () => {
   const [isCustomCourse, setIsCustomCourse] = useState(false);
   const [customCourseName, setCustomCourseName] = useState('');
   const [createBatchId, setCreateBatchId] = useState('');
+  const [createTotalFee, setCreateTotalFee] = useState(20000);
+  const [createPaidAmount, setCreatePaidAmount] = useState(0);
   const [createTempPassword, setCreateTempPassword] = useState('');
   const [createDob, setCreateDob] = useState('');
   const [createGender, setCreateGender] = useState('');
@@ -717,7 +728,7 @@ const AdminDashboard = () => {
   const [trainerName, setTrainerName] = useState('');
   const [trainerEmail, setTrainerEmail] = useState('');
   const [trainerPhone, setTrainerPhone] = useState('');
-  const [trainerSpecialization, setTrainerSpecialization] = useState('');
+  const [trainerRole, setTrainerRole] = useState('Trainer');
   const [trainerStatus, setTrainerStatus] = useState('Active');
   const [showLiveClassModal, setShowLiveClassModal] = useState(false);
   const [adminUploadClass, setAdminUploadClass] = useState(null);
@@ -1679,10 +1690,12 @@ const AdminDashboard = () => {
   };
 
   const exportFeesToCSV = () => {
-    const headers = ['Roll Number', 'Name', 'Total Package', 'Paid Amount', 'Dues Outstanding', 'Ledger Status', 'Payment Date'];
+    const headers = ['Roll Number', 'Name', 'Batch', 'Course', 'Total Package', 'Paid Amount', 'Dues Outstanding', 'Ledger Status', 'Payment Date'];
     const rows = filteredStudentsForFees.map(s => [
       `"${s.rollNumber || ''}"`,
       `"${s.name || ''}"`,
+      `"${s.batch_name || s.batch || 'Not Assigned'}"`,
+      `"${s.course || s.course_name || '—'}"`,
       s.feesTotal || 20000,
       s.feesPaidAmount || 0,
       s.feesRemainingAmount ?? (s.feesTotal || 20000),
@@ -1694,17 +1707,19 @@ const AdminDashboard = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'fees_ledger_export.csv');
+    link.setAttribute('download', `fees_ledger_${feesBatchFilter || 'all_batches'}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const exportFeesToExcel = () => {
-    const headers = ['Roll Number', 'Name', 'Total Package', 'Paid Amount', 'Dues Outstanding', 'Ledger Status', 'Payment Date'];
+    const headers = ['Roll Number', 'Name', 'Batch', 'Course', 'Total Package', 'Paid Amount', 'Dues Outstanding', 'Ledger Status', 'Payment Date'];
     const rows = filteredStudentsForFees.map(s => [
       s.rollNumber || '',
       s.name || '',
+      s.batch_name || s.batch || 'Not Assigned',
+      s.course || s.course_name || '—',
       s.feesTotal || 20000,
       s.feesPaidAmount || 0,
       s.feesRemainingAmount ?? (s.feesTotal || 20000),
@@ -1716,7 +1731,7 @@ const AdminDashboard = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'fees_ledger_export.xls');
+    link.setAttribute('download', `fees_ledger_${feesBatchFilter || 'all_batches'}.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1728,40 +1743,73 @@ const AdminDashboard = () => {
     filteredStudentsForFees.forEach(s => {
       rowsHtml += `
         <tr>
-          <td>${s.rollNumber || ''}</td>
+          <td><strong>${s.rollNumber || ''}</strong></td>
           <td>${s.name || ''}</td>
+          <td>${s.batch_name || s.batch || 'Not Assigned'}</td>
+          <td>${s.course || s.course_name || '—'}</td>
           <td>₹${s.feesTotal || 20000}</td>
-          <td>₹${s.feesPaidAmount || 0}</td>
-          <td>₹${s.feesRemainingAmount ?? (s.feesTotal || 20000)}</td>
+          <td style="color:#10B981;font-weight:bold;">₹${s.feesPaidAmount || 0}</td>
+          <td style="color:#EF4444;font-weight:bold;">₹${s.feesRemainingAmount ?? (s.feesTotal || 20000)}</td>
           <td>${s.feesStatus || 'Pending'}</td>
           <td>${s.feesPaymentDate || 'N/A'}</td>
         </tr>
       `;
     });
+
+    const batchTitle = selectedFeesBatchObj ? `Batch: ${selectedFeesBatchObj.name}` : 'All Batches (Institute Ledger)';
+
     printWindow.document.write(`
       <html>
         <head>
-          <title>Student Financial Ledger Report</title>
+          <title>${batchTitle} - Financial Report</title>
           <style>
-             body { font-family: sans-serif; padding: 20px; }
-             h1 { color: #6C3CF0; }
-             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-             th, td { border: 1px solid #E5E7EB; padding: 10px; text-align: left; }
-             th { background-color: #F9FAFB; font-weight: bold; }
+             body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; color: #1e293b; }
+             h1 { color: #4F46E5; margin-bottom: 4px; font-size: 22px; }
+             .meta { color: #64748b; font-size: 13px; margin-bottom: 18px; }
+             .kpi-grid { display: flex; gap: 12px; margin-bottom: 20px; }
+             .kpi-card { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; }
+             .kpi-title { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 4px; }
+             .kpi-value { font-size: 18px; font-weight: 800; }
+             table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+             th, td { border: 1px solid #E2E8F0; padding: 8px 10px; text-align: left; }
+             th { background-color: #F1F5F9; font-weight: 700; color: #334155; }
           </style>
         </head>
         <body>
-          <h1>Student Financial Ledger Report</h1>
+          <h1>${batchTitle}</h1>
+          <div class="meta">Levlox Student Financial Audit & Fee Ledger &bull; Generated on ${new Date().toLocaleDateString('en-GB')}</div>
+
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-title">Total Expected</div>
+              <div class="kpi-value">₹${batchFeesSummary.totalExpected.toLocaleString('en-IN')}</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-title">Total Collected</div>
+              <div class="kpi-value" style="color:#10B981;">₹${batchFeesSummary.totalPaid.toLocaleString('en-IN')}</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-title">Total Pending Dues</div>
+              <div class="kpi-value" style="color:#EF4444;">₹${batchFeesSummary.totalPending.toLocaleString('en-IN')}</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-title">Collection Rate</div>
+              <div class="kpi-value" style="color:#4F46E5;">${batchFeesSummary.percent}% (${batchFeesSummary.paidCount}/${batchFeesSummary.studentCount} Paid)</div>
+            </div>
+          </div>
+
           <table>
             <thead>
               <tr>
                 <th>Roll Number</th>
                 <th>Name</th>
-                 <th>Total Package</th>
-                 <th>Paid Amount</th>
-                 <th>Dues Outstanding</th>
-                 <th>Ledger Status</th>
-                 <th>Payment Date</th>
+                <th>Batch</th>
+                <th>Course</th>
+                <th>Total Package</th>
+                <th>Paid Amount</th>
+                <th>Pending Dues</th>
+                <th>Status</th>
+                <th>Payment Date</th>
               </tr>
             </thead>
             <tbody>
@@ -2250,6 +2298,50 @@ const AdminDashboard = () => {
     return matchesPaymentMethod && matchesDate;
   });
 
+  const selectedFeesBatchObj = React.useMemo(() => {
+    if (!feesBatchFilter) return null;
+    return batches.find(b => b.id === feesBatchFilter || b.name === feesBatchFilter) || null;
+  }, [batches, feesBatchFilter]);
+
+  const batchFeesSummary = React.useMemo(() => {
+    const targetStudents = feesBatchFilter 
+      ? allStudents.filter(s => 
+          String(s.batch_id || s.batchId || '') === String(feesBatchFilter) || 
+          String(s.batch_name || s.batch || '') === String(feesBatchFilter)
+        )
+      : filteredStudentsForFees;
+
+    let totalExpected = 0;
+    let totalPaid = 0;
+    let totalPending = 0;
+    let paidCount = 0;
+    let pendingCount = 0;
+    let partialCount = 0;
+
+    targetStudents.forEach(s => {
+      const feeInfo = getStudentFeeDetails(s);
+      totalExpected += (feeInfo.total || 0);
+      totalPaid += (feeInfo.paid || 0);
+      totalPending += (feeInfo.remaining || 0);
+      if (feeInfo.isPaid) paidCount++;
+      else if (feeInfo.paid > 0) partialCount++;
+      else pendingCount++;
+    });
+
+    const percent = totalExpected > 0 ? Math.round((totalPaid / totalExpected) * 100) : 0;
+
+    return {
+      studentCount: targetStudents.length,
+      totalExpected,
+      totalPaid,
+      totalPending,
+      paidCount,
+      partialCount,
+      pendingCount,
+      percent
+    };
+  }, [allStudents, filteredStudentsForFees, feesBatchFilter]);
+
   const filteredActivityLogs = activityLogs.filter(l => {
     const query = activitySearchQuery.toLowerCase();
     const matchesSearch = !query || 
@@ -2613,7 +2705,7 @@ const AdminDashboard = () => {
       setTrainerName(trainer.name || '');
       setTrainerEmail(trainer.email || '');
       setTrainerPhone(trainer.phone || '');
-      setTrainerSpecialization(trainer.specialization || trainer.course || '');
+      setTrainerRole(trainer.designation || trainer.role_title || trainer.specialization || 'Trainer');
       setTrainerStatus(trainer.status || 'Active');
       setTrainerTempPassword('');
     } else {
@@ -2621,7 +2713,7 @@ const AdminDashboard = () => {
       setTrainerName('');
       setTrainerEmail('');
       setTrainerPhone('');
-      setTrainerSpecialization('');
+      setTrainerRole('Trainer');
       setTrainerStatus('Active');
       setTrainerTempPassword(generateRandomPassword());
     }
@@ -2663,8 +2755,9 @@ const AdminDashboard = () => {
           email: trainerEmail.trim(),
           phone: trainerPhone.trim(),
           mobile: trainerPhone.trim(),
-          specialization: trainerSpecialization.trim(),
-          course: trainerSpecialization.trim(),
+          role: 'trainer',
+          designation: (trainerRole || 'Trainer').trim(),
+          specialization: (trainerRole || 'Trainer').trim(),
           status: trainerStatus,
         };
         await updateTrainer(editingTrainer.id, payload);
@@ -2740,8 +2833,10 @@ const AdminDashboard = () => {
           email: trainerEmail.trim(),
           phone: trainerPhone.trim(),
           mobile: trainerPhone.trim(),
-          specialization: trainerSpecialization.trim(),
-          course: trainerSpecialization.trim(),
+          role: 'trainer',
+          designation: (trainerRole || 'Trainer').trim(),
+          specialization: (trainerRole || 'Trainer').trim(),
+          course: '',
           status: trainerStatus,
           trainerId,
           trainer_id: trainerId,
@@ -3019,6 +3114,8 @@ const AdminDashboard = () => {
       };
 
       await updateStudent(studentId, patch);
+      queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
+      refetchAdminData();
       fetchStudents();
       fetchStats();
     } catch (error) {
@@ -3241,10 +3338,11 @@ const AdminDashboard = () => {
         batch_id: createBatchId,
         batch_name: selectedBatch?.name || '',
         rollNumber,
-        feesStatus: 'Pending Payment',
-        feesTotal: 20000,
-        feesPaidAmount: 0,
-        feesRemainingAmount: 20000,
+        feesStatus: (Number(createPaidAmount) || 0) >= (Number(createTotalFee) || 20000) ? 'Paid' : ((Number(createPaidAmount) || 0) > 0 ? 'Partially Paid' : 'Pending Payment'),
+        feesTotal: Number(createTotalFee) || 20000,
+        feesPaidAmount: Number(createPaidAmount) || 0,
+        feesRemainingAmount: Math.max(0, (Number(createTotalFee) || 20000) - (Number(createPaidAmount) || 0)),
+        feesPaymentDate: (Number(createPaidAmount) || 0) > 0 ? formatLocalDate(new Date()) : '',
         status: 'Pending Email Verification',
         emailVerified: false,
         verificationStatus: 'Pending',
@@ -3294,6 +3392,7 @@ const AdminDashboard = () => {
       setCreateTempPassword('');
       setCreateDob(''); setCreateGender(''); setCreateCity('');
       setCreateLocation(''); setCreateGuardianName(''); setCreateGuardianPhone('');
+      setCreateTotalFee(20000); setCreatePaidAmount(0);
       setShowCreateModal(false);
       fetchStudents(); fetchStats();
     } catch (e) {
@@ -3467,6 +3566,8 @@ const AdminDashboard = () => {
         feesPaymentDate: editPayDate,
       });
       setEditingFeesStudent(null);
+      queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
+      refetchAdminData();
       fetchStudents();
       fetchStats();
       showModal('Success', 'Fees updated successfully!', 'success');
@@ -7416,16 +7517,141 @@ const AdminDashboard = () => {
               onExportPDF={exportFeesToPDF}
             />
 
+            {/* ── BATCH SELECTOR & REPORT CONTROLS ── */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: '#FFFFFF',
+              padding: '16px 20px',
+              borderRadius: '16px',
+              border: '1px solid var(--border-light, #E2E8F0)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              flexWrap: 'wrap',
+              gap: 14
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                  🎓 Select Batch:
+                </span>
+                <select
+                  className="form-select"
+                  style={{ minWidth: 260, fontWeight: 600, height: 40, borderColor: feesBatchFilter ? 'var(--primary-color, #4F46E5)' : '#CBD5E1' }}
+                  value={feesBatchFilter}
+                  onChange={(e) => { setFeesBatchFilter(e.target.value); setFeesPage(1); }}
+                >
+                  <option value="">-- All Batches (Overall Institute) --</option>
+                  {batches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name} ({b.course_name})</option>
+                  ))}
+                </select>
+                {feesBatchFilter && (
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => { setFeesBatchFilter(''); setFeesPage(1); }}
+                    style={{ padding: '6px 12px', fontSize: 12, height: 40 }}
+                  >
+                    View All Batches
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>
+                  {batchFeesSummary.studentCount} Students in scope
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={exportFeesToCSV}
+                  style={{ height: 38, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                >
+                  <Download size={13} /> Export CSV
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={exportFeesToPDF}
+                  style={{ height: 38, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                >
+                  <FileText size={13} /> Batch Report PDF
+                </button>
+              </div>
+            </div>
+
+            {/* ── BATCH FINANCIAL REPORT SUMMARY CARDS ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+              {/* Card 1: Batch Name & Expected */}
+              <div style={{ background: '#FFFFFF', padding: '18px 20px', borderRadius: 16, border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+                <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#64748B', fontWeight: 700, letterSpacing: '0.5px' }}>
+                  {selectedFeesBatchObj ? `Batch: ${selectedFeesBatchObj.name}` : 'Total Expected (All Batches)'}
+                </span>
+                <h3 style={{ margin: '6px 0 2px', fontSize: 24, fontWeight: 800, color: '#0F172A' }}>
+                  {formatCurrency(batchFeesSummary.totalExpected)}
+                </h3>
+                <span style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>
+                  {batchFeesSummary.studentCount} students enrolled
+                </span>
+              </div>
+
+              {/* Card 2: Total Collected */}
+              <div style={{ background: '#FFFFFF', padding: '18px 20px', borderRadius: 16, border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+                <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#059669', fontWeight: 700, letterSpacing: '0.5px' }}>
+                  Total Collected / Paid
+                </span>
+                <h3 style={{ margin: '6px 0 2px', fontSize: 24, fontWeight: 800, color: '#10B981' }}>
+                  {formatCurrency(batchFeesSummary.totalPaid)}
+                </h3>
+                <span style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>
+                  ✓ {batchFeesSummary.paidCount} Fully Paid
+                </span>
+              </div>
+
+              {/* Card 3: Total Pending Balance */}
+              <div style={{ background: '#FFFFFF', padding: '18px 20px', borderRadius: 16, border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+                <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#DC2626', fontWeight: 700, letterSpacing: '0.5px' }}>
+                  Total Pending Dues
+                </span>
+                <h3 style={{ margin: '6px 0 2px', fontSize: 24, fontWeight: 800, color: '#EF4444' }}>
+                  {formatCurrency(batchFeesSummary.totalPending)}
+                </h3>
+                <span style={{ fontSize: 12, color: '#DC2626', fontWeight: 600 }}>
+                  ⏳ {batchFeesSummary.pendingCount + batchFeesSummary.partialCount} Pending / Partial
+                </span>
+              </div>
+
+              {/* Card 4: Collection Rate */}
+              <div style={{ background: '#FFFFFF', padding: '18px 20px', borderRadius: 16, border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+                <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#4F46E5', fontWeight: 700, letterSpacing: '0.5px' }}>
+                  Batch Collection Rate
+                </span>
+                <h3 style={{ margin: '6px 0 8px', fontSize: 24, fontWeight: 800, color: '#4F46E5' }}>
+                  {batchFeesSummary.percent}%
+                </h3>
+                <div style={{ height: 6, width: '100%', background: '#EEF2FF', borderRadius: 999, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${batchFeesSummary.percent}%`, background: 'linear-gradient(90deg, #6366F1, #10B981)', borderRadius: 999 }} />
+                </div>
+              </div>
+            </div>
+
             <div className="dashboard-card-section">
-              <div className="section-header-premium" style={{ marginBottom: '18px' }}>
-                <h3 className="section-title-premium" style={{ margin: 0 }}>Student Financial Ledger</h3>
+              <div className="section-header-premium" style={{ marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 className="section-title-premium" style={{ margin: 0 }}>
+                  {selectedFeesBatchObj ? `Financial Ledger: ${selectedFeesBatchObj.name}` : 'Student Financial Ledger'}
+                </h3>
+                <span style={{ fontSize: 12.5, color: '#64748B', fontWeight: 600 }}>
+                  Showing {filteredStudentsForFees.length} students
+                </span>
               </div>
               <div className="table-container-premium">
                 <table className="table-premium">
                   <thead>
                     <tr>
                       <th>Roll Number</th>
-                      <th>Name</th>
+                      <th>Student</th>
+                      <th>Batch</th>
+                      <th>Course</th>
                       <th>Total Package</th>
                       <th>Paid Amount</th>
                       <th>Dues Outstanding</th>
@@ -7439,37 +7665,56 @@ const AdminDashboard = () => {
                       const feeInfo = getStudentFeeDetails(student);
                       return (
                         <tr key={student.id}>
-                          <td><strong>{student.rollNumber}</strong></td>
-                          <td>{student.name}</td>
-                          <td>{formatCurrency(feeInfo.total)}</td>
-                          <td style={{ color: 'var(--success-color)' }}>{formatCurrency(feeInfo.paid)}</td>
-                          <td style={{ color: 'var(--danger-color)' }}>{formatCurrency(feeInfo.remaining)}</td>
+                          <td><strong>{student.rollNumber || student.id}</strong></td>
                           <td>
-                            <span className={`badge-status ${feeInfo.isPaid ? 'paid' : 'unpaid'}`}>
-                              {student.feesStatus || 'Pending Payment'}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              {student.profile_pic || student.profilePic ? (
+                                <img src={student.profile_pic || student.profilePic} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+                              ) : (
+                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #06b6d4)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>
+                                  {student.name ? student.name.charAt(0).toUpperCase() : 'S'}
+                                </div>
+                              )}
+                              <span style={{ fontWeight: 600 }}>{student.name}</span>
+                            </div>
+                          </td>
+                          <td style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}>
+                            {student.batch_name || student.batch || 'Not Assigned'}
+                          </td>
+                          <td style={{ fontSize: 12, color: '#64748B' }}>
+                            {student.course || student.course_name || '—'}
+                          </td>
+                          <td><strong>{formatCurrency(feeInfo.total)}</strong></td>
+                          <td style={{ color: '#10B981', fontWeight: 700 }}>{formatCurrency(feeInfo.paid)}</td>
+                          <td style={{ color: feeInfo.remaining > 0 ? '#EF4444' : '#10B981', fontWeight: 700 }}>
+                            {formatCurrency(feeInfo.remaining)}
+                          </td>
+                          <td>
+                            <span className={`badge-status ${feeInfo.isPaid ? 'paid' : (feeInfo.paid > 0 ? 'partial' : 'unpaid')}`}>
+                              {student.feesStatus || (feeInfo.isPaid ? 'Paid' : (feeInfo.paid > 0 ? 'Partially Paid' : 'Pending Payment'))}
                             </span>
                           </td>
                           <td>{student.feesPaymentDate || 'N/A'}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button 
-                            className={`btn ${student.feesStatus === 'Paid' ? 'btn-outline' : 'btn-primary'}`} 
-                            style={{ padding: '6px 10px', fontSize: '11.5px' }}
-                            onClick={() => toggleFees(student.id)}
-                          >
-                            Toggle Status
-                          </button>
-                          <button className="btn btn-outline" style={{ padding: '6px' }} onClick={() => handleEditFeesClick(student)}>
-                            <Pencil size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                </tbody>
-              </table>
-            </div>
+                          <td>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button 
+                                className={`btn ${student.feesStatus === 'Paid' ? 'btn-outline' : 'btn-primary'}`} 
+                                style={{ padding: '6px 10px', fontSize: '11.5px' }}
+                                onClick={() => toggleFees(student.id)}
+                              >
+                                Toggle
+                              </button>
+                              <button className="btn btn-outline" style={{ padding: '6px 8px' }} onClick={() => handleEditFeesClick(student)} title="Edit Fees & Record Payment">
+                                <Pencil size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
             {/* Pagination */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', borderTop: '1px solid var(--border-light)', paddingTop: '15px' }}>
@@ -7652,7 +7897,7 @@ const AdminDashboard = () => {
                           <div style={{ minWidth: 0, flexGrow: 1 }}>
                             <h4 style={{ margin: 0, fontSize: 16.5, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</h4>
                             <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--primary-color, #4F46E5)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {t.specialization || t.course || 'Faculty Trainer'}
+                              {t.designation || t.role_title || t.specialization || 'Faculty Trainer'}
                             </p>
                           </div>
                         </div>
@@ -8020,20 +8265,14 @@ const AdminDashboard = () => {
               </div>
 
               <div>
-                <label className="form-label" style={{ fontWeight: 600 }}>Course / Domain Expertise</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  list="trainerCourseOptions"
-                  value={trainerSpecialization}
-                  onChange={e => setTrainerSpecialization(e.target.value)}
-                  placeholder="e.g. Data Science & AI"
-                />
-                <datalist id="trainerCourseOptions">
-                  {courseTitles.map(c => (
-                    <option key={c} value={c} />
-                  ))}
-                </datalist>
+                <label className="form-label" style={{ fontWeight: 600 }}>Role / Designation *</label>
+                <select className="form-select" value={trainerRole} onChange={e => setTrainerRole(e.target.value)}>
+                  <option value="Trainer">Trainer</option>
+                  <option value="Senior Trainer">Senior Trainer</option>
+                  <option value="Lead Instructor">Lead Instructor</option>
+                  <option value="Technical Faculty">Technical Faculty</option>
+                  <option value="Guest Lecturer">Guest Lecturer</option>
+                </select>
               </div>
 
               <div>
@@ -8814,6 +9053,29 @@ const AdminDashboard = () => {
                         <option key={b.id} value={b.id}>{b.name}</option>
                       ))}
                     </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="createTotalFee">Total Course Fee (₹) *</label>
+                    <input
+                      id="createTotalFee"
+                      type="number"
+                      className="form-input"
+                      value={createTotalFee}
+                      onChange={(e) => setCreateTotalFee(e.target.value)}
+                      placeholder="e.g. 25000"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="createPaidAmount">Initial Paid Amount (₹)</label>
+                    <input
+                      id="createPaidAmount"
+                      type="number"
+                      className="form-input"
+                      value={createPaidAmount}
+                      onChange={(e) => setCreatePaidAmount(e.target.value)}
+                      placeholder="e.g. 0 or 25000"
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label" htmlFor="createDob">Date of Birth</label>

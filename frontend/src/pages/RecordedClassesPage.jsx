@@ -217,51 +217,96 @@ const RecordedClassesPage = ({
     loadData();
   }, []);
 
+  // Combined list of Courses + Playlists so all uploaded playlists are visible
+  const allPlaylistsAndCourses = useMemo(() => {
+    const courses = (coursesList && coursesList.length > 0) ? coursesList : DEFAULT_COURSES;
+    const knownKeys = new Set(courses.map(c => (c.title || c.name || c.id || '').toLowerCase().trim()));
+
+    // Custom playlists created by Admin/Trainer
+    const customPlaylistsMapped = (playlistsList || [])
+      .filter(pl => pl && pl.name && !knownKeys.has((pl.name || '').toLowerCase().trim()))
+      .map(pl => {
+        const plId = String(pl.id || pl.uid);
+        const relatedVideos = recordingsList.filter(r => 
+          String(r.playlist_id) === plId || 
+          String(r.batch_id) === plId || 
+          (r.playlist_name && r.playlist_name.toLowerCase().trim() === pl.name.toLowerCase().trim())
+        );
+
+        return {
+          id: plId,
+          courseId: plId,
+          title: pl.name,
+          name: pl.name,
+          category: pl.course_name || pl.category || 'Curated Playlist',
+          description: pl.description || 'Curated technical lecture series.',
+          thumbnail: pl.thumbnail || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&auto=format&fit=crop&q=80',
+          trainer_name: pl.trainer_name || 'Faculty Trainer',
+          progress: 0,
+          status: 'In Progress',
+          lessons_count: Math.max(relatedVideos.length, 1),
+          duration: `${relatedVideos.length * 45 || 90}m`,
+          is_playlist: true
+        };
+      });
+
+    return [...courses, ...customPlaylistsMapped];
+  }, [coursesList, playlistsList, recordingsList]);
+
   // Filtered courses based on category tabs
   const filteredCourses = useMemo(() => {
-    const list = coursesList.length > 0 ? coursesList : DEFAULT_COURSES;
+    const list = allPlaylistsAndCourses;
     if (categoryFilter === 'all') return list;
     if (categoryFilter === 'in-progress') return list.filter(c => c.status === 'In Progress' || (c.progress > 0 && c.progress < 100));
     if (categoryFilter === 'completed') return list.filter(c => c.status === 'Completed' || c.progress === 100);
     if (categoryFilter === 'not-started') return list.filter(c => c.status === 'Not Started' || c.progress === 0);
     return list;
-  }, [coursesList, categoryFilter]);
+  }, [allPlaylistsAndCourses, categoryFilter]);
 
-  // Lessons associated with the selected course
+  // Lessons associated with the selected course or playlist
   const courseLessons = useMemo(() => {
     if (!selectedCourse) return [];
     const courseTitleNorm = (selectedCourse.title || selectedCourse.name || '').toLowerCase().trim();
-    const courseId = selectedCourse.id || selectedCourse.courseId;
+    const courseId = String(selectedCourse.id || selectedCourse.courseId || selectedCourse.uid || '');
 
     const matched = recordingsList.filter(r => {
-      if (r.course_id && (r.course_id === courseId || r.course_id === selectedCourse.id)) return true;
-      if (r.course_title && r.course_title.toLowerCase().trim() === courseTitleNorm) return true;
-      if (r.course_name && r.course_name.toLowerCase().trim() === courseTitleNorm) return true;
+      // 1. Direct ID match
+      if (r.playlist_id && String(r.playlist_id) === courseId) return true;
+      if (r.course_id && String(r.course_id) === courseId) return true;
+      if (r.batch_id && String(r.batch_id) === courseId) return true;
+
+      // 2. Name matches
+      const rCourse = (r.course_title || r.course_name || '').toLowerCase().trim();
+      const rPlaylist = (r.playlist_name || '').toLowerCase().trim();
+      const rBatch = (r.batch_name || r.batchName || '').toLowerCase().trim();
+
+      if (rPlaylist && (rPlaylist === courseTitleNorm || courseTitleNorm.includes(rPlaylist) || rPlaylist.includes(courseTitleNorm))) return true;
+      if (rCourse && (rCourse === courseTitleNorm || courseTitleNorm.includes(rCourse) || rCourse.includes(courseTitleNorm))) return true;
+      if (rBatch && (rBatch === courseTitleNorm || courseTitleNorm.includes(rBatch) || rBatch.includes(courseTitleNorm))) return true;
+
       return false;
     });
 
-    // If no matching recordedClasses exist in DB for this course, synthesize demo lessons
-    if (matched.length === 0) {
-      const count = selectedCourse.lessons_count || 6;
-      return Array.from({ length: count }, (_, idx) => ({
-        id: `${selectedCourse.id}_lesson_${idx + 1}`,
-        title: idx === 0 ? "Environment Architecture & Fundamentals" :
-               idx === 1 ? "Core Data Structures & Control Workflows" :
-               idx === 2 ? "Object-Oriented Design & Encapsulation" :
-               idx === 3 ? "Advanced Asynchronous Operations & Streams" :
-               idx === 4 ? "Production Design Patterns & Best Practices" :
-               `Applied Engineering Capstone - Session ${idx + 1}`,
-        module: `Module ${Math.floor(idx / 2) + 1}`,
-        duration: idx === 0 ? "18m 10s" : idx === 1 ? "22m 15s" : idx === 2 ? "25m 40s" : idx === 3 ? "45m 32s" : "35m 20s",
-        video_url: "https://drive.google.com/file/d/1g-E8YJU8uciPyw1XNRMtGVH448KPm8kg/view?usp=sharing",
-        sort_order: idx + 1,
-        course_title: selectedCourse.title,
-        description: `In-depth hands-on technical breakdown of key topics, interactive architectures, and industry implementation standards.`
-      }));
+    if (matched.length > 0) {
+      matched.sort((a, b) => (Number(a.sort_order || 99) - Number(b.sort_order || 99)));
+      return matched;
     }
 
-    matched.sort((a, b) => (Number(a.sort_order || 99) - Number(b.sort_order || 99)));
-    return matched;
+    // Fallback demo lessons if no video uploaded yet
+    const count = selectedCourse.lessons_count || 4;
+    return Array.from({ length: count }, (_, idx) => ({
+      id: `${selectedCourse.id}_lesson_${idx + 1}`,
+      title: idx === 0 ? "Environment Architecture & Fundamentals" :
+             idx === 1 ? "Core Data Structures & Control Workflows" :
+             idx === 2 ? "Object-Oriented Design & Encapsulation" :
+             `Applied Engineering Capstone - Session ${idx + 1}`,
+      module: `Module ${Math.floor(idx / 2) + 1}`,
+      duration: idx === 0 ? "18m 10s" : idx === 1 ? "22m 15s" : idx === 2 ? "25m 40s" : "35m 20s",
+      video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      sort_order: idx + 1,
+      course_title: selectedCourse.title || selectedCourse.name,
+      description: `In-depth hands-on technical breakdown of key topics, interactive architectures, and industry implementation standards.`
+    }));
   }, [selectedCourse, recordingsList]);
 
   // Handle Join Session

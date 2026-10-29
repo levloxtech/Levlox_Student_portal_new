@@ -898,6 +898,8 @@ const TrainerDashboard = () => {
         module: recModule || 'General Class',
         course_title: finalCourseName,
         course_name: finalCourseName,
+        playlist_id: finalBatchId,
+        playlist_name: finalBatchName,
         batch_id: finalBatchId,
         batchId: finalBatchId,
         batch_name: finalBatchName,
