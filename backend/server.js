@@ -1176,6 +1176,13 @@ function syncUserCredentials(collection, id, data) {
     profilePhotoUrl: data.profilePic || data.profile_pic || data.profilePhotoUrl || data.photoURL || current?.profilePic || current?.profile_pic || current?.profilePhotoUrl || existingUser?.profilePhotoUrl || '',
   };
 
+  if (data.mustChangePassword !== undefined) {
+    patch.mustChangePassword = data.mustChangePassword;
+  }
+  if (data.profileCompleted !== undefined) {
+    patch.profileCompleted = data.profileCompleted;
+  }
+
   if (data.password && String(data.password).trim()) {
     const cleanPass = String(data.password).trim();
     const { salt, hash } = localDb.hashPassword(cleanPass);

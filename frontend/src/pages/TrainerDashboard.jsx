@@ -16,6 +16,7 @@ import CustomModal from '../components/Modal';
 import NotificationBell from '../components/NotificationBell';
 import levloxLogo from '../assets/levlox-logo.png';
 import { useAuth } from '../context/AuthContext';
+import TrainerOnboardingView from '../components/TrainerOnboardingView';
 import { 
   getTrainerBatches, 
   getTrainerStudents, 
@@ -174,16 +175,54 @@ const TrainerDashboard = () => {
     setTimeout(() => setToast(''), 3000);
   };
 
+  const isNewTrainer = Boolean(
+    userProfile &&
+    (userProfile.profileCompleted !== true ||
+     userProfile.mustChangePassword === true ||
+     userProfile.passwordChanged !== true)
+  );
+
+  if (isNewTrainer) {
+    return (
+      <TrainerOnboardingView
+        userProfile={userProfile}
+        currentUser={currentUser}
+        logout={logout}
+        applyProfilePatch={applyProfilePatch}
+        refreshProfile={refreshProfile}
+        showToast={showToast}
+      />
+    );
+  }
+
   const [editingTrainerProfile, setEditingTrainerProfile] = useState(false);
   const [trainerProfileName, setTrainerProfileName] = useState('');
   const [trainerProfilePhone, setTrainerProfilePhone] = useState('');
   const [trainerProfileRole, setTrainerProfileRole] = useState('');
+  const [trainerProfileSpecialization, setTrainerProfileSpecialization] = useState('');
+  const [trainerProfileQualification, setTrainerProfileQualification] = useState('');
+  const [trainerProfileExperience, setTrainerProfileExperience] = useState('');
+  const [trainerProfileSkills, setTrainerProfileSkills] = useState('');
+  const [trainerProfileCity, setTrainerProfileCity] = useState('');
+  const [trainerProfileGender, setTrainerProfileGender] = useState('Male');
+  const [trainerProfileDob, setTrainerProfileDob] = useState('');
+  const [trainerProfileBio, setTrainerProfileBio] = useState('');
+  const [trainerProfileLinkedin, setTrainerProfileLinkedin] = useState('');
   const [savingTrainerProfile, setSavingTrainerProfile] = useState(false);
 
   const startEditTrainerProfile = () => {
     setTrainerProfileName(userProfile?.fullName || userProfile?.name || '');
     setTrainerProfilePhone(userProfile?.phone || userProfile?.mobile || '');
-    setTrainerProfileRole(userProfile?.designation || userProfile?.specialization || 'Trainer');
+    setTrainerProfileRole(userProfile?.designation || userProfile?.specialization || 'Faculty Trainer');
+    setTrainerProfileSpecialization(userProfile?.specialization || 'Fullstack Engineering');
+    setTrainerProfileQualification(userProfile?.qualification || '');
+    setTrainerProfileExperience(userProfile?.experience || '');
+    setTrainerProfileSkills(userProfile?.skills || '');
+    setTrainerProfileCity(userProfile?.city || '');
+    setTrainerProfileGender(userProfile?.gender || 'Male');
+    setTrainerProfileDob(userProfile?.dob || '');
+    setTrainerProfileBio(userProfile?.bio || '');
+    setTrainerProfileLinkedin(userProfile?.linkedin || '');
     setEditingTrainerProfile(true);
   };
 
@@ -202,14 +241,25 @@ const TrainerDashboard = () => {
         phone: trainerProfilePhone.trim(),
         mobile: trainerProfilePhone.trim(),
         designation: trainerProfileRole.trim(),
-        specialization: trainerProfileRole.trim(),
+        specialization: trainerProfileSpecialization.trim() || trainerProfileRole.trim(),
+        qualification: trainerProfileQualification.trim(),
+        experience: trainerProfileExperience.trim(),
+        skills: trainerProfileSkills.trim(),
+        city: trainerProfileCity.trim(),
+        gender: trainerProfileGender,
+        dob: trainerProfileDob,
+        bio: trainerProfileBio.trim(),
+        linkedin: trainerProfileLinkedin.trim(),
         updatedAt: new Date().toISOString()
       };
       await updateTrainer(trainerUid, updates);
       try {
         await updateDocumentFields('users', trainerUid, {
           name: trainerProfileName.trim(),
-          phone: trainerProfilePhone.trim()
+          phone: trainerProfilePhone.trim(),
+          city: trainerProfileCity.trim(),
+          gender: trainerProfileGender,
+          dob: trainerProfileDob
         });
       } catch (_) {}
       if (applyProfilePatch) applyProfilePatch(updates);
@@ -2501,7 +2551,7 @@ const TrainerDashboard = () => {
 
               {!editingTrainerProfile ? (
                 /* View Mode */
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
                   <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
                     <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Full Name</span>
                     <strong style={{ fontSize: 15, color: '#1E293B' }}>{userProfile?.fullName || userProfile?.name || '—'}</strong>
@@ -2518,14 +2568,52 @@ const TrainerDashboard = () => {
                     <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Mobile Number</span>
                     <span style={{ fontSize: 14, color: '#334155' }}>{userProfile?.phone || userProfile?.mobile || 'Not provided'}</span>
                   </div>
-                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0', gridColumn: 'span 2' }}>
+                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
                     <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Role / Designation</span>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>{userProfile?.designation || userProfile?.specialization || 'Trainer'}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>{userProfile?.designation || userProfile?.specialization || 'Faculty Trainer'}</span>
                   </div>
+                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+                    <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Domain / Specialization</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>{userProfile?.specialization || 'Fullstack Engineering'}</span>
+                  </div>
+                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+                    <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Highest Qualification</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>{userProfile?.qualification || 'Not provided'}</span>
+                  </div>
+                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+                    <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Experience</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>{userProfile?.experience || 'Not provided'}</span>
+                  </div>
+                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0', gridColumn: 'span 2' }}>
+                    <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Technical Skills & Subjects</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>{userProfile?.skills || 'Not specified'}</span>
+                  </div>
+                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+                    <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Current City</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>{userProfile?.city || 'Not specified'}</span>
+                  </div>
+                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+                    <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Gender</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>{userProfile?.gender || 'Not specified'}</span>
+                  </div>
+                  {userProfile?.bio && (
+                    <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0', gridColumn: 'span 2' }}>
+                      <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Bio / Summary</span>
+                      <p style={{ margin: '4px 0 0', fontSize: 13.5, color: '#334155', lineHeight: 1.5 }}>{userProfile.bio}</p>
+                    </div>
+                  )}
+                  {userProfile?.linkedin && (
+                    <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0', gridColumn: 'span 2' }}>
+                      <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>LinkedIn Profile</span>
+                      <a href={userProfile.linkedin} target="_blank" rel="noreferrer" style={{ fontSize: 13.5, color: '#4F46E5', textDecoration: 'none', fontWeight: 600 }}>
+                        {userProfile.linkedin}
+                      </a>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Edit Mode */
-                <form onSubmit={handleSaveTrainerProfile} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <form onSubmit={handleSaveTrainerProfile} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
                   <div>
                     <label className="form-label" style={{ fontWeight: 600 }}>Full Name *</label>
                     <input
@@ -2535,7 +2623,6 @@ const TrainerDashboard = () => {
                       onChange={e => setTrainerProfileName(e.target.value)}
                       placeholder="Your full name"
                       required
-                      autoFocus
                     />
                   </div>
                   <div>
@@ -2559,7 +2646,7 @@ const TrainerDashboard = () => {
                     />
                   </div>
                   <div>
-                    <label className="form-label" style={{ fontWeight: 600 }}>Mobile Number</label>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Mobile Number *</label>
                     <input
                       type="text"
                       className="form-input"
@@ -2567,16 +2654,101 @@ const TrainerDashboard = () => {
                       onChange={e => setTrainerProfilePhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                       placeholder="10-digit mobile number"
                       maxLength={10}
+                      required
                     />
                   </div>
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label className="form-label" style={{ fontWeight: 600 }}>Role / Designation</label>
+                  <div>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Role / Designation *</label>
                     <input
                       type="text"
                       className="form-input"
                       value={trainerProfileRole}
                       onChange={e => setTrainerProfileRole(e.target.value)}
-                      placeholder="e.g. Lead Instructor, Senior Python Faculty"
+                      placeholder="e.g. Lead Instructor, Senior Faculty"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Domain / Specialization *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={trainerProfileSpecialization}
+                      onChange={e => setTrainerProfileSpecialization(e.target.value)}
+                      placeholder="e.g. Fullstack Web Dev, AI & Data Science"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Highest Qualification / Degree</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={trainerProfileQualification}
+                      onChange={e => setTrainerProfileQualification(e.target.value)}
+                      placeholder="e.g. M.Tech in CSE, B.E., MCA"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Years of Experience</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={trainerProfileExperience}
+                      onChange={e => setTrainerProfileExperience(e.target.value)}
+                      placeholder="e.g. 5+ Years"
+                    />
+                  </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Key Technical Skills</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={trainerProfileSkills}
+                      onChange={e => setTrainerProfileSkills(e.target.value)}
+                      placeholder="e.g. Python, React, Node.js, SQL, AWS, Docker"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Current City</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={trainerProfileCity}
+                      onChange={e => setTrainerProfileCity(e.target.value)}
+                      placeholder="e.g. Chennai, Bangalore"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Gender</label>
+                    <select
+                      className="form-input"
+                      value={trainerProfileGender}
+                      onChange={e => setTrainerProfileGender(e.target.value)}
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Bio / Summary</label>
+                    <textarea
+                      className="form-input"
+                      rows={3}
+                      value={trainerProfileBio}
+                      onChange={e => setTrainerProfileBio(e.target.value)}
+                      placeholder="Brief overview of your teaching approach..."
+                    />
+                  </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label className="form-label" style={{ fontWeight: 600 }}>LinkedIn Profile URL</label>
+                    <input
+                      type="url"
+                      className="form-input"
+                      value={trainerProfileLinkedin}
+                      onChange={e => setTrainerProfileLinkedin(e.target.value)}
+                      placeholder="https://linkedin.com/in/yourprofile"
                     />
                   </div>
                   <div style={{ gridColumn: 'span 2', display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>

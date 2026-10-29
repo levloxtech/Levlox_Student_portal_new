@@ -7968,9 +7968,34 @@ const AdminDashboard = () => {
                             <span style={{ fontWeight: 600, color: '#475569' }}>Phone:</span>
                             <span>{t.phone || '—'}</span>
                           </div>
+
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ fontWeight: 600, color: '#475569' }}>Batches:</span>
                             <span style={{ fontWeight: 700, color: '#0F172A' }}>{(t.assigned_batch_ids || []).length} assigned</span>
+                          </div>
+                          {t.qualification && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ fontWeight: 600, color: '#475569' }}>Degree:</span>
+                              <span style={{ fontWeight: 600, color: '#1E293B' }}>{t.qualification}</span>
+                            </div>
+                          )}
+                          {t.experience && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ fontWeight: 600, color: '#475569' }}>Experience:</span>
+                              <span style={{ fontWeight: 600, color: '#1E293B' }}>{t.experience}</span>
+                            </div>
+                          )}
+                          {t.city && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ fontWeight: 600, color: '#475569' }}>Location:</span>
+                              <span style={{ fontWeight: 600, color: '#1E293B' }}>{t.city}</span>
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontWeight: 600, color: '#475569' }}>Setup:</span>
+                            <span style={{ fontWeight: 700, color: t.profileCompleted ? '#16A34A' : '#D97706' }}>
+                              {t.profileCompleted ? '✓ Setup Complete' : '⏳ Initial Setup Pending'}
+                            </span>
                           </div>
                         </div>
                       </div>

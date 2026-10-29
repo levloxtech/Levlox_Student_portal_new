@@ -50,9 +50,16 @@ export const validatePasswordStrength = (password) => {
  * Firebase requires a recent login for this, so the current password is used to
  * reauthenticate first — that is also what verifies the user actually knows it.
  */
-export const changeOwnPassword = async (currentPassword, newPassword) => {
+export const changeOwnPassword = async (arg1, arg2, arg3) => {
+  let currentPassword = arg1;
+  let newPassword = arg2;
+  if (arg3 !== undefined) {
+    currentPassword = arg2;
+    newPassword = arg3;
+  }
   const token = localStorage.getItem("levlox_auth_token");
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+  const isProd = import.meta.env.PROD;
+  const API_BASE = isProd ? "" : (import.meta.env.VITE_API_URL || "");
 
   if (token) {
     const res = await fetch(`${API_BASE}/api/auth/change-password`, {
