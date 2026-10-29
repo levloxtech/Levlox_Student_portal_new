@@ -11,6 +11,8 @@ mandatory safe deployment workflow for the Levlox Portal.
 --------------------------------------------------------------------------------
 1. SERVER, HOSTING & RUNTIME ENVIRONMENT
 --------------------------------------------------------------------------------
+* Frontend Hosting: Vercel (Production domain: https://www.levloxstudent.com)
+  - Vercel rewrites /api/*, /health, /uploads/* to Cloudflare Tunnel (https://clean-olympics-punk-questions.trycloudflare.com)
 * VPS IP Address: 148.113.17.68
 * SSH Port: 20027
 * SSH User: root
