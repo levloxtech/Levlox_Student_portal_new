@@ -489,6 +489,8 @@ const AdminDashboard = () => {
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [batchName, setBatchName] = useState('');
   const [batchCourseName, setBatchCourseName] = useState('');
+  const [isCustomBatchCourse, setIsCustomBatchCourse] = useState(false);
+  const [customBatchCourseName, setCustomBatchCourseName] = useState('');
   const [batchTrainerName, setBatchTrainerName] = useState('');
   const [batchStartDate, setBatchStartDate] = useState('');
   const [batchEndDate, setBatchEndDate] = useState('');
@@ -673,6 +675,8 @@ const AdminDashboard = () => {
   const [createEmail, setCreateEmail] = useState('');
   const [createPhone, setCreatePhone] = useState('');
   const [createCourse, setCreateCourse] = useState('Fullstack Engineering');
+  const [isCustomCourse, setIsCustomCourse] = useState(false);
+  const [customCourseName, setCustomCourseName] = useState('');
   const [createBatchId, setCreateBatchId] = useState('');
   const [createTempPassword, setCreateTempPassword] = useState('');
   const [createDob, setCreateDob] = useState('');
@@ -1896,6 +1900,8 @@ const AdminDashboard = () => {
   const [editRollNumber, setEditRollNumber] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editCourse, setEditCourse] = useState('Fullstack Engineering');
+  const [isCustomEditCourse, setIsCustomEditCourse] = useState(false);
+  const [customEditCourseName, setCustomEditCourseName] = useState('');
   const [editBatchId, setEditBatchId] = useState('');
   const [editCollege, setEditCollege] = useState('');
   const [editProfilePic, setEditProfilePic] = useState('');
@@ -2528,9 +2534,10 @@ const AdminDashboard = () => {
 
   const batchPayload = () => {
     const calculatedDays = Number(batchDurationDays) || getDaysBetween(batchStartDate, batchEndDate) || 50;
+    const resolvedCourse = (isCustomBatchCourse ? customBatchCourseName : batchCourseName).trim();
     return {
       name: batchName.trim(),
-      course_name: batchCourseName.trim(),
+      course_name: resolvedCourse,
       trainer_name: batchTrainerName.trim(),
       trainer_uid: (trainers.find(t => t.name === batchTrainerName.trim() || t.trainer_id === batchTrainerName.trim() || t.trainerId === batchTrainerName.trim())?.id) || '',
       trainer_id: (trainers.find(t => t.name === batchTrainerName.trim() || t.trainer_id === batchTrainerName.trim() || t.trainerId === batchTrainerName.trim())?.trainerId) || '',
@@ -2545,7 +2552,8 @@ const AdminDashboard = () => {
   };
 
   const validateBatchForm = () => {
-    if (!batchName.trim() || !batchCourseName.trim() || !batchTrainerName.trim() || !batchStartDate || !batchEndDate) {
+    const resolvedCourse = (isCustomBatchCourse ? customBatchCourseName : batchCourseName).trim();
+    if (!batchName.trim() || !resolvedCourse || !batchTrainerName.trim() || !batchStartDate || !batchEndDate) {
       showModal('Missing Fields', 'Name, course, trainer, start date and end date are all required.', 'warning');
       return false;
     }
@@ -2567,12 +2575,26 @@ const AdminDashboard = () => {
     e.preventDefault();
     if (!validateBatchForm()) return;
     try {
+      if (isCustomBatchCourse && customBatchCourseName.trim()) {
+        const cTitle = customBatchCourseName.trim();
+        await addCourse({
+          title: cTitle,
+          name: cTitle,
+          description: `${cTitle} Course`,
+          category: 'Technical',
+          status: 'Active',
+          createdAt: new Date().toISOString()
+        }).catch(err => console.warn('[Admin] Auto-create batch course error:', err));
+        queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
+      }
       const code = await generateNextId('batch');
       const created = await addBatch({ ...batchPayload(), code });
       if (created?.id) {
         await syncBatchTrainer(created.id, batchTrainerName.trim());
       }
       resetBatchForm();
+      setIsCustomBatchCourse(false);
+      setCustomBatchCourseName('');
       setShowBatchModal(false);
       showModal('Success', `New batch (${code}) created successfully!`, 'success');
       fetchBatches();
@@ -3178,6 +3200,29 @@ const AdminDashboard = () => {
         }
       }
 
+      let finalCourseName = (createCourse || '').trim();
+      if (isCustomCourse || createCourse === '__add_new__') {
+        finalCourseName = (customCourseName || '').trim();
+        if (!finalCourseName) {
+          showModal('Missing Course', 'Please enter a name for the new course.', 'warning');
+          return;
+        }
+        try {
+          await addCourse({
+            title: finalCourseName,
+            name: finalCourseName,
+            description: `${finalCourseName} Course Module`,
+            category: 'Technical',
+            status: 'Active',
+            createdAt: new Date().toISOString()
+          });
+          queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
+        } catch (cErr) {
+          console.warn('[Admin] Auto-create course failed:', cErr);
+        }
+      }
+      if (!finalCourseName) finalCourseName = 'Fullstack Engineering';
+
       const rollNumber = await generateNextId('student');
       const selectedBatch = batches.find(b => b.id === createBatchId);
       const vToken = generateVerificationToken();
@@ -3187,7 +3232,7 @@ const AdminDashboard = () => {
         name: createName,
         email: cleanEmail || authEmail,
         phone: cleanPhone || '',
-        course: createCourse,
+        course: finalCourseName,
         batch_id: createBatchId,
         batch_name: selectedBatch?.name || '',
         rollNumber,
@@ -3235,12 +3280,12 @@ const AdminDashboard = () => {
         name: createName,
         email: cleanEmail || authEmail,
         phone: createPhone ? normalizeMobile(createPhone) : '',
-        course: createCourse || 'Fullstack Engineering',
+        course: finalCourseName,
         batch: selectedBatch?.name || '',
       });
 
       setCreateName(''); setCreateEmail(''); setCreatePhone('');
-      setCreateCourse('Fullstack Engineering'); setCreateBatchId('');
+      setCreateCourse(finalCourseName); setIsCustomCourse(false); setCustomCourseName(''); setCreateBatchId('');
       setCreateTempPassword('');
       setCreateDob(''); setCreateGender(''); setCreateCity('');
       setCreateLocation(''); setCreateGuardianName(''); setCreateGuardianPhone('');
@@ -3305,6 +3350,8 @@ const AdminDashboard = () => {
     setEditPhone(student.phone || '');
     setEditPassword('');
     setEditCourse(student.course || 'Fullstack Engineering');
+    setIsCustomEditCourse(false);
+    setCustomEditCourseName('');
     setEditBatchId(student.batch_id || '');
     setEditCollege(student.college || 'Levlox Technical Institute');
     setEditProfilePic(student.profile_pic || '');
@@ -3318,13 +3365,36 @@ const AdminDashboard = () => {
   const saveStudentEdit = async (e) => {
     e.preventDefault();
     try {
+      let finalCourse = (editCourse || '').trim();
+      if (isCustomEditCourse || editCourse === '__add_new__') {
+        finalCourse = (customEditCourseName || '').trim();
+        if (!finalCourse) {
+          showModal('Missing Course', 'Please enter a name for the new course.', 'warning');
+          return;
+        }
+        try {
+          await addCourse({
+            title: finalCourse,
+            name: finalCourse,
+            description: `${finalCourse} Course Module`,
+            category: 'Technical',
+            status: 'Active',
+            createdAt: new Date().toISOString()
+          });
+          queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
+        } catch (cErr) {
+          console.warn('[Admin] Auto-create edit course failed:', cErr);
+        }
+      }
+      if (!finalCourse) finalCourse = 'Fullstack Engineering';
+
       const selectedBatch = batches.find(b => b.id === editBatchId);
       const payload = {
         name: editName,
         email: editEmail,
         rollNumber: editRollNumber,
         phone: editPhone,
-        course: editCourse,
+        course: finalCourse,
         batch_id: editBatchId,
         batch_name: selectedBatch?.name || '',
         college: editCollege,
@@ -3357,6 +3427,8 @@ const AdminDashboard = () => {
         }
       }
 
+      setIsCustomEditCourse(false);
+      setCustomEditCourseName('');
       setEditingStudent(null);
       fetchStudents();
       fetchStats();
@@ -8197,19 +8269,82 @@ const AdminDashboard = () => {
                     <input id="editRollNumber" type="text" className="form-input" value={editRollNumber} readOnly style={{ cursor: 'default', background: 'var(--surface-alt)', opacity: 0.9 }} required />
                   </div>
                   <div className="form-group">
-                    <label className="form-label" htmlFor="editCourse">Course Name</label>
-                    <select id="editCourse" className="form-select" value={editCourse} onChange={(e) => setEditCourse(e.target.value)}>
-                      {courseTitles.length === 0 ? (
-                        <option value="">No courses available</option>
-                      ) : (
-                        <>
-                          <option value="">-- Select Course --</option>
-                          {courseTitles.map(c => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </>
-                      )}
-                    </select>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label className="form-label" htmlFor="editCourse" style={{ margin: 0 }}>Course Name</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextState = !isCustomEditCourse;
+                          setIsCustomEditCourse(nextState);
+                          if (nextState) {
+                            setCustomEditCourseName('');
+                          } else {
+                            setEditCourse(courseTitles[0] || 'Fullstack Engineering');
+                          }
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--primary, #6366f1)',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: 0
+                        }}
+                      >
+                        {isCustomEditCourse ? '← Select Existing Course' : '+ Create New Course'}
+                      </button>
+                    </div>
+
+                    {isCustomEditCourse ? (
+                      <div>
+                        <input
+                          id="editCourseCustom"
+                          type="text"
+                          className="form-input"
+                          placeholder="Type new course name"
+                          value={customEditCourseName}
+                          onChange={(e) => setCustomEditCourseName(e.target.value)}
+                          required
+                          autoFocus
+                          style={{ borderColor: 'var(--primary, #6366f1)' }}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                          Will automatically add this course to your institute's catalog.
+                        </span>
+                      </div>
+                    ) : (
+                      <select
+                        id="editCourse"
+                        className="form-select"
+                        value={editCourse}
+                        onChange={(e) => {
+                          if (e.target.value === '__add_new__') {
+                            setIsCustomEditCourse(true);
+                            setCustomEditCourseName('');
+                          } else {
+                            setEditCourse(e.target.value);
+                          }
+                        }}
+                      >
+                        {courseTitles.length === 0 ? (
+                          <option value="">No courses available</option>
+                        ) : (
+                          <>
+                            <option value="">-- Select Course --</option>
+                            {courseTitles.map(c => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                            <option value="__add_new__" style={{ fontWeight: 600, color: 'var(--primary, #6366f1)' }}>
+                              + Create New Course...
+                            </option>
+                          </>
+                        )}
+                      </select>
+                    )}
                   </div>
                   <div className="form-group">
                     <label className="form-label" htmlFor="editBatch">Assign Batch</label>
@@ -8510,19 +8645,83 @@ const AdminDashboard = () => {
                     </div>
                   </div>
                   <div className="form-group">
-                    <label className="form-label" htmlFor="createCourse">Course *</label>
-                    <select id="createCourse" className="form-select" value={createCourse} onChange={(e) => setCreateCourse(e.target.value)} required>
-                      {courseTitles.length === 0 ? (
-                        <option value="">No courses available</option>
-                      ) : (
-                        <>
-                          <option value="">-- Select Course --</option>
-                          {courseTitles.map(c => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </>
-                      )}
-                    </select>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label className="form-label" htmlFor="createCourse" style={{ margin: 0 }}>Course *</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextState = !isCustomCourse;
+                          setIsCustomCourse(nextState);
+                          if (nextState) {
+                            setCustomCourseName('');
+                          } else {
+                            setCreateCourse(courseTitles[0] || 'Fullstack Engineering');
+                          }
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--primary, #6366f1)',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: 0
+                        }}
+                      >
+                        {isCustomCourse ? '← Select Existing Course' : '+ Create New Course'}
+                      </button>
+                    </div>
+
+                    {isCustomCourse ? (
+                      <div>
+                        <input
+                          id="createCourseCustom"
+                          type="text"
+                          className="form-input"
+                          placeholder="Type new course name (e.g. AI & Machine Learning)"
+                          value={customCourseName}
+                          onChange={(e) => setCustomCourseName(e.target.value)}
+                          required
+                          autoFocus
+                          style={{ borderColor: 'var(--primary, #6366f1)' }}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                          Will automatically add this course to the portal courses list.
+                        </span>
+                      </div>
+                    ) : (
+                      <select
+                        id="createCourse"
+                        className="form-select"
+                        value={createCourse}
+                        onChange={(e) => {
+                          if (e.target.value === '__add_new__') {
+                            setIsCustomCourse(true);
+                            setCustomCourseName('');
+                          } else {
+                            setCreateCourse(e.target.value);
+                          }
+                        }}
+                        required
+                      >
+                        {courseTitles.length === 0 ? (
+                          <option value="">No courses available</option>
+                        ) : (
+                          <>
+                            <option value="">-- Select Course --</option>
+                            {courseTitles.map(c => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                            <option value="__add_new__" style={{ fontWeight: 600, color: 'var(--primary, #6366f1)' }}>
+                              + Create New Course...
+                            </option>
+                          </>
+                        )}
+                      </select>
+                    )}
                   </div>
                   <div className="form-group">
                     <label className="form-label" htmlFor="createBatch">Batch *</label>
@@ -8963,13 +9162,77 @@ const AdminDashboard = () => {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label" htmlFor="batchCourseName">Course Title</label>
-                    <select id="batchCourseName" className="form-select" value={batchCourseName} onChange={(e) => setBatchCourseName(e.target.value)} required>
-                      <option value="">-- Select Course --</option>
-                      {courseTitles.map((c, i) => (
-                        <option key={i} value={c}>{c}</option>
-                      ))}
-                    </select>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label className="form-label" htmlFor="batchCourseName" style={{ margin: 0 }}>Course Title</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextState = !isCustomBatchCourse;
+                          setIsCustomBatchCourse(nextState);
+                          if (nextState) {
+                            setCustomBatchCourseName('');
+                          } else {
+                            setBatchCourseName(courseTitles[0] || 'Fullstack Engineering');
+                          }
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--primary, #6366f1)',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: 0
+                        }}
+                      >
+                        {isCustomBatchCourse ? '← Select Existing Course' : '+ Create New Course'}
+                      </button>
+                    </div>
+
+                    {isCustomBatchCourse ? (
+                      <div>
+                        <input
+                          id="batchCourseCustom"
+                          type="text"
+                          className="form-input"
+                          placeholder="Type new course name"
+                          value={customBatchCourseName}
+                          onChange={(e) => setCustomBatchCourseName(e.target.value)}
+                          required
+                          autoFocus
+                          style={{ borderColor: 'var(--primary, #6366f1)' }}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                          Will automatically add this course to your institute's catalog.
+                        </span>
+                      </div>
+                    ) : (
+                      <select
+                        id="batchCourseName"
+                        className="form-select"
+                        value={batchCourseName}
+                        onChange={(e) => {
+                          if (e.target.value === '__add_new__') {
+                            setIsCustomBatchCourse(true);
+                            setCustomBatchCourseName('');
+                          } else {
+                            setBatchCourseName(e.target.value);
+                          }
+                        }}
+                        required
+                      >
+                        <option value="">-- Select Course --</option>
+                        {courseTitles.map((c, i) => (
+                          <option key={i} value={c}>{c}</option>
+                        ))}
+                        <option value="__add_new__" style={{ fontWeight: 600, color: 'var(--primary, #6366f1)' }}>
+                          + Create New Course...
+                        </option>
+                      </select>
+                    )}
                   </div>
 
                   <div className="form-group">
