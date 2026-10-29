@@ -2183,7 +2183,7 @@ app.post('/api/messages/batch/:batchId', (req, res) => {
 app.delete('/api/messages/:messageId', (req, res) => {
   try {
     const { messageId } = req.params;
-    const { userId, userRole } = req.query;
+    const { userId, userRole, hardDelete } = req.query;
 
     const messages = localDb.loadCollection('messages');
     const targetIndex = messages.findIndex(m => String(m.id) === String(messageId));
@@ -2201,10 +2201,33 @@ app.delete('/api/messages/:messageId', (req, res) => {
       return res.status(403).json({ error: 'Forbidden: You can only delete your own messages.' });
     }
 
-    messages.splice(targetIndex, 1);
-    localDb.saveCollection('messages', messages);
+    // Students have a strict 2-hour window for deleting messages
+    if (!isModerator && isOwner) {
+      const msgTime = new Date(msg.createdAt).getTime();
+      const now = Date.now();
+      const twoHoursMs = 2 * 60 * 60 * 1000;
+      if (now - msgTime > twoHoursMs) {
+        return res.status(400).json({ error: 'Messages can only be deleted for everyone within 2 hours of sending.' });
+      }
+    }
 
-    res.json({ success: true, deletedId: messageId });
+    if (hardDelete === 'true' && isModerator) {
+      messages.splice(targetIndex, 1);
+    } else {
+      // WhatsApp style tombstone "This message was deleted"
+      msg.isDeleted = true;
+      msg.deletedAt = new Date().toISOString();
+      msg.deletedBy = isModerator ? (role === 'trainer' ? 'Trainer' : 'Admin') : 'Sender';
+      msg.text = '🚫 This message was deleted';
+      msg.mediaUrl = null;
+      msg.mediaType = null;
+      msg.fileName = null;
+      msg.fileSize = null;
+      msg.sticker = null;
+    }
+
+    localDb.saveCollection('messages', messages);
+    res.json({ success: true, message: msg, deletedId: messageId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

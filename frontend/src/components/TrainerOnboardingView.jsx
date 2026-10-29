@@ -516,3 +516,4 @@ const TrainerOnboardingView = ({
 };
 
 export default TrainerOnboardingView;
+

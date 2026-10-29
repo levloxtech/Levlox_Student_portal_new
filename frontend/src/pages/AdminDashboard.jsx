@@ -1,3 +1,4 @@
+import BatchChatPage from './BatchChatPage';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -10,7 +11,7 @@ import {
   Key, RefreshCw, ChevronDown, X, Download, FileText, FileSpreadsheet,
   User, Mail, Phone, Lock, EyeOff, Camera, Save, Shield, Menu,
   Calendar, Timer, Sparkles, FastForward, CheckCheck, History, ArrowUpRight, UserCheck,
-  Globe, ArrowLeft, ArrowRight, Upload, Image as ImageIcon, UploadCloud
+  Globe, ArrowLeft, ArrowRight, Upload, Image as ImageIcon, UploadCloud, MessageSquare
 } from 'lucide-react';
 import CustomModal from '../components/Modal';
 import FilterBar from '../components/FilterBar';
@@ -4450,6 +4451,11 @@ const AdminDashboard = () => {
             <span className="sidebar-link-text">Assignments</span>
           </button>
           
+          <button className={`sidebar-link ${activeTab === 'chat' || activeTab === 'batch-chat' ? 'active' : ''}`} onClick={() => handleNavTabClick('chat')}>
+            <MessageSquare size={18} />
+            <span className="sidebar-link-text">Batch Chat</span>
+          </button>
+          
           <button className={`sidebar-link ${activeTab === 'fees-management' ? 'active' : ''}`} onClick={() => handleNavTabClick('fees-management', () => setCurrentPage(1))}>
             <Wallet size={18} />
             <span className="sidebar-link-text">Fees Management</span>
@@ -7513,6 +7519,13 @@ const AdminDashboard = () => {
                 );
               })()}
             </div>
+          </div>
+        )}
+
+        {/* Batch Chat Tab */}
+        {(activeTab === 'chat' || activeTab === 'batch-chat') && (
+          <div className="animate-fade-in" style={{ height: 'calc(100vh - 120px)', minHeight: 650, width: '100%' }}>
+            <BatchChatPage user={currentUser} userProfile={userProfile} batches={batches} />
           </div>
         )}
 

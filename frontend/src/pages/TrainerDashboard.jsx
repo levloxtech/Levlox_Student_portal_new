@@ -2421,7 +2421,7 @@ const TrainerDashboard = () => {
         {/* ─── TAB 10: BATCH CHAT ───────────────────────────────────────────── */}
         {activeTab === 'chat' && (
           <div className="animate-fade-in">
-            <BatchChatPage />
+            <BatchChatPage user={currentUser} userProfile={userProfile} batches={batches} />
           </div>
         )}
 
