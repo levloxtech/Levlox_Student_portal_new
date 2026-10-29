@@ -2159,6 +2159,18 @@ app.post('/api/messages/upload', (req, res) => {
   });
 });
 
+// ── Serve Frontend Production Build (SPA Fallback) ─────────────────────────
+const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // SERVER STARTUP
 // ════════════════════════════════════════════════════════════════════════════
