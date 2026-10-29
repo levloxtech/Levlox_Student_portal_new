@@ -744,7 +744,20 @@ const AdminDashboard = () => {
   const [trainerName, setTrainerName] = useState('');
   const [trainerEmail, setTrainerEmail] = useState('');
   const [trainerPhone, setTrainerPhone] = useState('');
+  const PRESET_TRAINER_ROLES = [
+    'Trainer',
+    'Senior Trainer',
+    'Lead Instructor',
+    'Technical Faculty',
+    'Guest Lecturer',
+    'Full Stack Mentor',
+    'DevOps Instructor',
+    'Data Science Mentor',
+    'Cyber Security Faculty',
+    'Soft Skills Trainer'
+  ];
   const [trainerRole, setTrainerRole] = useState('Trainer');
+  const [isCustomRole, setIsCustomRole] = useState(false);
   const [trainerStatus, setTrainerStatus] = useState('Active');
   const [showLiveClassModal, setShowLiveClassModal] = useState(false);
   const [adminUploadClass, setAdminUploadClass] = useState(null);
@@ -2722,7 +2735,9 @@ const AdminDashboard = () => {
       setTrainerName(trainer.name || '');
       setTrainerEmail(trainer.email || '');
       setTrainerPhone(trainer.phone || '');
-      setTrainerRole(trainer.designation || trainer.role_title || trainer.specialization || 'Trainer');
+      const currentRole = trainer.designation || trainer.role_title || trainer.specialization || 'Trainer';
+      setTrainerRole(currentRole);
+      setIsCustomRole(!PRESET_TRAINER_ROLES.includes(currentRole));
       setTrainerStatus(trainer.status || 'Active');
       setTrainerTempPassword('');
     } else {
@@ -2731,6 +2746,7 @@ const AdminDashboard = () => {
       setTrainerEmail('');
       setTrainerPhone('');
       setTrainerRole('Trainer');
+      setIsCustomRole(false);
       setTrainerStatus('Active');
       setTrainerTempPassword(generateRandomPassword());
     }
@@ -8287,14 +8303,68 @@ const AdminDashboard = () => {
               </div>
 
               <div>
-                <label className="form-label" style={{ fontWeight: 600 }}>Role / Designation *</label>
-                <select className="form-select" value={trainerRole} onChange={e => setTrainerRole(e.target.value)}>
-                  <option value="Trainer">Trainer</option>
-                  <option value="Senior Trainer">Senior Trainer</option>
-                  <option value="Lead Instructor">Lead Instructor</option>
-                  <option value="Technical Faculty">Technical Faculty</option>
-                  <option value="Guest Lecturer">Guest Lecturer</option>
-                </select>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label className="form-label" style={{ fontWeight: 600, margin: 0 }}>Role / Designation *</label>
+                  <button
+                    type="button"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--primary-color, #6C3CF0)',
+                      fontSize: '11.5px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      padding: '2px 6px',
+                      borderRadius: 4
+                    }}
+                    onClick={() => {
+                      if (!isCustomRole) {
+                        setIsCustomRole(true);
+                        setTrainerRole('');
+                      } else {
+                        setIsCustomRole(false);
+                        setTrainerRole('Trainer');
+                      }
+                    }}
+                  >
+                    {isCustomRole ? '← Choose from Presets' : '✏️ Create / Enter Manually'}
+                  </button>
+                </div>
+
+                {isCustomRole ? (
+                  <div>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={trainerRole}
+                      onChange={e => setTrainerRole(e.target.value)}
+                      placeholder="e.g. Lead Python Faculty, DevOps Specialist"
+                      required
+                      autoFocus
+                    />
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: 4 }}>
+                      Enter any custom role manually. It will be assigned to this trainer account.
+                    </div>
+                  </div>
+                ) : (
+                  <select
+                    className="form-select"
+                    value={PRESET_TRAINER_ROLES.includes(trainerRole) ? trainerRole : 'CUSTOM'}
+                    onChange={e => {
+                      if (e.target.value === 'CUSTOM') {
+                        setIsCustomRole(true);
+                        setTrainerRole('');
+                      } else {
+                        setTrainerRole(e.target.value);
+                      }
+                    }}
+                  >
+                    {PRESET_TRAINER_ROLES.map(role => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                    <option value="CUSTOM">+ Create Custom Role Manually...</option>
+                  </select>
+                )}
               </div>
 
               <div>
