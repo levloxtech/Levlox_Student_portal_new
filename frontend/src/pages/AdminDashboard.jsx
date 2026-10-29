@@ -27,6 +27,7 @@ import {
   getStudentCount,
   createStudent,
   updateStudent,
+  deleteDocument,
   deleteDocument as deleteStudentDoc,
   formatCurrency,
   getStudentFeeDetails,
@@ -2762,6 +2763,8 @@ const AdminDashboard = () => {
         // Trigger welcome email status tracking in Firestore
         sendTrainerWelcomeEmail({ name: trainerName.trim(), email: trainerEmail.trim(), trainerId, openMailClient: false }, trainerTempPassword);
       }
+      queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
+      refetchAdminData();
       fetchStats();
     } catch (err) {
       console.error('[Admin] Trainer creation/update failed:', err);
@@ -2776,6 +2779,8 @@ const AdminDashboard = () => {
     if (!window.confirm('Are you sure you want to delete this trainer record?')) return;
     try {
       await deleteTrainer(trainerId);
+      queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
+      refetchAdminData();
       showModal('Success', 'Trainer deleted successfully.', 'success');
       fetchStats();
     } catch (err) {
@@ -7623,40 +7628,68 @@ const AdminDashboard = () => {
                   <p style={{ fontSize: 13, margin: '4px 0 0' }}>Click "+ Create Trainer" to add your first trainer.</p>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
                   {trainers.map((t) => (
-                    <div key={t.id} className="feed-item-premium" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 20, background: '#FFF', borderRadius: 16, border: '1px solid var(--border-light)' }}>
+                    <div key={t.id} className="feed-item-premium" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 22, background: '#FFF', borderRadius: 16, border: '1px solid var(--border-light, #E2E8F0)', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                          <span style={{ fontSize: 11, fontWeight: 800, background: 'var(--primary-light)', color: 'var(--primary-color)', padding: '3px 8px', borderRadius: 6 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                          <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(79, 70, 229, 0.08)', color: 'var(--primary-color, #4F46E5)', padding: '4px 10px', borderRadius: 8, fontFamily: 'monospace' }}>
                             {t.trainerId || t.code || 'TRN-001'}
                           </span>
-                          <span className={`badge-status ${t.status === 'Active' ? 'paid' : 'unpaid'}`} style={{ fontSize: 10, fontWeight: 700 }}>
+                          <span className={`badge-status ${t.status === 'Active' ? 'paid' : 'unpaid'}`} style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>
                             {t.status || 'Active'}
                           </span>
                         </div>
-                        <h4 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>{t.name}</h4>
-                        <p style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--primary-color)', fontWeight: 700 }}>{t.specialization || 'Instructor'}</p>
-                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <span>Email: {t.email ? <a href={`mailto:${t.email}`} style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: 600 }}>{t.email}</a> : '—'}</span>
-                          <span>Phone: {t.phone || '—'}</span>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                          {t.profilePic || t.profile_pic ? (
+                            <img src={t.profilePic || t.profile_pic} alt={t.name} style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid #E2E8F0', flexShrink: 0 }} />
+                          ) : (
+                            <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #06b6d4)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 17, flexShrink: 0 }}>
+                              {t.name ? t.name.charAt(0).toUpperCase() : 'T'}
+                            </div>
+                          )}
+                          <div style={{ minWidth: 0, flexGrow: 1 }}>
+                            <h4 style={{ margin: 0, fontSize: 16.5, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</h4>
+                            <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--primary-color, #4F46E5)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {t.specialization || t.course || 'Faculty Trainer'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary, #64748B)', display: 'flex', flexDirection: 'column', gap: 6, background: '#F8FAFC', padding: 12, borderRadius: 10, marginTop: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontWeight: 600, color: '#475569' }}>Email:</span>
+                            <span style={{ maxWidth: '65%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {t.email ? <a href={`mailto:${t.email}`} style={{ color: 'var(--primary-color, #4F46E5)', textDecoration: 'none', fontWeight: 600 }}>{t.email}</a> : '—'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontWeight: 600, color: '#475569' }}>Phone:</span>
+                            <span>{t.phone || '—'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontWeight: 600, color: '#475569' }}>Batches:</span>
+                            <span style={{ fontWeight: 700, color: '#0F172A' }}>{(t.assigned_batch_ids || []).length} assigned</span>
+                          </div>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 8, marginTop: 16, borderTop: '1px solid var(--border-light)', paddingTop: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+
+                      <div style={{ display: 'flex', gap: 8, marginTop: 16, borderTop: '1px solid var(--border-light, #F1F5F9)', paddingTop: 14, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                         {t.email && (
                           <button
                             type="button"
                             className="btn btn-outline"
-                            style={{ padding: '6px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--primary-color)', borderColor: 'var(--primary-color)' }}
+                            style={{ padding: '6px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--primary-color, #4F46E5)', borderColor: 'var(--primary-color, #4F46E5)' }}
                             onClick={() => openSendTrainerMailModal(t)}
                           >
                             <Mail size={14} /> Send Mail
                           </button>
                         )}
-                        <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => openTrainerModal(t)}>
+                        <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => openTrainerModal(t)}>
                           <Pencil size={14} /> Edit
                         </button>
-                        <button className="btn btn-danger" style={{ padding: '6px 12px', fontSize: 12, backgroundColor: 'var(--danger-color)', color: 'white' }} onClick={() => handleDeleteTrainer(t.id)}>
+                        <button className="btn btn-danger" style={{ padding: '6px 12px', fontSize: 12, backgroundColor: '#EF4444', color: 'white', display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => handleDeleteTrainer(t.id)}>
                           <Trash2 size={14} /> Delete
                         </button>
                       </div>
@@ -7949,52 +7982,102 @@ const AdminDashboard = () => {
           title={editingTrainer ? 'Edit Trainer Profile' : 'Create New Trainer Account'}
         >
           <form onSubmit={handleSaveTrainer} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label className="form-label">Full Name *</label>
-              <input type="text" className="form-input" value={trainerName} onChange={e => setTrainerName(e.target.value)} placeholder="e.g. Sri Trainer" required />
-            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>Full Name *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={trainerName}
+                  onChange={e => setTrainerName(e.target.value)}
+                  placeholder="e.g. Dr. Abdul Kalam"
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="form-label">Email Address *</label>
-              <input type="email" className="form-input" value={trainerEmail} onChange={e => setTrainerEmail(e.target.value)} placeholder="e.g. trainer@levlox.com" required />
-            </div>
+              <div>
+                <label className="form-label" style={{ fontWeight: 600 }}>Email Address *</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={trainerEmail}
+                  onChange={e => setTrainerEmail(e.target.value)}
+                  placeholder="trainer@levlox.com"
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="form-label">Mobile Number</label>
-              <input type="text" className="form-input" value={trainerPhone} onChange={e => setTrainerPhone(e.target.value)} placeholder="e.g. +91 9876543210" />
-            </div>
+              <div>
+                <label className="form-label" style={{ fontWeight: 600 }}>Mobile Number</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={trainerPhone}
+                  onChange={e => setTrainerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="10-digit mobile number"
+                  maxLength={10}
+                />
+              </div>
 
-            <div>
-              <label className="form-label">Course / Expertise</label>
-              <input type="text" className="form-input" value={trainerSpecialization} onChange={e => setTrainerSpecialization(e.target.value)} placeholder="e.g. Full Stack Web Development" />
-            </div>
+              <div>
+                <label className="form-label" style={{ fontWeight: 600 }}>Course / Domain Expertise</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  list="trainerCourseOptions"
+                  value={trainerSpecialization}
+                  onChange={e => setTrainerSpecialization(e.target.value)}
+                  placeholder="e.g. Data Science & AI"
+                />
+                <datalist id="trainerCourseOptions">
+                  {courseTitles.map(c => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </div>
 
-            <div>
-              <label className="form-label">Account Status</label>
-              <select className="form-select" value={trainerStatus} onChange={e => setTrainerStatus(e.target.value)}>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
+              <div>
+                <label className="form-label" style={{ fontWeight: 600 }}>Account Status</label>
+                <select className="form-select" value={trainerStatus} onChange={e => setTrainerStatus(e.target.value)}>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
             </div>
 
             {!editingTrainer && (
-              <div>
-                <label className="form-label">Temporary Password *</label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input type="text" className="form-input" value={trainerTempPassword} onChange={e => setTrainerTempPassword(e.target.value)} required />
-                  <button type="button" className="btn btn-outline" style={{ flexShrink: 0, padding: '0 12px', fontSize: 12 }} onClick={() => setTrainerTempPassword(generateRandomPassword())}>
-                    Generate
+              <div style={{ background: '#F8FAFC', padding: 14, borderRadius: 12, border: '1px solid #E2E8F0', marginTop: 4 }}>
+                <label className="form-label" style={{ marginBottom: 6, fontWeight: 600 }}>Temporary Password *</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={trainerTempPassword}
+                    readOnly
+                    required
+                    style={{ fontFamily: 'monospace', letterSpacing: '0.8px', background: '#FFF', fontWeight: 600, flexGrow: 1 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ flexShrink: 0, padding: '0 14px', height: 42, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600 }}
+                    onClick={() => setTrainerTempPassword(generateRandomPassword())}
+                    title="Generate New Password"
+                  >
+                    <RefreshCw size={14} /> Regenerate
                   </button>
                 </div>
-                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4, display: 'block' }}>
-                  Trainer will be forced to change this password on their first login.
+                <span style={{ fontSize: 11.5, color: '#64748B', marginTop: 6, display: 'block' }}>
+                  Trainer will use this password to sign in to the Trainer Portal.
                 </span>
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
               <button type="button" className="btn btn-outline" onClick={() => setShowTrainerModal(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary">{editingTrainer ? 'Save Changes' : 'Create Trainer'}</button>
+              <button type="submit" className="btn btn-primary" style={{ minWidth: 140 }}>
+                {editingTrainer ? 'Save Changes' : 'Create Trainer'}
+              </button>
             </div>
           </form>
         </CustomModal>
