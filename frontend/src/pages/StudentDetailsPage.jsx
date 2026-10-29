@@ -97,9 +97,11 @@ const StudentDetailsPage = () => {
     enabled: !!studentId,
   });
 
+  const isDirtyRef = useRef(false);
+
   // Populate edit form when student data loads
   useEffect(() => {
-    if (student) {
+    if (student && !isDirtyRef.current) {
       setEditForm({
         name: student.name || '',
         phone: student.phone || student.mobile || '',
@@ -218,6 +220,7 @@ const StudentDetailsPage = () => {
       // Invalidate React Query caches
       await queryClient.invalidateQueries({ queryKey: ['adminStudentDetails', studentId] });
       await queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
+      isDirtyRef.current = false;
       refetchStudent();
 
       setSaveSuccessMessage('Profile updated & notification email sent successfully!');

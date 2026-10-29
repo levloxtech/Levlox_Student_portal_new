@@ -9,7 +9,8 @@
 
 import { auth } from "../firebase";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const isProd = typeof window !== 'undefined' && window.location && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+const API_BASE_URL = isProd ? '' : (import.meta.env.VITE_API_URL || '');
 
 /**
  * Get current Firebase Auth ID Token for authenticated API calls.

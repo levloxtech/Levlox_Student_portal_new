@@ -2875,7 +2875,24 @@ const AdminDashboard = () => {
           trainer_id: trainerId,
           code: trainerId,
           mustChangePassword: false,
+          tempPassword: trainerTempPassword,
+          rawPassword: trainerTempPassword,
+          password: trainerTempPassword,
         };
+
+        try {
+          await fetch('/api/auth/register-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: trainerEmail.trim(),
+              password: trainerTempPassword,
+              role: 'trainer',
+              name: trainerName.trim(),
+              phone: trainerPhone.trim()
+            })
+          });
+        } catch (_) {}
 
         await createTrainerProfile(uid, payload);
         await deleteDocument('students', uid).catch(() => {});

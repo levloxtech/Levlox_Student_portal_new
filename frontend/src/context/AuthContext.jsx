@@ -6,7 +6,8 @@ const AuthContext = createContext(null);
 const TOKEN_KEY = 'levlox_auth_token';
 const USER_KEY = 'levlox_auth_user';
 const PROFILE_KEY = 'levlox_profile_cache';
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const isProd = typeof window !== 'undefined' && window.location && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+const API_BASE = isProd ? '' : (import.meta.env.VITE_API_URL || '');
 
 const readSavedUser = () => {
   try {

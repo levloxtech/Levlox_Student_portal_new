@@ -80,7 +80,8 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
  * @returns {Promise<string>} the new user's uid
  */
 export const createAuthUserDetached = async (email, password, role = 'student', name = '', phone = '') => {
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+  const isProd = typeof window !== 'undefined' && window.location && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+  const API_BASE = isProd ? '' : (import.meta.env.VITE_API_URL || '');
   const token = localStorage.getItem("levlox_auth_token");
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;

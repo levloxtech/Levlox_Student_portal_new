@@ -5,8 +5,8 @@
  * Persists all trainer data locally via http://localhost:4000/api/data/*
  */
 
-import { 
-  getDocuments, 
+import {
+  getDocuments,
   getDocument,
   addDocument,
   updateDocumentFields,

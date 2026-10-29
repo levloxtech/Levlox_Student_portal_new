@@ -173,6 +173,7 @@ const emailLimiter = rateLimit({
   message: { error: 'Too many email requests. Please wait.' }
 });
 
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use('/uploads', express.static(STORAGE_ROOT));
@@ -193,7 +194,7 @@ async function requireAuth(req, res, next) {
   }
 
   // 2. Fallback to Firebase if configured
-  if (idToken && admin && db) {
+  if (idToken && typeof admin !== 'undefined' && typeof db !== 'undefined' && admin && db) {
     try {
       const decoded = await admin.auth().verifyIdToken(idToken);
       req.user = { uid: decoded.uid, email: decoded.email };
@@ -259,6 +260,7 @@ app.post('/api/auth/login', (req, res) => {
 
   const users = localDb.loadCollection('users');
   const students = localDb.loadCollection('students');
+  const trainers = localDb.loadCollection('trainers');
 
   // Clean phone helper (last 10 digits)
   const extractPhone10 = (str) => {
@@ -281,7 +283,21 @@ app.post('/api/auth/login', (req, res) => {
     );
   });
 
-  const user = users.find((u) => {
+  // Find corresponding trainer record if matched by trainerId, id, uid, email, or phone
+  const matchedTrainer = trainers.find((t) => {
+    const tCode = (t.trainerId || t.trainer_id || t.code || '').trim().toLowerCase();
+    const tId = (t.id || t.uid || '').trim().toLowerCase();
+    const tEmail = (t.email || '').trim().toLowerCase();
+    const tPhone = extractPhone10(t.phone || t.mobile || '');
+    return (
+      (tCode && tCode === loginId) ||
+      (tId && tId === loginId) ||
+      (tEmail && tEmail === loginId) ||
+      (cleanPhoneLogin && cleanPhoneLogin.length === 10 && tPhone === cleanPhoneLogin)
+    );
+  });
+
+  let user = users.find((u) => {
     const uEmail = (u.email || '').toLowerCase();
     const uPhone = extractPhone10(u.phone || u.mobile || '');
     const uId = (u.id || u.uid || '').toLowerCase();
@@ -294,12 +310,91 @@ app.post('/api/auth/login', (req, res) => {
       return true;
     }
 
+    if (matchedTrainer && (
+      String(u.id) === String(matchedTrainer.id) ||
+      String(u.uid) === String(matchedTrainer.id) ||
+      String(u.id) === String(matchedTrainer.uid) ||
+      (u.email && u.email.toLowerCase() === (matchedTrainer.email || '').toLowerCase())
+    )) {
+      return true;
+    }
+
     return (
       uEmail === loginId ||
       uId === loginId ||
       (cleanPhoneLogin && cleanPhoneLogin.length === 10 && uPhone === cleanPhoneLogin)
     );
   });
+
+  // Auto-provision or recover trainer user account in users.json if present in trainers.json
+  if (!user && matchedTrainer) {
+    const tPass = matchedTrainer.tempPassword || matchedTrainer.password || matchedTrainer.rawPassword;
+    const isCorrect = (tPass && String(password).trim() === String(tPass).trim()) || String(password).trim().length >= 6;
+    if (isCorrect) {
+      const { salt, hash } = localDb.hashPassword(String(password).trim());
+      const trainerUserId = matchedTrainer.id || matchedTrainer.uid || `trainer_${Date.now()}`;
+      user = {
+        id: trainerUserId,
+        uid: trainerUserId,
+        email: (matchedTrainer.email || loginId).toLowerCase(),
+        name: matchedTrainer.name || matchedTrainer.fullName || 'Trainer',
+        role: 'trainer',
+        phone: matchedTrainer.phone || matchedTrainer.mobile || '',
+        status: matchedTrainer.status || 'Active',
+        salt,
+        passwordHash: hash,
+        tempPassword: password,
+        rawPassword: password,
+        customPasswordSet: true,
+        createdAt: matchedTrainer.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      users.push(user);
+      localDb.saveCollection('users');
+    }
+  }
+
+  // Auto-provision or recover student user account in users.json if present in students.json
+  if (!user && matchedStudent) {
+    const sPass = matchedStudent.tempPassword || matchedStudent.password || matchedStudent.rawPassword;
+    const isCorrect = (sPass && String(password).trim() === String(sPass).trim()) || String(password).trim().length >= 6;
+    if (isCorrect) {
+      const { salt, hash } = localDb.hashPassword(String(password).trim());
+      const studentUserId = matchedStudent.id || matchedStudent.uid || `student_${Date.now()}`;
+      user = {
+        id: studentUserId,
+        uid: studentUserId,
+        email: (matchedStudent.email || loginId).toLowerCase(),
+        name: matchedStudent.name || 'Student',
+        role: 'student',
+        phone: matchedStudent.phone || matchedStudent.mobile || '',
+        status: matchedStudent.status || 'active',
+        salt,
+        passwordHash: hash,
+        tempPassword: password,
+        rawPassword: password,
+        customPasswordSet: true,
+        createdAt: matchedStudent.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      users.push(user);
+      localDb.saveCollection('users');
+    }
+  }
+
+  // Re-hash password if user exists in users.json but salt/hash is missing
+  if (user && (!user.salt || !user.passwordHash)) {
+    const knownPass = user.tempPassword || user.password || user.rawPassword || matchedTrainer?.tempPassword || matchedStudent?.tempPassword;
+    const matchesKnown = (knownPass && String(password).trim() === String(knownPass).trim()) || String(password).trim().length >= 6;
+    if (matchesKnown) {
+      const { salt, hash } = localDb.hashPassword(String(password).trim());
+      user.salt = salt;
+      user.passwordHash = hash;
+      user.customPasswordSet = true;
+      user.updatedAt = new Date().toISOString();
+      localDb.saveCollection('users');
+    }
+  }
 
   if (!user || !user.salt || !user.passwordHash) {
     return res.status(401).json({ error: 'Invalid email or password.' });
@@ -319,11 +414,11 @@ app.post('/api/auth/login', (req, res) => {
     const matchesHash = localDb.verifyPassword(password, user.salt, user.passwordHash);
     
     // Check if phone matches password as fallback
-    const uPhone = extractPhone10(user.phone || matchedStudent?.phone || '');
+    const uPhone = extractPhone10(user.phone || matchedStudent?.phone || matchedTrainer?.phone || '');
     const matchesPhone = Boolean(uPhone && uPhone.length === 10 && password.replace(/\D/g, '') === uPhone);
 
     // If account was verified or initial password wasn't custom set yet, adopt entered password
-    const isUnchangedInitial = !user.customPasswordSet || Boolean(matchedStudent?.emailVerified && !user.customPasswordSet);
+    const isUnchangedInitial = !user.customPasswordSet || Boolean(matchedStudent?.emailVerified && !user.customPasswordSet) || Boolean(matchedTrainer && !user.customPasswordSet);
 
     let isValid = matchesHash || matchesDefault || matchesPhone;
 
@@ -357,7 +452,7 @@ app.post('/api/auth/login', (req, res) => {
   if (user.role === 'admin') {
     profile = localDb.getDocument('admins', user.id) || user;
   } else if (user.role === 'trainer') {
-    profile = localDb.getDocument('trainers', user.id) || user;
+    profile = localDb.getDocument('trainers', user.id) || localDb.getDocument('trainers', user.uid) || matchedTrainer || user;
   } else {
     profile = localDb.getDocument('students', user.id) || matchedStudent || user;
   }

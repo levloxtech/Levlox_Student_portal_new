@@ -47,6 +47,7 @@ import {
   getCourses,
   addCourse,
   updateCourse,
+  updateTrainer,
   getPlaylists,
   addPlaylist,
   updatePlaylist,
@@ -171,6 +172,55 @@ const TrainerDashboard = () => {
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
+  };
+
+  const [editingTrainerProfile, setEditingTrainerProfile] = useState(false);
+  const [trainerProfileName, setTrainerProfileName] = useState('');
+  const [trainerProfilePhone, setTrainerProfilePhone] = useState('');
+  const [trainerProfileRole, setTrainerProfileRole] = useState('');
+  const [savingTrainerProfile, setSavingTrainerProfile] = useState(false);
+
+  const startEditTrainerProfile = () => {
+    setTrainerProfileName(userProfile?.fullName || userProfile?.name || '');
+    setTrainerProfilePhone(userProfile?.phone || userProfile?.mobile || '');
+    setTrainerProfileRole(userProfile?.designation || userProfile?.specialization || 'Trainer');
+    setEditingTrainerProfile(true);
+  };
+
+  const handleSaveTrainerProfile = async (e) => {
+    if (e) e.preventDefault();
+    if (!trainerProfileName.trim()) {
+      showToast('Full name cannot be empty.');
+      return;
+    }
+    setSavingTrainerProfile(true);
+    try {
+      const trainerUid = userProfile?.id || userProfile?.uid || currentUser?.uid;
+      const updates = {
+        name: trainerProfileName.trim(),
+        fullName: trainerProfileName.trim(),
+        phone: trainerProfilePhone.trim(),
+        mobile: trainerProfilePhone.trim(),
+        designation: trainerProfileRole.trim(),
+        specialization: trainerProfileRole.trim(),
+        updatedAt: new Date().toISOString()
+      };
+      await updateTrainer(trainerUid, updates);
+      try {
+        await updateDocumentFields('users', trainerUid, {
+          name: trainerProfileName.trim(),
+          phone: trainerProfilePhone.trim()
+        });
+      } catch (_) {}
+      if (applyProfilePatch) applyProfilePatch(updates);
+      setEditingTrainerProfile(false);
+      showToast('Profile updated successfully ✓');
+    } catch (err) {
+      console.error('[Trainer] Save profile failed:', err);
+      showToast(err?.message || 'Failed to update trainer profile');
+    } finally {
+      setSavingTrainerProfile(false);
+    }
   };
 
   const trainerUid = currentUser?.uid;
@@ -2393,12 +2443,47 @@ const TrainerDashboard = () => {
 
         {/* ─── TAB 12: TRAINER PROFILE ──────────────────────────────────────── */}
         {activeTab === 'profile' && (
-          <div className="animate-fade-in" style={{ maxWidth: 700 }}>
+          <div className="animate-fade-in" style={{ maxWidth: 750 }}>
             <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 20, padding: 28, boxShadow: 'var(--shadow-card)' }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 16px', color: '#1E293B' }}>Trainer Faculty Profile</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div>
+                  <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0, color: '#1E293B' }}>Trainer Faculty Profile</h2>
+                  <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>View and manage your professional instructor profile</p>
+                </div>
+                {!editingTrainerProfile ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={startEditTrainerProfile}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+                  >
+                    <Pencil size={14} /> Edit Profile
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={handleSaveTrainerProfile}
+                      disabled={savingTrainerProfile}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+                    >
+                      <Save size={14} /> {savingTrainerProfile ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setEditingTrainerProfile(false)}
+                      disabled={savingTrainerProfile}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 24, paddingBottom: 20, borderBottom: '1px solid var(--border-color)' }}>
-                <div style={{ position: 'relative', width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', border: '3px solid var(--primary-color)' }}>
+                <div style={{ position: 'relative', width: 85, height: 85, borderRadius: '50%', overflow: 'hidden', border: '3px solid var(--primary-color)' }}>
                   <img 
                     src={userProfile?.profilePic || userProfile?.profile_pic || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
                     alt="Trainer Avatar" 
@@ -2414,24 +2499,94 @@ const TrainerDashboard = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div>
-                  <label className="form-label">Full Name</label>
-                  <input type="text" className="form-input" value={userProfile?.fullName || userProfile?.name || ''} readOnly />
+              {!editingTrainerProfile ? (
+                /* View Mode */
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+                    <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Full Name</span>
+                    <strong style={{ fontSize: 15, color: '#1E293B' }}>{userProfile?.fullName || userProfile?.name || '—'}</strong>
+                  </div>
+                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+                    <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Faculty ID</span>
+                    <strong style={{ fontSize: 15, fontFamily: 'monospace', color: 'var(--primary-color)' }}>{userProfile?.trainerId || userProfile?.code || 'TRN001013'}</strong>
+                  </div>
+                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+                    <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Email Address</span>
+                    <span style={{ fontSize: 14, color: '#334155' }}>{userProfile?.email || '—'}</span>
+                  </div>
+                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+                    <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Mobile Number</span>
+                    <span style={{ fontSize: 14, color: '#334155' }}>{userProfile?.phone || userProfile?.mobile || 'Not provided'}</span>
+                  </div>
+                  <div style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0', gridColumn: 'span 2' }}>
+                    <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Role / Designation</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>{userProfile?.designation || userProfile?.specialization || 'Trainer'}</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="form-label">Trainer Faculty ID</label>
-                  <input type="text" className="form-input" value={userProfile?.trainerId || userProfile?.code || 'TRN001013'} readOnly style={{ fontFamily: 'monospace', fontWeight: 700 }} />
-                </div>
-                <div>
-                  <label className="form-label">Email Address</label>
-                  <input type="text" className="form-input" value={userProfile?.email || ''} readOnly />
-                </div>
-                <div>
-                  <label className="form-label">Mobile Number</label>
-                  <input type="text" className="form-input" value={userProfile?.phone || ''} readOnly />
-                </div>
-              </div>
+              ) : (
+                /* Edit Mode */
+                <form onSubmit={handleSaveTrainerProfile} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Full Name *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={trainerProfileName}
+                      onChange={e => setTrainerProfileName(e.target.value)}
+                      placeholder="Your full name"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Faculty ID (Fixed)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={userProfile?.trainerId || userProfile?.code || 'TRN001013'}
+                      readOnly
+                      style={{ fontFamily: 'monospace', fontWeight: 700, background: '#F1F5F9' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Email Address (Fixed)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={userProfile?.email || ''}
+                      readOnly
+                      style={{ background: '#F1F5F9' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Mobile Number</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={trainerProfilePhone}
+                      onChange={e => setTrainerProfilePhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="10-digit mobile number"
+                      maxLength={10}
+                    />
+                  </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Role / Designation</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={trainerProfileRole}
+                      onChange={e => setTrainerProfileRole(e.target.value)}
+                      placeholder="e.g. Lead Instructor, Senior Python Faculty"
+                    />
+                  </div>
+                  <div style={{ gridColumn: 'span 2', display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+                    <button type="button" className="btn btn-ghost" onClick={() => setEditingTrainerProfile(false)}>Cancel</button>
+                    <button type="submit" className="btn btn-primary" disabled={savingTrainerProfile}>
+                      {savingTrainerProfile ? 'Saving Changes...' : 'Save Profile Changes'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         )}

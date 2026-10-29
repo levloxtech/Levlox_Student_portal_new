@@ -57,17 +57,23 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
   const [guardianPhone, setGuardianPhone] = useState('');
   const [guardianRelation, setGuardianRelation] = useState('Guardian');
 
+  const isEditingRef = React.useRef(false);
+  isEditingRef.current = editing;
+
   useEffect(() => {
-    fetchProfile();
-  }, [dashboardData, uid]);
+    fetchProfile(true);
+  }, [uid]);
 
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
   };
 
-  const fetchProfile = async () => {
-    setLoading(true);
+  const fetchProfile = async (isInitial = false) => {
+    if (isEditingRef.current) return;
+    if (isInitial && !profileData) {
+      setLoading(true);
+    }
     try {
       let d = dashboardData?.student;
       if (!d && uid) {
@@ -75,20 +81,22 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
       }
       if (d) {
         setProfileData(d);
-        setName(d.name || '');
-        setEmail(d.email || '');
-        setPhone(d.phone || '');
-        setCurrentLocation(d.current_location || d.location || '');
-        setPermanentAddress(d.permanent_address || '');
-        setProfilePic(d.profile_pic || d.profilePhotoUrl || '');
-        setCollege(d.college || 'Levlox Technical Institute');
-        setCompany(d.company || '');
-        setDob(d.dob || d.date_of_birth || d.dateOfBirth || '');
-        setGender(d.gender || '');
-        setCity(d.city || '');
-        setGuardianName(d.guardian_name || d.guardianName || '');
-        setGuardianPhone(d.guardian_phone || d.guardianPhone || d.guardianContact || '');
-        setGuardianRelation(d.guardian_relation || d.guardianRelation || 'Guardian');
+        if (!isEditingRef.current) {
+          setName(d.name || '');
+          setEmail(d.email || '');
+          setPhone(d.phone || '');
+          setCurrentLocation(d.current_location || d.location || '');
+          setPermanentAddress(d.permanent_address || '');
+          setProfilePic(d.profile_pic || d.profilePhotoUrl || '');
+          setCollege(d.college || 'Levlox Technical Institute');
+          setCompany(d.company || '');
+          setDob(d.dob || d.date_of_birth || d.dateOfBirth || '');
+          setGender(d.gender || '');
+          setCity(d.city || '');
+          setGuardianName(d.guardian_name || d.guardianName || '');
+          setGuardianPhone(d.guardian_phone || d.guardianPhone || d.guardianContact || '');
+          setGuardianRelation(d.guardian_relation || d.guardianRelation || 'Guardian');
+        }
 
         // Look up assigned batch details from local server database
         const bId = d.batchId || d.batch_id;
