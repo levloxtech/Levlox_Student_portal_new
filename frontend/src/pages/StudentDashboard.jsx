@@ -723,6 +723,7 @@ const StudentDashboard = () => {
   const courses = dashboardData?.courses || [];
   const enrolledCourses = dashboardData?.enrolledCourses || [];
   const submissions = dashboardData?.submissions || [];
+  const recordedClasses = dashboardData?.recordedClasses || [];
   const latestReplays = dashboardData?.latestReplays || [];
   const batchLiveClasses = dashboardData?.batchLiveClasses || [];
   const liveClassesList = dashboardData?.upcomingLiveClasses || [];
@@ -1563,7 +1564,7 @@ const StudentDashboard = () => {
 
             {/* RECENTLY VIEWED VIDEOS & FEE STATUS HIGHLIGHT ROW */}
             {(() => {
-              const allRecordings = rawRecordings || [];
+              const allRecordings = recordedClasses || dashboardData?.recordedClasses || [];
               const relevantRecordings = allRecordings.filter(r => {
                 if (!r) return false;
                 if (r.visibility === 'everyone') return true;
