@@ -452,6 +452,19 @@ button, input, select, textarea {
   background-color: var(--primary-light);
 }
 
+.btn-success {
+  background-color: #10B981 !important;
+  color: white !important;
+  border-color: #10B981 !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35) !important;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #059669 !important;
+  border-color: #059669 !important;
+  transform: translateY(-1px);
+}
+
 .btn-danger {
   background-color: var(--danger-color);
   color: white;

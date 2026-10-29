@@ -634,19 +634,30 @@ const TrainerDashboard = () => {
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [savingAttendance, setSavingAttendance] = useState(false);
 
+  // Automatically select the first batch if none is currently selected
+  useEffect(() => {
+    if (!attBatchId && batches.length > 0) {
+      setAttBatchId(batches[0].id);
+    }
+  }, [batches, attBatchId]);
+
   const selectedAttBatch = useMemo(() => batches.find(b => b.id === attBatchId), [batches, attBatchId]);
 
   const attBatchStudents = useMemo(() => {
     if (!attBatchId) return [];
-    const bCode = selectedAttBatch?.code || selectedAttBatch?.batchId;
-    const bName = selectedAttBatch?.name;
-    const sIds = Array.isArray(selectedAttBatch?.student_ids) ? selectedAttBatch.student_ids : [];
+    const bCode = (selectedAttBatch?.code || selectedAttBatch?.batchId || '').toLowerCase();
+    const bName = (selectedAttBatch?.name || '').toLowerCase();
+    const sIds = (Array.isArray(selectedAttBatch?.student_ids) ? selectedAttBatch.student_ids : []).map(String);
     return students.filter(s => {
-      const sBId = s.batch_id || s.batchId;
-      if (sBId && sBId === attBatchId) return true;
-      if (bCode && sBId && sBId === bCode) return true;
-      if (bName && (s.batch_name === bName || s.batchName === bName)) return true;
-      if (sIds.includes(s.id) || sIds.includes(s.uid)) return true;
+      if (s.role === 'trainer') return false;
+      const sBId = String(s.batch_id || s.batchId || '');
+      const sBName = String(s.batch_name || s.batchName || s.batch || '').toLowerCase();
+      const sId = String(s.id || s.uid || '');
+
+      if (sBId && sBId === String(attBatchId)) return true;
+      if (bCode && sBId.toLowerCase() === bCode) return true;
+      if (bName && sBName === bName) return true;
+      if (sId && sIds.includes(sId)) return true;
       return false;
     });
   }, [students, attBatchId, selectedAttBatch]);
@@ -718,28 +729,60 @@ const TrainerDashboard = () => {
     }
     setSavingAttendance(true);
     try {
-      const recordsToSave = attBatchStudents.map(s => ({
-        studentId: s.id,
-        student_id: s.id,
-        studentName: s.name,
-        rollNumber: s.rollNumber || s.id,
-        status: attStudentRecords[s.id] || 'Not Marked',
-        batchId: attBatchId,
-        date: attDate,
-        course_name: selectedAttBatch?.course_name || s.course || '',
-      }));
+      const recordsToSave = attBatchStudents.map(s => {
+        const sStatus = attStudentRecords[s.id] || attStudentRecords[s.uid] || 'Not Marked';
+        return {
+          studentId: s.id,
+          student_id: s.id,
+          studentName: s.name,
+          student_name: s.name,
+          name: s.name,
+          rollNumber: s.rollNumber || s.id,
+          status: sStatus,
+          batchId: attBatchId,
+          batch_id: attBatchId,
+          batchName: selectedAttBatch?.name || '',
+          batch_name: selectedAttBatch?.name || '',
+          date: attDate,
+          course: selectedAttBatch?.course_name || s.course || '',
+          course_name: selectedAttBatch?.course_name || s.course || '',
+        };
+      });
 
       await saveBatchAttendance(attBatchId, attDate, recordsToSave, {
         batchId: attBatchId,
         date: attDate,
-        markedBy: userProfile?.fullName || 'Trainer',
+        batchName: selectedAttBatch?.name || '',
+        courseName: selectedAttBatch?.course_name || '',
+        markedBy: userProfile?.fullName || 'Faculty Trainer',
         total: attSummary.total,
         present: attSummary.present,
         absent: attSummary.absent,
       });
 
+      // Recalculate each student's overall attendance rate
+      await Promise.all(recordsToSave.map(async (r) => {
+        try {
+          const sid = r.studentId;
+          const allStudentAtt = await getAttendanceForStudent(sid);
+          const presentDays = allStudentAtt.filter(rec => (rec.status || '').toLowerCase() === 'present').length;
+          const totalDays = allStudentAtt.length;
+          const pct = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+          await updateStudent(sid, {
+            attendance: pct,
+            attendanceRate: pct,
+            updatedAt: new Date().toISOString()
+          });
+        } catch (syncErr) {
+          console.warn('Sync student attendance failed:', syncErr);
+        }
+      }));
+
       showToast('Attendance records saved successfully ✓');
       refetchSheets();
+      refetchStudents();
+      queryClient.invalidateQueries({ queryKey: ['trainerAttendanceSheets'] });
+      queryClient.invalidateQueries({ queryKey: ['trainerStudents'] });
     } catch (err) {
       console.error(err);
       alert(classifyFirestoreError(err).message);
@@ -1925,10 +1968,30 @@ const TrainerDashboard = () => {
                     </div>
 
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button className="btn btn-outline btn-sm" onClick={() => handleSelectAll('Present')}>All Present</button>
-                      <button className="btn btn-outline btn-sm" onClick={() => handleSelectAll('Absent')}>All Absent</button>
-                      <button className="btn btn-ghost btn-sm" onClick={handleResetAttendance}>Reset</button>
-                      <button className="btn btn-primary btn-sm" onClick={handleSaveAttendance} disabled={savingAttendance}>
+                      <button 
+                        type="button" 
+                        className="btn btn-outline btn-sm" 
+                        onClick={() => handleSelectAll('Present')}
+                        style={{ borderColor: '#10B981', color: '#059669', fontWeight: 800, background: 'rgba(16,185,129,0.06)' }}
+                      >
+                        ✓ All Present
+                      </button>
+                      <button 
+                        type="button" 
+                        className="btn btn-outline btn-sm" 
+                        onClick={() => handleSelectAll('Absent')}
+                        style={{ borderColor: '#EF4444', color: '#DC2626', fontWeight: 800, background: 'rgba(239,68,68,0.06)' }}
+                      >
+                        ✗ All Absent
+                      </button>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={handleResetAttendance}>Reset</button>
+                      <button 
+                        type="button" 
+                        className="btn btn-primary btn-sm" 
+                        onClick={handleSaveAttendance} 
+                        disabled={savingAttendance}
+                        style={{ background: 'linear-gradient(135deg, #10B981, #059669)', border: 'none', color: '#FFF', fontWeight: 800, padding: '6px 18px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}
+                      >
                         <Save size={14} /> {savingAttendance ? 'Saving...' : 'Save Attendance'}
                       </button>
                     </div>
@@ -1961,20 +2024,48 @@ const TrainerDashboard = () => {
                               </td>
                               <td style={{ padding: '14px 20px', fontFamily: 'monospace', fontWeight: 700 }}>{s.rollNumber || s.id}</td>
                               <td style={{ padding: '14px 20px' }}>
-                                <div style={{ display: 'flex', gap: 8 }}>
+                                <div style={{ display: 'inline-flex', gap: '8px', background: 'var(--surface-alt)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                                   <button
-                                    className={`btn btn-sm ${status === 'Present' ? 'btn-success' : 'btn-outline'}`}
+                                    type="button"
                                     onClick={() => handleMarkStudent(s.id, 'Present')}
-                                    style={{ padding: '4px 12px', fontSize: 12, fontWeight: 700 }}
+                                    style={{
+                                      padding: '6px 18px',
+                                      borderRadius: '6px',
+                                      border: 'none',
+                                      fontWeight: 800,
+                                      fontSize: '12.5px',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s ease',
+                                      background: status === 'Present' ? '#10B981' : 'transparent',
+                                      color: status === 'Present' ? '#FFFFFF' : 'var(--text-secondary)',
+                                      boxShadow: status === 'Present' ? '0 2px 8px rgba(16,185,129,0.45)' : 'none',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
                                   >
-                                    Present
+                                    ✓ Present
                                   </button>
                                   <button
-                                    className={`btn btn-sm ${status === 'Absent' ? 'btn-danger' : 'btn-outline'}`}
+                                    type="button"
                                     onClick={() => handleMarkStudent(s.id, 'Absent')}
-                                    style={{ padding: '4px 12px', fontSize: 12, fontWeight: 700 }}
+                                    style={{
+                                      padding: '6px 18px',
+                                      borderRadius: '6px',
+                                      border: 'none',
+                                      fontWeight: 800,
+                                      fontSize: '12.5px',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s ease',
+                                      background: status === 'Absent' ? '#EF4444' : 'transparent',
+                                      color: status === 'Absent' ? '#FFFFFF' : 'var(--text-secondary)',
+                                      boxShadow: status === 'Absent' ? '0 2px 8px rgba(239,68,68,0.45)' : 'none',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
                                   >
-                                    Absent
+                                    ✗ Absent
                                   </button>
                                 </div>
                               </td>
