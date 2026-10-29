@@ -22,26 +22,40 @@ export const getTrainerBatches = async (trainerUid, assignedBatchIds = []) => {
   if (!trainerUid) return [];
 
   try {
-    const allBatches = await getDocuments("batches");
-    const assignedSet = new Set((assignedBatchIds || []).map(String));
+    const [allBatches, trainerDoc] = await Promise.all([
+      getDocuments("batches"),
+      getDocument("trainers", trainerUid).catch(() => null)
+    ]);
+
+    const assignedSet = new Set((assignedBatchIds || []).concat(trainerDoc?.assigned_batch_ids || []).map(String));
+    const trainerName = (trainerDoc?.name || '').trim().toLowerCase();
+    const trainerEmail = (trainerDoc?.email || '').trim().toLowerCase();
+    const trainerCode = (trainerDoc?.trainerId || trainerDoc?.code || '').trim().toLowerCase();
 
     const matchedBatches = allBatches.filter(b => {
       const bId = String(b.id || b.uid || '');
       const isOwner = String(b.trainer_uid || '') === String(trainerUid);
       const isAssigned = assignedSet.has(bId);
-      return isOwner || isAssigned;
+      const isNameMatch = trainerName && (b.trainer_name || '').trim().toLowerCase() === trainerName;
+      const isEmailMatch = trainerEmail && (b.trainer_email || '').trim().toLowerCase() === trainerEmail;
+      const isCodeMatch = trainerCode && (String(b.trainerId || b.trainer_id || '').trim().toLowerCase() === trainerCode);
+      return isOwner || isAssigned || isNameMatch || isEmailMatch || isCodeMatch;
     });
 
     // Enrich with accurate student counts
     const allStudents = await getDocuments("students").catch(() => []);
     return matchedBatches.map(b => {
       const bId = String(b.id || b.uid || '');
+      const bCode = String(b.code || b.batchId || '');
+      const bName = String(b.name || '');
       const studentIdsSet = new Set(b.student_ids || []);
-      const matchingStudents = allStudents.filter(s => 
-        String(s.batch_id || s.batchId || '') === bId || 
-        studentIdsSet.has(s.id) || 
-        studentIdsSet.has(s.uid)
-      );
+      const matchingStudents = allStudents.filter(s => {
+        if (s.role && s.role !== 'student') return false;
+        const sBId = String(s.batch_id || s.batchId || '');
+        const sBName = String(s.batch_name || s.batchName || '');
+        return sBId === bId || (bCode && sBId === bCode) || (bName && sBName === bName) ||
+          studentIdsSet.has(s.id) || studentIdsSet.has(s.uid);
+      });
       const realCount = Math.max(matchingStudents.length, (b.student_ids || []).length, Number(b.students_count) || 0);
       return {
         ...b,
@@ -57,16 +71,43 @@ export const getTrainerBatches = async (trainerUid, assignedBatchIds = []) => {
 /**
  * Fetch all students belonging to the trainer's assigned batches.
  */
-export const getTrainerStudents = async (assignedBatchIds = []) => {
-  if (!assignedBatchIds || assignedBatchIds.length === 0) return [];
-
+export const getTrainerStudents = async (assignedBatchIds = [], trainerUid = null) => {
   try {
-    const allStudents = await getDocuments("students");
-    const assignedSet = new Set((assignedBatchIds || []).map(String));
+    const [allStudents, allBatches, trainerDoc] = await Promise.all([
+      getDocuments("students"),
+      getDocuments("batches"),
+      trainerUid ? getDocument("trainers", trainerUid).catch(() => null) : Promise.resolve(null)
+    ]);
+
+    const batchIds = new Set((assignedBatchIds || []).map(String));
+    const batchCodes = new Set();
+    const batchNames = new Set();
+
+    const trainerName = (trainerDoc?.name || '').trim().toLowerCase();
+    const trainerEmail = (trainerDoc?.email || '').trim().toLowerCase();
+    const trainerCode = (trainerDoc?.trainerId || trainerDoc?.code || '').trim().toLowerCase();
+
+    allBatches.forEach(b => {
+      const bId = String(b.id || b.uid || '');
+      const isOwner = trainerUid && String(b.trainer_uid || '') === String(trainerUid);
+      const isAssigned = batchIds.has(bId);
+      const isNameMatch = trainerName && (b.trainer_name || '').trim().toLowerCase() === trainerName;
+      const isEmailMatch = trainerEmail && (b.trainer_email || '').trim().toLowerCase() === trainerEmail;
+      const isCodeMatch = trainerCode && (String(b.trainerId || b.trainer_id || '').trim().toLowerCase() === trainerCode);
+
+      if (isOwner || isAssigned || isNameMatch || isEmailMatch || isCodeMatch) {
+        batchIds.add(bId);
+        if (b.code) batchCodes.add(String(b.code).toLowerCase());
+        if (b.batchId) batchCodes.add(String(b.batchId).toLowerCase());
+        if (b.name) batchNames.add(String(b.name).toLowerCase());
+      }
+    });
 
     return allStudents.filter(s => {
-      const bId = String(s.batch_id || s.batchId || '');
-      return assignedSet.has(bId);
+      if (s.role && s.role !== 'student') return false;
+      const sBId = String(s.batch_id || s.batchId || '');
+      const sBName = String(s.batch_name || s.batchName || '').toLowerCase();
+      return batchIds.has(sBId) || batchCodes.has(sBId.toLowerCase()) || (sBName && batchNames.has(sBName));
     });
   } catch (err) {
     console.error("[trainerService] getTrainerStudents error:", err);

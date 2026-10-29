@@ -16,7 +16,9 @@ const ResetPassword = () => {
   const navigate = useNavigate();
 
   // Action code from URL parameter (e.g. ?oobCode=... or ?code=...)
-  const oobCode = searchParams.get('oobCode') || searchParams.get('code');
+  const oobCode = searchParams.get('token') || searchParams.get('oobCode') || searchParams.get('code');
+  const token = oobCode;
+  const emailParam = searchParams.get('email') || '';
 
   // Verification state
   const [verifying, setVerifying] = useState(true);
@@ -44,7 +46,15 @@ const ResetPassword = () => {
     }
 
     // Verify reset code with Firebase Auth
-    verifyPasswordResetCode(auth, oobCode)
+    const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+    fetch(`${API_BASE}/api/auth/verify-reset-token?token=${encodeURIComponent(oobCode)}&email=${encodeURIComponent(emailParam)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.valid) {
+          return data.email || emailParam;
+        }
+        return verifyPasswordResetCode(auth, oobCode);
+      })
       .then((userEmail) => {
         setEmail(userEmail || '');
         setVerifying(false);
@@ -84,7 +94,19 @@ const ResetPassword = () => {
 
     setLoading(true);
     try {
-      await confirmPasswordReset(auth, oobCode, newPassword);
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: oobCode, email, newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setSuccess(true);
+      } else {
+        await confirmPasswordReset(auth, oobCode, newPassword);
+        setSuccess(true);
+      }
       setSuccess(true);
     } catch (err) {
       console.error('[ResetPassword] Reset failed:', err);

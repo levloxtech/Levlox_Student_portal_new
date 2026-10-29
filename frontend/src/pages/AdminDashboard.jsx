@@ -415,7 +415,19 @@ const AdminDashboard = () => {
   const batches = firestoreBatches;
   // Falls back to a module-level constant rather than a fresh `[]` each render,
   // so the students memo below is not invalidated on every render.
-  const allStudents = adminData?.studentList || EMPTY_LIST;
+  const allStudents = React.useMemo(() => {
+    const rawList = adminData?.studentList || EMPTY_LIST;
+    const trainerList = adminData?.trainerList || EMPTY_LIST;
+    const trainerEmails = new Set(trainerList.map(t => (t.email || '').toLowerCase()).filter(Boolean));
+    const trainerIds = new Set(trainerList.map(t => String(t.id || t.uid || '')).filter(Boolean));
+    return rawList.filter(s => {
+      const email = (s.email || '').toLowerCase();
+      const sId = String(s.id || s.uid || '');
+      if (trainerEmails.has(email) || trainerIds.has(sId)) return false;
+      if (s.role && s.role !== 'student') return false;
+      return true;
+    });
+  }, [adminData?.studentList, adminData?.trainerList]);
 
   const hasUpcomingLiveClasses = React.useMemo(() => {
     return (liveClasses || []).some(c => {
@@ -2520,6 +2532,9 @@ const AdminDashboard = () => {
       name: batchName.trim(),
       course_name: batchCourseName.trim(),
       trainer_name: batchTrainerName.trim(),
+      trainer_uid: (trainers.find(t => t.name === batchTrainerName.trim() || t.trainer_id === batchTrainerName.trim() || t.trainerId === batchTrainerName.trim())?.id) || '',
+      trainer_id: (trainers.find(t => t.name === batchTrainerName.trim() || t.trainer_id === batchTrainerName.trim() || t.trainerId === batchTrainerName.trim())?.trainerId) || '',
+      trainer_email: (trainers.find(t => t.name === batchTrainerName.trim() || t.trainer_id === batchTrainerName.trim() || t.trainerId === batchTrainerName.trim())?.email) || '',
       start_date: batchStartDate,
       end_date: batchEndDate,
       duration_days: calculatedDays,
@@ -2640,7 +2655,7 @@ const AdminDashboard = () => {
 
         let uid;
         try {
-          uid = await createAuthUserDetached(trainerEmail.trim(), trainerTempPassword);
+          uid = await createAuthUserDetached(trainerEmail.trim(), trainerTempPassword, 'trainer', trainerName.trim(), trainerPhone.trim());
         } catch (authErr) {
           if (authErr?.code === 'auth/email-already-in-use') {
             const cleanEmailLower = trainerEmail.trim().toLowerCase();
@@ -2708,10 +2723,11 @@ const AdminDashboard = () => {
           trainerId,
           trainer_id: trainerId,
           code: trainerId,
-          mustChangePassword: true,
+          mustChangePassword: false,
         };
 
         await createTrainerProfile(uid, payload);
+        await deleteDocument('students', uid).catch(() => {});
         
         setShowTrainerModal(false);
         setCreatedTrainerCredentials({
@@ -8780,6 +8796,10 @@ const AdminDashboard = () => {
                       <div>
                         <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>Email Address</span>
                         <p style={{ margin: '2px 0 0', fontSize: '13px', fontWeight: 600, wordBreak: 'break-all' }}>{selectedStudentDetails.email}</p>
+                        <div style={{ background: '#F1F5F9', padding: '6px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '11px', color: '#475569', fontWeight: 700 }}>Pass: <strong>{selectedStudentDetails.password || selectedStudentDetails.tempPassword || selectedStudentDetails.initialPassword || selectedStudentDetails.rawPassword || 'Student@123'}</strong></span>
+                          <button type="button" style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '11px', color: '#4568F5', fontWeight: 700 }} onClick={() => { navigator.clipboard.writeText(selectedStudentDetails.password || selectedStudentDetails.tempPassword || selectedStudentDetails.initialPassword || selectedStudentDetails.rawPassword || 'Student@123'); showModal('Copied', 'Password copied!', 'info'); }}>Copy</button>
+                        </div>
                       </div>
                       <div>
                         <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>Mobile Number</span>

@@ -79,7 +79,7 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
  *
  * @returns {Promise<string>} the new user's uid
  */
-export const createAuthUserDetached = async (email, password) => {
+export const createAuthUserDetached = async (email, password, role = 'student', name = '', phone = '') => {
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
   const token = localStorage.getItem("levlox_auth_token");
   const headers = { "Content-Type": "application/json" };
@@ -89,7 +89,7 @@ export const createAuthUserDetached = async (email, password) => {
     const res = await fetch(`${API_BASE}/api/auth/register-user`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, role, name, phone }),
     });
 
     const data = await res.json().catch(() => ({}));
@@ -105,7 +105,7 @@ export const createAuthUserDetached = async (email, password) => {
   }
 
   // Self-hosted fallback ID
-  return `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  return `${role}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 };
 
 export default app;

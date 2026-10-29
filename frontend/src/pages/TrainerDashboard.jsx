@@ -170,18 +170,30 @@ const TrainerDashboard = () => {
     refetchOnWindowFocus: true,
   });
 
+  // Effective batch IDs derived from profile plus all matched batches
+  const effectiveBatchIds = useMemo(() => {
+    const fromProfile = (assignedBatchIds || []).map(String);
+    const fromBatches = (batches || []).map(b => String(b.id || b.uid || '')).filter(Boolean);
+    return [...new Set([...fromProfile, ...fromBatches])];
+  }, [assignedBatchIds, batches]);
+
   const { data: students = [], isLoading: studentsLoading, refetch: refetchStudents } = useQuery({
-    queryKey: ['trainerStudents', assignedBatchIds],
-    queryFn: () => getTrainerStudents(assignedBatchIds),
-    enabled: assignedBatchIds.length > 0,
+    queryKey: ['trainerStudents', trainerUid, effectiveBatchIds],
+    queryFn: () => getTrainerStudents(effectiveBatchIds, trainerUid),
+    enabled: !!trainerUid,
+
+
+
+
+
     staleTime: 1000 * 30,
     refetchInterval: 60000,
     refetchOnWindowFocus: true,
   });
 
   const { data: liveClasses = [], isLoading: liveLoading, refetch: refetchLive } = useQuery({
-    queryKey: ['trainerLiveClasses', trainerUid, assignedBatchIds],
-    queryFn: () => getTrainerLiveClasses(trainerUid, assignedBatchIds),
+    queryKey: ['trainerLiveClasses', trainerUid, effectiveBatchIds],
+    queryFn: () => getTrainerLiveClasses(trainerUid, effectiveBatchIds),
     enabled: !!trainerUid,
     staleTime: 1000 * 30,
     refetchInterval: 60000, // auto-refresh live classes every 1 min
@@ -189,25 +201,25 @@ const TrainerDashboard = () => {
   });
 
   const { data: recordedClasses = [], isLoading: recordedLoading, refetch: refetchRecorded } = useQuery({
-    queryKey: ['trainerRecordedClasses', assignedBatchIds, assignedCourseIds],
-    queryFn: () => getTrainerRecordedClasses(assignedBatchIds, assignedCourseIds),
+    queryKey: ['trainerRecordedClasses', effectiveBatchIds, assignedCourseIds],
+    queryFn: () => getTrainerRecordedClasses(effectiveBatchIds, assignedCourseIds),
     staleTime: 1000 * 30,
     refetchInterval: 60000,
     refetchOnWindowFocus: true,
   });
 
   const { data: announcements = [], isLoading: announcementsLoading, refetch: refetchAnnouncements } = useQuery({
-    queryKey: ['trainerAnnouncements', assignedBatchIds],
-    queryFn: () => getTrainerAnnouncements(assignedBatchIds),
+    queryKey: ['trainerAnnouncements', effectiveBatchIds],
+    queryFn: () => getTrainerAnnouncements(effectiveBatchIds),
     staleTime: 1000 * 30,
     refetchInterval: 60000, // auto-refresh announcements every 1 min
     refetchOnWindowFocus: true,
   });
 
   const { data: attendanceSheets = [], isLoading: sheetsLoading, refetch: refetchSheets } = useQuery({
-    queryKey: ['trainerAttendanceSheets', assignedBatchIds],
-    queryFn: () => getTrainerAttendanceSheets(assignedBatchIds),
-    enabled: assignedBatchIds.length > 0,
+    queryKey: ['trainerAttendanceSheets', effectiveBatchIds],
+    queryFn: () => getTrainerAttendanceSheets(effectiveBatchIds),
+
     staleTime: 1000 * 30,
     refetchInterval: 60000, // auto-refresh attendance every 1 min
     refetchOnWindowFocus: true,
@@ -901,7 +913,7 @@ const TrainerDashboard = () => {
                 <button 
                   className={`sidebar-link ${isActive ? 'active' : ''}`}
                   onClick={() => handleTabChange(item.key)}
-                  disabled={mustChangePassword && item.key !== 'settings'}
+                  /* Always enabled for seamless navigation */
                 >
                   <Icon size={18} />
                   <span className="sidebar-link-text">{item.label}</span>
@@ -917,7 +929,7 @@ const TrainerDashboard = () => {
             <button 
               className={`sidebar-link ${activeTab === 'profile' ? 'active' : ''}`}
               onClick={() => handleTabChange('profile')}
-              disabled={mustChangePassword}
+              /* Always enabled */
             >
               <User size={18} />
               <span className="sidebar-link-text">Profile</span>
@@ -991,7 +1003,7 @@ const TrainerDashboard = () => {
               <div>
                 <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#92400E' }}>Temporary Password Change Required</h4>
                 <p style={{ margin: '2px 0 0', fontSize: 12.5, color: '#B45309' }}>
-                  For security reasons, you must set a new password before navigating the Trainer Portal.
+                  Welcome to your Trainer Operations Portal! You can update your temporary password anytime in Settings.
                 </p>
               </div>
             </div>

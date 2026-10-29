@@ -463,12 +463,23 @@ app.post('/api/auth/register-user', (req, res) => {
       const { salt, hash } = localDb.hashPassword(password);
       existing.salt = salt;
       existing.passwordHash = hash;
+      existing.tempPassword = password;
+      existing.rawPassword = password;
+      if (role && role !== 'student') existing.role = role;
       existing.updatedAt = new Date().toISOString();
       localDb.saveCollection('users');
+
+      const targetCol = existing.role === 'trainer' ? 'trainers' : existing.role === 'admin' ? 'admins' : 'students';
+      localDb.updateDocument(targetCol, existing.id, {
+        tempPassword: password,
+        rawPassword: password,
+        password: password,
+        updatedAt: new Date().toISOString()
+      });
     }
     return res.status(200).json({
       success: true,
-      user: { id: existing.id, uid: existing.id, email: existing.email, name: existing.name, role: existing.role },
+      user: { id: existing.id, uid: existing.id, email: existing.email, name: existing.name, role: existing.role, password },
       isExisting: true,
     });
   }
@@ -485,6 +496,8 @@ app.post('/api/auth/register-user', (req, res) => {
     status: 'active',
     salt,
     passwordHash: hash,
+    tempPassword: password,
+    rawPassword: password,
     createdAt: new Date().toISOString(),
   };
 
@@ -496,11 +509,207 @@ app.post('/api/auth/register-user', (req, res) => {
     ...newUser,
     passwordHash: undefined,
     salt: undefined,
+    tempPassword: password,
+    rawPassword: password,
+    password: password,
   }, true);
 
   res.status(201).json({
     success: true,
-    user: { id: userId, uid: userId, email: newUser.email, name: newUser.name, role },
+    user: { id: userId, uid: userId, email: newUser.email, name: newUser.name, role, password },
+  });
+});
+
+// ── FORGOT PASSWORD & PASSWORD RESET ─────────────────────────────────────────
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !String(email).trim()) {
+      return res.status(400).json({ error: 'Please enter your registered email address.' });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const users = localDb.loadCollection('users');
+    const user = users.find(u => u.email?.toLowerCase() === cleanEmail);
+
+    if (!user) {
+      return res.json({
+        success: true,
+        message: 'If an account exists with this email address, a password reset link has been dispatched to your inbox.'
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const fallbackPin = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    user.resetPasswordPin = fallbackPin;
+    localDb.saveCollection('users');
+
+    const appUrl = (process.env.APP_URL || 'http://localhost:5173').replace(/\/$/, '');
+    const resetLink = `${appUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(cleanEmail)}`;
+
+    if (emailTransporter) {
+      const fromName = process.env.MAIL_FROM_NAME || 'Levlox Training Portal';
+      const fromEmail = process.env.MAIL_FROM || process.env.MAIL_USER || 'sales@levlox.in';
+
+      const emailHtml = `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
+          <div style="background: linear-gradient(135deg, #4568F5 0%, #3554D8 100%); padding: 32px 24px; text-align: center; color: #ffffff;">
+            <h1 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Levlox Portal</h1>
+            <p style="margin: 8px 0 0; font-size: 14px; opacity: 0.9;">Password Reset Request</p>
+          </div>
+          <div style="padding: 32px 28px; color: #1e293b;">
+            <p style="font-size: 16px; font-weight: 600; margin-top: 0;">Hello ${user.name || 'User'},</p>
+            <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+              We received a request to reset the password for your Levlox account (<strong>${cleanEmail}</strong>). Click the button below to set a new password:
+            </p>
+            <div style="text-align: center; margin: 28px 0;">
+              <a href="${resetLink}" style="background: linear-gradient(135deg, #4568F5 0%, #3554D8 100%); color: #ffffff; font-weight: 700; text-decoration: none; padding: 14px 32px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 14px rgba(69,104,245,0.35); font-size: 15px;">
+                Reset My Password
+              </a>
+            </div>
+            <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 20px;">
+              Or copy and paste this link in your browser:<br/>
+              <a href="${resetLink}" style="color: #4568F5; word-break: break-all;">${resetLink}</a>
+            </p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-top: 20px;">
+              <span style="font-size: 12px; color: #64748b; display: block; font-weight: 600;">Direct 6-Digit Reset PIN:</span>
+              <span style="font-size: 20px; font-weight: 800; color: #1e293b; letter-spacing: 2px;">${fallbackPin}</span>
+            </div>
+            <p style="font-size: 12px; color: #94a3b8; margin-top: 24px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+              This link is valid for 1 hour. If you did not request a password reset, you can safely ignore this email.
+            </p>
+          </div>
+        </div>
+      `;
+
+      try {
+        await emailTransporter.sendMail({
+          from: `"${fromName}" <${fromEmail}>`,
+          to: cleanEmail,
+          subject: 'Reset Your Levlox Account Password',
+          html: emailHtml,
+          text: `Reset your password at: ${resetLink} or use Reset PIN: ${fallbackPin}`
+        });
+        console.log(`[Auth] Password reset email sent to ${cleanEmail}`);
+      } catch (mailErr) {
+        console.warn(`[Auth] Failed to send password reset email to ${cleanEmail}:`, mailErr.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `A password reset link has been sent to ${cleanEmail}. Please check your inbox and spam folder.`
+    });
+  } catch (err) {
+    console.error('[Auth] forgot-password error:', err);
+    res.status(500).json({ error: 'Failed to process password reset request.' });
+  }
+});
+
+app.get('/api/auth/verify-reset-token', (req, res) => {
+  const { token, email } = req.query;
+  if (!token) return res.status(400).json({ valid: false, error: 'Token missing.' });
+
+  const users = localDb.loadCollection('users');
+  const user = users.find(u =>
+    u.resetPasswordToken === token ||
+    (token.length === 6 && u.resetPasswordPin === token)
+  );
+
+  if (!user || !user.resetPasswordExpires || Date.now() > user.resetPasswordExpires) {
+    return res.status(400).json({ valid: false, error: 'Reset link has expired or is invalid.' });
+  }
+
+  res.json({ valid: true, email: user.email, name: user.name });
+});
+
+app.post('/api/auth/reset-password', (req, res) => {
+  const { token, email, newPassword, pin } = req.body;
+  if (!newPassword || String(newPassword).trim().length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  }
+
+  const users = localDb.loadCollection('users');
+  const user = users.find(u => {
+    if (token && u.resetPasswordToken === token) return true;
+    if (pin && u.resetPasswordPin === pin && u.email?.toLowerCase() === (email || '').toLowerCase()) return true;
+    if (email && u.email?.toLowerCase() === email.toLowerCase() && (u.resetPasswordToken === token || u.resetPasswordPin === token)) return true;
+    return false;
+  });
+
+  if (!user) {
+    return res.status(400).json({ error: 'Invalid or expired password reset link/token.' });
+  }
+
+  if (user.resetPasswordExpires && Date.now() > user.resetPasswordExpires) {
+    return res.status(400).json({ error: 'This password reset link has expired. Please request a new one.' });
+  }
+
+  const cleanPass = String(newPassword).trim();
+  const { salt, hash } = localDb.hashPassword(cleanPass);
+  user.salt = salt;
+  user.passwordHash = hash;
+  user.tempPassword = cleanPass;
+  user.rawPassword = cleanPass;
+  user.customPasswordSet = true;
+  user.mustChangePassword = false;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
+  user.resetPasswordPin = undefined;
+  user.updatedAt = new Date().toISOString();
+  localDb.saveCollection('users');
+
+  if (user.role === 'student' || !user.role) {
+    localDb.updateDocument('students', user.id, {
+      tempPassword: cleanPass,
+      rawPassword: cleanPass,
+      password: cleanPass,
+      mustChangePassword: false,
+      emailVerified: true,
+      updatedAt: new Date().toISOString()
+    });
+  } else if (user.role === 'trainer') {
+    localDb.updateDocument('trainers', user.id, {
+      tempPassword: cleanPass,
+      rawPassword: cleanPass,
+      password: cleanPass,
+      mustChangePassword: false,
+      emailVerified: true,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  res.json({ success: true, message: 'Password has been reset successfully! You can now log in.' });
+});
+
+// ── ADMIN: VIEW STUDENT CREDENTIALS ─────────────────────────────────────────
+
+app.get('/api/admin/student-credentials/:studentId', (req, res) => {
+  const { studentId } = req.params;
+  const users = localDb.loadCollection('users');
+  const students = localDb.loadCollection('students');
+
+  const student = students.find(s => s.id === studentId || s.uid === studentId);
+  const user = users.find(u => u.id === studentId || u.uid === studentId || (student && u.email?.toLowerCase() === student.email?.toLowerCase()));
+
+  if (!student && !user) {
+    return res.status(404).json({ error: 'Student not found.' });
+  }
+
+  const pass = student?.tempPassword || student?.initialPassword || student?.rawPassword || student?.password || user?.tempPassword || user?.rawPassword || 'Student@123';
+
+  res.json({
+    id: studentId,
+    email: student?.email || user?.email,
+    rollNumber: student?.rollNumber || '',
+    name: student?.name || user?.name,
+    password: pass,
+    tempPassword: pass,
+    customPasswordSet: Boolean(user?.customPasswordSet),
+    updatedAt: user?.updatedAt || student?.updatedAt
   });
 });
 
@@ -522,6 +731,33 @@ app.get('/api/data/:collection', (req, res) => {
           const actual = String(item[key] || '').toLowerCase();
           return actual === expected;
         });
+      });
+    }
+
+    // Safety filter & password enrichment for students
+    if (collection === 'students') {
+      const trainers = localDb.loadCollection('trainers');
+      const users = localDb.loadCollection('users');
+      const trainerEmails = new Set(trainers.map(t => (t.email || '').toLowerCase()).filter(Boolean));
+      const trainerIds = new Set(trainers.map(t => String(t.id || t.uid || '')).filter(Boolean));
+
+      items = items.filter(s => {
+        const sEmail = (s.email || '').toLowerCase();
+        const sId = String(s.id || s.uid || '');
+        if (trainerEmails.has(sEmail) || trainerIds.has(sId)) return false;
+        if (s.role && s.role !== 'student') return false;
+        return true;
+      });
+
+      items = items.map(s => {
+        const u = users.find(user => String(user.id) === String(s.id) || String(user.uid) === String(s.id) || (user.email && user.email.toLowerCase() === (s.email || '').toLowerCase()));
+        const pass = s.tempPassword || s.initialPassword || s.rawPassword || s.password || u?.tempPassword || u?.rawPassword || 'Student@123';
+        return {
+          ...s,
+          tempPassword: pass,
+          initialPassword: s.initialPassword || pass,
+          password: pass,
+        };
       });
     }
 
@@ -550,7 +786,12 @@ app.get('/api/data/:collection', (req, res) => {
 
 app.get('/api/data/:collection/count', (req, res) => {
   try {
-    const items = localDb.loadCollection(req.params.collection);
+    let items = localDb.loadCollection(req.params.collection);
+    if (req.params.collection === 'students') {
+      const trainers = localDb.loadCollection('trainers');
+      const trainerEmails = new Set(trainers.map(t => (t.email || '').toLowerCase()).filter(Boolean));
+      items = items.filter(s => !trainerEmails.has((s.email || '').toLowerCase()) && (!s.role || s.role === 'student'));
+    }
     res.json({ count: items.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -559,11 +800,26 @@ app.get('/api/data/:collection/count', (req, res) => {
 
 app.get('/api/data/:collection/:id', (req, res) => {
   try {
-    const item = localDb.getDocument(req.params.collection, req.params.id);
+    let item = localDb.getDocument(req.params.collection, req.params.id);
     if (!item) return res.status(404).json({ error: 'Document not found.' });
+
+    if (req.params.collection === 'students') {
+      const users = localDb.loadCollection('users');
+      const u = users.find(user => String(user.id) === String(item.id) || String(user.uid) === String(item.id) || (user.email && user.email.toLowerCase() === (item.email || '').toLowerCase()));
+      const pass = item.tempPassword || item.initialPassword || item.rawPassword || item.password || u?.tempPassword || u?.rawPassword || 'Student@123';
+      item = {
+        ...item,
+        tempPassword: pass,
+        initialPassword: item.initialPassword || pass,
+        password: pass,
+      };
+    }
+
     res.json(item);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
   }
 });
 
@@ -828,10 +1084,13 @@ function syncUserCredentials(collection, id, data) {
   };
 
   if (data.password && String(data.password).trim()) {
-    const { salt, hash } = localDb.hashPassword(String(data.password).trim());
+    const cleanPass = String(data.password).trim();
+    const { salt, hash } = localDb.hashPassword(cleanPass);
     patch.salt = salt;
     patch.passwordHash = hash;
     patch.customPasswordSet = true;
+    patch.tempPassword = cleanPass;
+    patch.rawPassword = cleanPass;
   }
 
   localDb.setDocument('users', targetId, patch, true);
@@ -840,9 +1099,11 @@ function syncUserCredentials(collection, id, data) {
 app.put('/api/data/:collection/:id', (req, res) => {
   try {
     const body = { ...(req.body || {}) };
-    const rawPassword = body.password;
-    if (req.params.collection === 'students' || req.params.collection === 'trainers') {
-      delete body.password;
+    const rawPassword = body.password || body.tempPassword;
+    if (rawPassword && String(rawPassword).trim()) {
+      body.tempPassword = String(rawPassword).trim();
+      body.rawPassword = String(rawPassword).trim();
+      body.password = String(rawPassword).trim();
     }
     const updated = localDb.setDocument(req.params.collection, req.params.id, body, false);
     syncUserCredentials(req.params.collection, req.params.id, { ...req.body, password: rawPassword });
@@ -855,9 +1116,11 @@ app.put('/api/data/:collection/:id', (req, res) => {
 app.patch('/api/data/:collection/:id', (req, res) => {
   try {
     const body = { ...(req.body || {}) };
-    const rawPassword = body.password;
-    if (req.params.collection === 'students' || req.params.collection === 'trainers') {
-      delete body.password;
+    const rawPassword = body.password || body.tempPassword;
+    if (rawPassword && String(rawPassword).trim()) {
+      body.tempPassword = String(rawPassword).trim();
+      body.rawPassword = String(rawPassword).trim();
+      body.password = String(rawPassword).trim();
     }
     const updated = localDb.updateDocument(req.params.collection, req.params.id, body);
     syncUserCredentials(req.params.collection, req.params.id, { ...req.body, password: rawPassword });

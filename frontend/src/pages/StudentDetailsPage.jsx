@@ -41,6 +41,8 @@ const StudentDetailsPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState(null);
+  const [showStudentPassword, setShowStudentPassword] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
 
   const [pendingAvatar, setPendingAvatar] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState('');
@@ -582,6 +584,58 @@ const StudentDetailsPage = () => {
                     <span style={{ color: '#94A3B8' }}>No phone recorded</span>
                   )}
                 </span>
+              </div>
+
+              {/* Login Credentials & Password Badge */}
+              <div style={{
+                marginTop: 12,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 10,
+                background: '#FFFFFF',
+                border: '1.5px solid #CBD5E1',
+                padding: '6px 14px',
+                borderRadius: 12,
+                boxShadow: '0 2px 5px rgba(0,0,0,0.03)'
+              }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+                  🔑 Password:
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', fontFamily: 'monospace', letterSpacing: '0.5px' }}>
+                  {showStudentPassword ? (student.password || student.tempPassword || student.initialPassword || student.rawPassword || 'Student@123') : '••••••••••'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowStudentPassword(p => !p)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#64748B', display: 'flex', alignItems: 'center' }}
+                  title={showStudentPassword ? "Hide password" : "Show password"}
+                >
+                  {showStudentPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(student.password || student.tempPassword || student.initialPassword || student.rawPassword || 'Student@123');
+                    setCopiedPassword(true);
+                    setTimeout(() => setCopiedPassword(false), 2000);
+                  }}
+                  style={{
+                    background: '#F1F5F9',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: 6,
+                    padding: '2px 8px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    color: '#334155',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}
+                >
+                  {copiedPassword ? <Check size={12} color="#16A34A" /> : <Copy size={12} />}
+                  {copiedPassword ? 'Copied' : 'Copy'}
+                </button>
               </div>
             </div>
           </div>

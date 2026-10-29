@@ -236,7 +236,16 @@ const Login = () => {
 
     setResetLoading(true);
     try {
-      await sendPasswordResetEmail(auth, cleanEmail);
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send password reset request.');
+      }
       setResetModalOpen(false);
       setResetEmail('');
       setResetError('');
@@ -247,6 +256,8 @@ const Login = () => {
       );
     } catch (err) {
       console.error('[Login] Password reset failed:', err);
+      setResetError(err.message || 'Failed to send password reset email. Please try again later.');
+      return;
       const code = err?.code || '';
 
       if (code === 'auth/invalid-email') {
