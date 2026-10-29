@@ -1,0 +1,131 @@
+================================================================================
+           LEVLOX PORTAL - SYSTEM MASTER ARCHITECTURE & DIRECTORY
+================================================================================
+Last Updated: 2026-10-29
+Author: Levlox Engineering / Antigravity
+
+This document contains the complete technical configuration, server architecture,
+active credentials, data storage layout, feature implementations, and the 
+mandatory safe deployment workflow for the Levlox Portal.
+
+--------------------------------------------------------------------------------
+1. SERVER, HOSTING & RUNTIME ENVIRONMENT
+--------------------------------------------------------------------------------
+* VPS IP Address: 148.113.17.68
+* SSH Port: 20027
+* SSH User: root
+* Remote Web Root: /var/www/levlox-portal/
+* Backend Port: 20020 (bound locally to 127.0.0.1:20020)
+* PM2 Process 0: levlox-backend (Node.js API & LocalDB engine)
+* PM2 Process 1: tunnel (Cloudflare Tunnel daemon)
+* Public Cloudflare URL: https://clean-olympics-punk-questions.trycloudflare.com
+* Health Check Endpoint: https://clean-olympics-punk-questions.trycloudflare.com/health
+* Remote Git Branch: main (https://github.com/levloxtech/Levlox_Student_portal_new.git)
+
+--------------------------------------------------------------------------------
+2. MASTER ACCESS CREDENTIALS
+--------------------------------------------------------------------------------
+* SUPER ADMIN ACCOUNT (Active in Production):
+  - Email: levloxtech@gmail.com
+  - Password: Root@123
+  - Role: admin
+  - UID: super_admin_001
+  - Pass Hash: PBKDF2 with unique cryptographic salt (stored in users.json)
+
+--------------------------------------------------------------------------------
+3. DATABASE ARCHITECTURE (SELF-HOSTED / ZERO-CLOUD-DEPENDENCY)
+--------------------------------------------------------------------------------
+The portal uses an ultra-fast, self-hosted, atomic JSON database engine
+(backend/localDb.js). No external subscriptions (Firebase, MongoDB Atlas) needed.
+
+* Remote Server Database Path: /var/www/levlox-portal/storage/data/
+* Remote Uploads Path:         /var/www/levlox-portal/storage/uploads/
+* Remote Backups Path:         /var/www/levlox-portal/storage/backups/
+* Local Machine Data Path:     d:\portal\Levlox-Students-Portal\storage\data\
+
+COLLECTION FILES BREAKDOWN:
+- users.json            : Authentication credentials, roles, PBKDF2 salts & hashes.
+- admins.json           : Super Admin profiles and system permission records.
+- trainers.json         : Faculty profiles, employee IDs (TR-XXXX), specializations.
+- students.json         : Student roster, roll numbers (STU-XXXX), fee ledger.
+- courses.json          : Course catalog, syllabus modules, curriculum data.
+- batches.json          : Batches/cohorts, trainer assignments, student rosters.
+- liveClasses.json      : Scheduled/active live sessions, Google Meet/Zoom URLs.
+- recordedClasses.json  : Recorded classes (YouTube Unlisted, Google Drive, MP4).
+- playlists.json        : Video playlists grouping classes by subject/module.
+- assignments.json      : Homework assignments, task instructions, attached PDFs.
+- submissions.json      : Student assignment submissions, GitHub links, grades.
+- attendanceSheets.json : Daily attendance register sheets per batch & date.
+- attendance.json       : Individual student attendance logs.
+- announcements.json    : Notice board alerts, broadcasts, hackathon updates.
+- messages.json         : Batch community chat room discussions.
+- sessions.json         : Active bearer login tokens.
+- emailLogs.json        : Dispatch logs for welcome credentials and alerts.
+- deletedUsers.json     : Audit trail of deleted accounts.
+
+--------------------------------------------------------------------------------
+4. KEY IMPLEMENTATIONS & CUSTOMIZATIONS COMPLETED
+--------------------------------------------------------------------------------
+1. Browser Tab Branding & Titles:
+   - Tab Favicon: frontend/public/levlox-tab-logo.png
+   - Dynamic PageTitleManager in App.jsx:
+     * Student: "Levlox Student Portal"
+     * Admin: "Levlox Admin Portal"
+     * Trainer: "Levlox Trainer Portal"
+     * Default: "Levlox Portal"
+
+2. Instant Auto-Refresh on Navigation:
+   - AdminDashboard.jsx: Clicking any sidebar tab triggers handleNavTabClick,
+     instantly refetching adminData, batches, and cache invalidation.
+   - StudentDashboard.jsx: Clicking any navigation option triggers refetchAll(),
+     refreshing courses, attendance, fees, and assignments over the wire.
+   - TrainerDashboard.jsx: Clicking any tab triggers handleTabChange,
+     refetching all trainer-assigned cohorts, live sessions, and sheets.
+
+3. 100% Dynamic Student Dashboard:
+   - Live Fees Ledger: Displays actual total fees, amount paid, pending balance,
+     and payment status badge directly calculated from database.
+   - Batch Assignments: Live count of completed vs total assigned homework.
+   - Enrolled Courses: Real courses enrolled by student cohort.
+   - Recently Viewed Videos: Dynamic progress tracking from database.
+
+4. Admin Live Classes Filter & UI:
+   - FilterBar defaults to 'All' rather than 'Today' so newly scheduled future
+     classes are immediately visible without confusing date filters.
+   - Dynamic modals for scheduling, editing, ending sessions, and attaching
+     recording links.
+
+5. Permanent Data Safety Policy (Zero-Data-Loss):
+   - storage/data/ and storage/uploads/ are permanently untracked in .gitignore.
+   - Local dummy/test data created on ANY laptop will NEVER be pushed to GitHub
+     or overwrite the server's live database.
+   - Pre-deployment automated backups are archived in storage/backups/.
+   - Documented in DATA_SAFETY_POLICY.md.
+
+--------------------------------------------------------------------------------
+5. MANDATORY SAFE DEPLOYMENT PROCEDURE (FOR EVERY CODE UPDATE)
+--------------------------------------------------------------------------------
+Whenever making any code changes in the future, follow this EXACT process:
+
+STEP 1: Work on Code Only
+- Edit React frontend (.jsx, .css) or backend logic (.js).
+- Never commit test data files from storage/data/.
+
+STEP 2: Build the Production Frontend
+  npm --prefix frontend run build
+
+STEP 3: Commit and Push Code to GitHub
+  git add .
+  git commit -m "Your descriptive message"
+  git push origin main
+
+STEP 4: Synchronize Code on Remote VPS Server
+  ssh -p 20027 root@148.113.17.68 "cd /var/www/levlox-portal && git pull origin main && pm2 restart levlox-backend"
+
+STEP 5: Deploy Frontend Dist to Web Root
+  scp -P 20027 -r frontend/dist/* root@148.113.17.68:/var/www/levlox-portal/frontend/dist/
+
+STEP 6: Verify Live Health
+  - Check health endpoint: https://clean-olympics-punk-questions.trycloudflare.com/health
+  - Test admin login: verify HTTP 200 OK
+================================================================================
