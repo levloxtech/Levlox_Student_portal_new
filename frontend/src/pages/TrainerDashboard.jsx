@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -8,11 +8,13 @@ import {
   PlayCircle, Clock3, Trophy, Key, ChevronDown, X, Download, 
   FileText, FileSpreadsheet, User, Mail, Phone, Lock, EyeOff, 
   Camera, Save, Shield, Menu, Calendar as CalendarIcon, Check, CheckSquare,
-  AlertCircle, ChevronLeft, ChevronRight, ExternalLink, Trash2, UploadCloud, Play, MessageSquare
+  AlertCircle, ChevronLeft, ChevronRight, ExternalLink, Trash2, UploadCloud, Play, MessageSquare,
+  Copy, Sparkles, Layers as LayersIcon, ArrowUpRight, Wallet as WalletIcon, CheckCheck, Globe,
+  Activity
 } from 'lucide-react';
 import CustomModal from '../components/Modal';
 import NotificationBell from '../components/NotificationBell';
-import leveloxIcon from '../assets/levelox-icon-transparent.png';
+import levloxLogo from '../assets/levlox-logo.png';
 import { useAuth } from '../context/AuthContext';
 import { 
   getTrainerBatches, 
@@ -20,9 +22,9 @@ import {
   getTrainerAttendanceSheets, 
   getTrainerLiveClasses, 
   createTrainerLiveClass,
-  getTrainerRecordedClasses,
+  getTrainerRecordedClasses, 
   createTrainerRecordedClass,
-  getTrainerAnnouncements,
+  getTrainerAnnouncements, 
   createTrainerAnnouncement,
   uploadTrainerProfilePic
 } from '../services/trainerService';
@@ -34,7 +36,24 @@ import {
   awardActivityScore,
   updateDocumentFields,
   deleteDocument,
-  classifyFirestoreError 
+  classifyFirestoreError,
+  getBatches,
+  addBatch,
+  updateBatch,
+  deleteBatch as deleteBatchDoc,
+  assignStudentsToBatch,
+  assignTrainerToBatch,
+  generateNextId,
+  getCourses,
+  addCourse,
+  updateCourse,
+  getPlaylists,
+  addPlaylist,
+  updatePlaylist,
+  deletePlaylist,
+  uploadProfileImage,
+  formatCurrency,
+  getStudentFeeDetails
 } from '../services/firebaseService';
 import { 
   changeOwnPassword, 
@@ -46,10 +65,10 @@ import TrainerAssignmentsView from '../components/TrainerAssignmentsView';
 import BatchChatPage from './BatchChatPage';
 import { uploadUniversalFile, getDownloadUrl } from '../services/apiService';
 import { getGoogleDriveFileId, getResolvedThumbnail } from '../utils/videoUtils';
+import { addDaysToDate, getDaysBetween, formatReadableDate, formatLocalDate } from '../utils/batchUtils';
 
 const PLAYLIST_CARD_THEMES = [
   {
-    // Mint / Sage
     bg: 'linear-gradient(165deg, rgba(236, 253, 245, 0.95) 0%, rgba(209, 250, 229, 0.55) 100%)',
     border: 'rgba(167, 243, 208, 0.85)',
     tagBg: 'rgba(16, 185, 129, 0.15)',
@@ -60,7 +79,6 @@ const PLAYLIST_CARD_THEMES = [
     shadow: '0 10px 25px -4px rgba(16, 185, 129, 0.12), 0 4px 10px rgba(0,0,0,0.02)'
   },
   {
-    // Sky / Cyan
     bg: 'linear-gradient(165deg, rgba(240, 249, 255, 0.95) 0%, rgba(224, 242, 254, 0.55) 100%)',
     border: 'rgba(186, 230, 253, 0.85)',
     tagBg: 'rgba(14, 165, 233, 0.15)',
@@ -71,7 +89,6 @@ const PLAYLIST_CARD_THEMES = [
     shadow: '0 10px 25px -4px rgba(14, 165, 233, 0.12), 0 4px 10px rgba(0,0,0,0.02)'
   },
   {
-    // Lavender / Violet
     bg: 'linear-gradient(165deg, rgba(245, 243, 255, 0.95) 0%, rgba(237, 233, 254, 0.55) 100%)',
     border: 'rgba(221, 214, 254, 0.85)',
     tagBg: 'rgba(124, 58, 237, 0.15)',
@@ -82,7 +99,6 @@ const PLAYLIST_CARD_THEMES = [
     shadow: '0 10px 25px -4px rgba(124, 58, 237, 0.12), 0 4px 10px rgba(0,0,0,0.02)'
   },
   {
-    // Slate / Ice
     bg: 'linear-gradient(165deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.55) 100%)',
     border: 'rgba(203, 213, 225, 0.85)',
     tagBg: 'rgba(100, 116, 139, 0.15)',
@@ -93,7 +109,6 @@ const PLAYLIST_CARD_THEMES = [
     shadow: '0 10px 25px -4px rgba(100, 116, 139, 0.12), 0 4px 10px rgba(0,0,0,0.02)'
   },
   {
-    // Warm Amber / Peach
     bg: 'linear-gradient(165deg, rgba(255, 251, 235, 0.95) 0%, rgba(254, 243, 199, 0.55) 100%)',
     border: 'rgba(253, 230, 138, 0.85)',
     tagBg: 'rgba(245, 158, 11, 0.15)',
@@ -104,7 +119,6 @@ const PLAYLIST_CARD_THEMES = [
     shadow: '0 10px 25px -4px rgba(245, 158, 11, 0.12), 0 4px 10px rgba(0,0,0,0.02)'
   },
   {
-    // Emerald / Teal
     bg: 'linear-gradient(165deg, rgba(240, 253, 250, 0.95) 0%, rgba(204, 251, 241, 0.55) 100%)',
     border: 'rgba(153, 246, 228, 0.85)',
     tagBg: 'rgba(20, 184, 166, 0.15)',
@@ -126,7 +140,7 @@ const TrainerDashboard = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Determine active tab from URL path (e.g. /trainer/batches -> batches)
+  // Active tab state from URL path
   const currentPath = location.pathname.replace('/trainer', '').replace('/', '') || 'dashboard';
   const [activeTab, setActiveTab] = useState(currentPath);
 
@@ -141,13 +155,13 @@ const TrainerDashboard = () => {
     if (tabKey === 'dashboard') {
       navigate('/trainer');
     } else {
-      navigate(`/trainer/${tabKey}`);
+      navigate('/trainer/' + tabKey);
     }
   };
 
   const mustChangePassword = userProfile?.mustChangePassword === true;
 
-  // Toast notification state
+  // Toast / Error state
   const [toast, setToast] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -170,7 +184,6 @@ const TrainerDashboard = () => {
     refetchOnWindowFocus: true,
   });
 
-  // Effective batch IDs derived from profile plus all matched batches
   const effectiveBatchIds = useMemo(() => {
     const fromProfile = (assignedBatchIds || []).map(String);
     const fromBatches = (batches || []).map(b => String(b.id || b.uid || '')).filter(Boolean);
@@ -181,14 +194,15 @@ const TrainerDashboard = () => {
     queryKey: ['trainerStudents', trainerUid, effectiveBatchIds],
     queryFn: () => getTrainerStudents(effectiveBatchIds, trainerUid),
     enabled: !!trainerUid,
-
-
-
-
-
     staleTime: 1000 * 30,
     refetchInterval: 60000,
     refetchOnWindowFocus: true,
+  });
+
+  const { data: courses = [], isLoading: coursesLoading } = useQuery({
+    queryKey: ['trainerCourses'],
+    queryFn: () => getCourses(),
+    staleTime: 1000 * 60,
   });
 
   const { data: liveClasses = [], isLoading: liveLoading, refetch: refetchLive } = useQuery({
@@ -196,7 +210,7 @@ const TrainerDashboard = () => {
     queryFn: () => getTrainerLiveClasses(trainerUid, effectiveBatchIds),
     enabled: !!trainerUid,
     staleTime: 1000 * 30,
-    refetchInterval: 60000, // auto-refresh live classes every 1 min
+    refetchInterval: 60000,
     refetchOnWindowFocus: true,
   });
 
@@ -212,20 +226,19 @@ const TrainerDashboard = () => {
     queryKey: ['trainerAnnouncements', effectiveBatchIds],
     queryFn: () => getTrainerAnnouncements(effectiveBatchIds),
     staleTime: 1000 * 30,
-    refetchInterval: 60000, // auto-refresh announcements every 1 min
+    refetchInterval: 60000,
     refetchOnWindowFocus: true,
   });
 
   const { data: attendanceSheets = [], isLoading: sheetsLoading, refetch: refetchSheets } = useQuery({
     queryKey: ['trainerAttendanceSheets', effectiveBatchIds],
     queryFn: () => getTrainerAttendanceSheets(effectiveBatchIds),
-
     staleTime: 1000 * 30,
-    refetchInterval: 60000, // auto-refresh attendance every 1 min
+    refetchInterval: 60000,
     refetchOnWindowFocus: true,
   });
 
-  // Automatically refresh trainer data whenever user navigates between tabs/pages
+  // Automatically refresh trainer data whenever user navigates between tabs
   useEffect(() => {
     refetchBatches();
     refetchStudents();
@@ -237,16 +250,18 @@ const TrainerDashboard = () => {
     queryClient.invalidateQueries({ queryKey: ['trainerSubmissionsData'] });
   }, [activeTab, queryClient]);
 
-  // Derived Statistics for Dashboard Cards
+  // Upcoming live class indicator for pulsing dot
+  const hasUpcomingLiveClasses = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return liveClasses.some(c => (c.date || '') >= todayStr && (c.status || '').toLowerCase() !== 'completed');
+  }, [liveClasses]);
+
+  // Derived Statistics for Executive Dashboard
   const stats = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
     const todayClassesCount = liveClasses.filter(c => c.date === todayStr).length;
     const upcomingClassesCount = liveClasses.filter(c => (c.date || '') >= todayStr && (c.status || '').toLowerCase() !== 'completed').length;
-    
-    // Total Activity Points awarded across assigned students
     const totalPoints = students.reduce((acc, s) => acc + (Number(s.activityPoints) || 0), 0);
-
-    // Pending attendance sheets count for today
     const markedTodayBatchIds = new Set(attendanceSheets.filter(s => s.date === todayStr).map(s => s.batchId || s.batch_id));
     const attendancePendingCount = Math.max(0, batches.length - markedTodayBatchIds.size);
 
@@ -257,13 +272,360 @@ const TrainerDashboard = () => {
       upcomingClassesCount,
       attendancePendingCount,
       totalPoints,
+      activeAssignmentsCount: 4,
     };
   }, [batches, students, liveClasses, attendanceSheets]);
 
-  // Student Search Query State
-  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  // ─── 2. BATCH MANAGEMENT (CREATE & EDIT RIGHTS) ──────────────────────────
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [editingBatch, setEditingBatch] = useState(null);
+  const [batchName, setBatchName] = useState('');
+  const [batchCourseName, setBatchCourseName] = useState('');
+  const [batchStartDate, setBatchStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [batchDurationDays, setBatchDurationDays] = useState(50);
+  const [batchEndDate, setBatchEndDate] = useState(addDaysToDate(new Date().toISOString().split('T')[0], 50));
+  const [batchTiming, setBatchTiming] = useState('10:00 AM - 12:00 PM');
+  const [batchStatus, setBatchStatus] = useState('Active');
+  const [batchMaxStudents, setBatchMaxStudents] = useState(30);
+  const [savingBatch, setSavingBatch] = useState(false);
 
-  // ─── 2. ATTENDANCE MODULE STATES ──────────────────────────────────────────
+  const resetBatchForm = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setBatchName('');
+    setBatchCourseName(courses[0]?.title || courses[0]?.name || 'Data Science & AI');
+    setBatchStartDate(today);
+    setBatchDurationDays(50);
+    setBatchEndDate(addDaysToDate(today, 50));
+    setBatchTiming('10:00 AM - 12:00 PM');
+    setBatchStatus('Active');
+    setBatchMaxStudents(30);
+    setEditingBatch(null);
+  };
+
+  const openCreateBatchModal = () => {
+    resetBatchForm();
+    setShowBatchModal(true);
+  };
+
+  const openEditBatchModal = (batch) => {
+    setEditingBatch(batch);
+    setBatchName(batch.name || '');
+    setBatchCourseName(batch.course_name || batch.courseName || '');
+    setBatchStartDate(batch.start_date || new Date().toISOString().split('T')[0]);
+    setBatchDurationDays(batch.duration_days || 50);
+    setBatchEndDate(batch.end_date || addDaysToDate(batch.start_date || new Date().toISOString().split('T')[0], 50));
+    setBatchTiming(batch.timing || '10:00 AM - 12:00 PM');
+    setBatchStatus(batch.status || 'Active');
+    setBatchMaxStudents(batch.max_students || 30);
+    setShowBatchModal(true);
+  };
+
+  const handleSaveBatch = async (e) => {
+    e.preventDefault();
+    if (!batchName.trim() || !batchCourseName.trim()) {
+      alert('Batch Name and Course are required.');
+      return;
+    }
+    setSavingBatch(true);
+    try {
+      const payload = {
+        name: batchName.trim(),
+        course_name: batchCourseName.trim(),
+        trainer_name: userProfile?.fullName || userProfile?.name || 'Faculty Trainer',
+        trainer_uid: trainerUid || '',
+        trainer_id: userProfile?.trainerId || userProfile?.trainer_id || userProfile?.code || 'TRN',
+        trainer_email: userProfile?.email || '',
+        start_date: batchStartDate,
+        end_date: batchEndDate,
+        duration_days: Number(batchDurationDays) || 50,
+        timing: batchTiming.trim() || '10:00 AM - 12:00 PM',
+        status: batchStatus,
+        max_students: Number(batchMaxStudents) || 30,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (editingBatch) {
+        await updateBatch(editingBatch.id, payload);
+        showToast('Batch details updated successfully ✓');
+      } else {
+        const code = await generateNextId('batch');
+        await addBatch({
+          ...payload,
+          code,
+          batchId: code,
+          student_ids: [],
+          students_count: 0,
+          createdAt: new Date().toISOString(),
+        });
+        showToast('New batch created successfully ✓');
+      }
+
+      setShowBatchModal(false);
+      resetBatchForm();
+      refetchBatches();
+      queryClient.invalidateQueries({ queryKey: ['trainerBatches'] });
+    } catch (err) {
+      console.error('Failed to save batch:', err);
+      alert(classifyFirestoreError(err).message);
+    } finally {
+      setSavingBatch(false);
+    }
+  };
+
+  const handleDeleteBatch = async (batchId) => {
+    if (!batchId) return;
+    if (!window.confirm('Are you sure you want to permanently delete this batch? All assigned students will be unlinked.')) return;
+    try {
+      await assignStudentsToBatch(batchId, []).catch(() => null);
+      await deleteBatchDoc(batchId);
+      showToast('Batch removed successfully ✓');
+      refetchBatches();
+      queryClient.invalidateQueries({ queryKey: ['trainerBatches'] });
+    } catch (err) {
+      console.error(err);
+      alert(classifyFirestoreError(err).message);
+    }
+  };
+
+  // ─── 3. STUDENT REGISTRY & PROFILE RIGHTS ────────────────────────────────
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [studentBatchFilter, setStudentBatchFilter] = useState('all');
+  const [studentCourseFilter, setStudentCourseFilter] = useState('all');
+  const [studentStatusFilter, setStudentStatusFilter] = useState('all');
+
+  const [selectedStudentDetails, setSelectedStudentDetails] = useState(null);
+  const [showStudentPassword, setShowStudentPassword] = useState(false);
+  const [uploadingStudentPhoto, setUploadingStudentPhoto] = useState(false);
+
+  // Student Edit Modal State
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [editStudentName, setEditStudentName] = useState('');
+  const [editStudentEmail, setEditStudentEmail] = useState('');
+  const [editStudentPhone, setEditStudentPhone] = useState('');
+  const [editStudentCourse, setEditStudentCourse] = useState('');
+  const [editStudentBatchId, setEditStudentBatchId] = useState('');
+  const [editStudentCollege, setEditStudentCollege] = useState('');
+  const [editStudentLocation, setEditStudentLocation] = useState('');
+  const [editStudentAddress, setEditStudentAddress] = useState('');
+  const [editStudentCompany, setEditStudentCompany] = useState('');
+  const [editStudentStatus, setEditStudentStatus] = useState('active');
+  const [editStudentProfilePic, setEditStudentProfilePic] = useState('');
+  const [savingStudentEdit, setSavingStudentEdit] = useState(false);
+
+  // Award Activity Points Modal State
+  const [awardPointsStudent, setAwardPointsStudent] = useState(null);
+  const [pointsToAward, setPointsToAward] = useState(10);
+  const [awardReason, setAwardReason] = useState('Active Participation in Live Session');
+  const [savingPoints, setSavingPoints] = useState(false);
+
+  const filteredTrainerStudents = useMemo(() => {
+    return students.filter(s => {
+      // Exclude any accidental trainer records
+      if (s.role === 'trainer') return false;
+      
+      // Batch filter
+      if (studentBatchFilter !== 'all') {
+        const bId = s.batch_id || s.batchId || '';
+        const bName = s.batch_name || s.batchName || '';
+        if (bId !== studentBatchFilter && bName !== studentBatchFilter) return false;
+      }
+
+      // Course filter
+      if (studentCourseFilter !== 'all') {
+        const c = s.course || s.course_name || '';
+        if (c !== studentCourseFilter) return false;
+      }
+
+      // Status filter
+      if (studentStatusFilter !== 'all') {
+        const st = (s.status || 'active').toLowerCase();
+        if (st !== studentStatusFilter.toLowerCase()) return false;
+      }
+
+      // Search query
+      if (studentSearchQuery.trim()) {
+        const q = studentSearchQuery.toLowerCase();
+        const matchesName = (s.name || '').toLowerCase().includes(q);
+        const matchesEmail = (s.email || '').toLowerCase().includes(q);
+        const matchesRoll = (s.rollNumber || s.id || '').toLowerCase().includes(q);
+        const matchesPhone = (s.phone || '').toLowerCase().includes(q);
+        if (!matchesName && !matchesEmail && !matchesRoll && !matchesPhone) return false;
+      }
+
+      return true;
+    });
+  }, [students, studentSearchQuery, studentBatchFilter, studentCourseFilter, studentStatusFilter]);
+
+  const openStudentDetails = (student) => {
+    setSelectedStudentDetails(student);
+    setShowStudentPassword(false);
+  };
+
+  const openEditStudentModal = (student) => {
+    setEditingStudent(student);
+    setEditStudentName(student.name || '');
+    setEditStudentEmail(student.email || '');
+    setEditStudentPhone(student.phone || '');
+    setEditStudentCourse(student.course || '');
+    setEditStudentBatchId(student.batch_id || student.batchId || '');
+    setEditStudentCollege(student.college || '');
+    setEditStudentLocation(student.current_location || student.location || '');
+    setEditStudentAddress(student.permanent_address || '');
+    setEditStudentCompany(student.company || '');
+    setEditStudentStatus(student.status || 'active');
+    setEditStudentProfilePic(student.profile_pic || student.profilePhotoUrl || '');
+  };
+
+  const handleSaveStudentEdit = async (e) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    setSavingStudentEdit(true);
+    try {
+      const selectedBatch = batches.find(b => b.id === editStudentBatchId);
+      const payload = {
+        name: editStudentName.trim(),
+        email: editStudentEmail.trim(),
+        phone: editStudentPhone.trim(),
+        course: editStudentCourse.trim(),
+        batch_id: editStudentBatchId,
+        batchId: editStudentBatchId,
+        batch_name: selectedBatch?.name || editingStudent.batch_name || '',
+        college: editStudentCollege.trim(),
+        current_location: editStudentLocation.trim(),
+        location: editStudentLocation.trim(),
+        permanent_address: editStudentAddress.trim(),
+        company: editStudentCompany.trim(),
+        status: editStudentStatus,
+        profile_pic: editStudentProfilePic,
+        profilePhotoUrl: editStudentProfilePic,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await updateStudent(editingStudent.id, payload);
+
+      // Handle batch roster update if batch changed
+      const oldBatchId = editingStudent.batch_id || editingStudent.batchId;
+      if (oldBatchId && oldBatchId !== editStudentBatchId) {
+        const oldB = batches.find(b => b.id === oldBatchId);
+        if (oldB && Array.isArray(oldB.student_ids)) {
+          const updatedOld = oldB.student_ids.filter(id => id !== editingStudent.id);
+          await assignStudentsToBatch(oldBatchId, updatedOld).catch(() => null);
+        }
+      }
+      if (editStudentBatchId && editStudentBatchId !== oldBatchId) {
+        const newB = batches.find(b => b.id === editStudentBatchId);
+        if (newB) {
+          const existingIds = Array.isArray(newB.student_ids) ? newB.student_ids : [];
+          if (!existingIds.includes(editingStudent.id)) {
+            await assignStudentsToBatch(editStudentBatchId, [...existingIds, editingStudent.id]).catch(() => null);
+          }
+        }
+      }
+
+      showToast('Student information saved successfully ✓');
+      setEditingStudent(null);
+      refetchStudents();
+      queryClient.invalidateQueries({ queryKey: ['trainerStudents'] });
+    } catch (err) {
+      console.error(err);
+      alert(classifyFirestoreError(err).message);
+    } finally {
+      setSavingStudentEdit(false);
+    }
+  };
+
+  const handleUploadStudentPhoto = async (studentId, file) => {
+    if (!file || !studentId) return;
+    setUploadingStudentPhoto(true);
+    try {
+      const photoUrl = await uploadProfileImage(studentId, file);
+      await updateStudent(studentId, {
+        profile_pic: photoUrl,
+        profilePhotoUrl: photoUrl,
+        updatedAt: new Date().toISOString(),
+      });
+      if (selectedStudentDetails?.id === studentId) {
+        setSelectedStudentDetails(prev => ({
+          ...prev,
+          profile_pic: photoUrl,
+          profilePhotoUrl: photoUrl
+        }));
+      }
+      if (editingStudent?.id === studentId) {
+        setEditStudentProfilePic(photoUrl);
+      }
+      showToast('Student photo uploaded successfully ✓');
+      refetchStudents();
+    } catch (err) {
+      console.error(err);
+      alert('Photo upload failed: ' + err.message);
+    } finally {
+      setUploadingStudentPhoto(false);
+    }
+  };
+
+  const handleAwardActivityPoints = async (e) => {
+    e.preventDefault();
+    if (!awardPointsStudent) return;
+    setSavingPoints(true);
+    try {
+      const currentPts = Number(awardPointsStudent.activityPoints) || 0;
+      const newTotal = currentPts + Number(pointsToAward);
+      await updateStudent(awardPointsStudent.id, {
+        activityPoints: newTotal,
+        updatedAt: new Date().toISOString(),
+      });
+      await awardActivityScore({
+        studentId: awardPointsStudent.id,
+        studentName: awardPointsStudent.name,
+        points: Number(pointsToAward),
+        reason: awardReason,
+        awardedBy: userProfile?.fullName || 'Faculty Trainer',
+        date: new Date().toISOString(),
+      }).catch(() => null);
+
+      showToast(`Awarded ${pointsToAward} pts to ${awardPointsStudent.name} ✓`);
+      setAwardPointsStudent(null);
+      setPointsToAward(10);
+      refetchStudents();
+      queryClient.invalidateQueries({ queryKey: ['trainerStudents'] });
+    } catch (err) {
+      console.error(err);
+      alert(classifyFirestoreError(err).message);
+    } finally {
+      setSavingPoints(false);
+    }
+  };
+
+  const handleExportStudentsCSV = () => {
+    if (filteredTrainerStudents.length === 0) {
+      alert('No students to export.');
+      return;
+    }
+    const headers = ['Student ID', 'Full Name', 'Email', 'Mobile', 'Course', 'Batch', 'Attendance %', 'Activity Points', 'Fee Status', 'Account Status'];
+    const rows = filteredTrainerStudents.map(s => [
+      s.rollNumber || s.id || '',
+      s.name || '',
+      s.email || '',
+      s.phone || '',
+      s.course || '',
+      s.batch_name || s.batchName || '',
+      (s.attendance || 0) + '%',
+      s.activityPoints || 0,
+      s.feesStatus || 'Pending',
+      s.status || 'Active'
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.map(i => `"${String(i).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Levlox_Learners_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // ─── 4. ATTENDANCE MODULE ────────────────────────────────────────────────
   const [attCourseFilter, setAttCourseFilter] = useState('');
   const [attBatchId, setAttBatchId] = useState('');
   const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
@@ -272,10 +634,8 @@ const TrainerDashboard = () => {
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [savingAttendance, setSavingAttendance] = useState(false);
 
-  // Selected batch for attendance sheet
   const selectedAttBatch = useMemo(() => batches.find(b => b.id === attBatchId), [batches, attBatchId]);
 
-  // Students belonging to selected attendance batch
   const attBatchStudents = useMemo(() => {
     if (!attBatchId) return [];
     const bCode = selectedAttBatch?.code || selectedAttBatch?.batchId;
@@ -291,7 +651,6 @@ const TrainerDashboard = () => {
     });
   }, [students, attBatchId, selectedAttBatch]);
 
-  // Load attendance records when batch or date changes
   useEffect(() => {
     if (!attBatchId || !attDate) return;
     let isMounted = true;
@@ -311,7 +670,7 @@ const TrainerDashboard = () => {
         setAttStudentRecords(initialMap);
         setAttRecordDetails(detailsMap);
       })
-      .catch(err => console.error("Error loading attendance:", err))
+      .catch(err => console.error('Error loading attendance:', err))
       .finally(() => { if (isMounted) setLoadingAttendance(false); });
     return () => { isMounted = false; };
   }, [attBatchId, attDate]);
@@ -335,7 +694,6 @@ const TrainerDashboard = () => {
     setAttStudentRecords({});
   };
 
-  // Attendance summary metrics
   const attSummary = useMemo(() => {
     let present = 0;
     let absent = 0;
@@ -349,72 +707,39 @@ const TrainerDashboard = () => {
       else notMarked += 1;
     });
 
-    const markedCount = present + absent;
-    const rate = markedCount > 0 ? ((present / markedCount) * 100).toFixed(1) : 0;
+    const rate = total > 0 ? Math.round((present / total) * 100) : 0;
     return { total, present, absent, notMarked, rate };
   }, [attBatchStudents, attStudentRecords]);
 
   const handleSaveAttendance = async () => {
     if (!attBatchId || !attDate) {
-      alert("Please select a batch and class date.");
+      alert('Please choose batch and date first.');
       return;
     }
-    if (attBatchStudents.length === 0) {
-      alert("No students in this batch to mark attendance.");
-      return;
-    }
-
     setSavingAttendance(true);
     try {
-      const recordsToSave = attBatchStudents.map(s => {
-        const detail = attRecordDetails[s.id];
-        const status = attStudentRecords[s.id] || 'Absent';
-        const isAuto = Boolean(detail?.attendedLive || detail?.attendance_mode === 'Auto') && status === 'Present';
-        return {
-          studentId: s.id,
-          studentName: s.name || 'Student',
-          rollNumber: s.rollNumber || s.id,
-          course: s.course || selectedAttBatch?.course_name || '',
-          status: status,
-          attendedLive: isAuto,
-          liveClassTitle: detail?.liveClassTitle || '',
-          marked_by: isAuto ? (detail?.marked_by || 'Auto-Attendance (Live Class)') : 'Trainer (Manual)',
-          attendance_mode: isAuto ? 'Auto' : 'Manual',
-          marked_time: isAuto ? detail?.marked_time : new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        };
-      });
-
-      await saveBatchAttendance(attBatchId, attDate, recordsToSave, {
-        batchName: selectedAttBatch?.name || '',
-        courseName: selectedAttBatch?.course_name || '',
-        markedBy: 'Trainer (Manual)',
-      });
-
-      // Synchronize student attendance metrics in students collection
-      await Promise.all(recordsToSave.map(async (r) => {
-        try {
-          const allStudentAtt = await getAttendanceForStudent(r.studentId);
-          const presentCount = allStudentAtt.filter(rec => (rec.status || '').toLowerCase() === 'present').length;
-          const totalDaysCount = allStudentAtt.length;
-          const absentCount = totalDaysCount - presentCount;
-          const pct = totalDaysCount > 0 ? Math.round((presentCount / totalDaysCount) * 100) : 0;
-          await updateStudent(r.studentId, {
-            attendance: {
-              present: presentCount,
-              absent: absentCount,
-              total_days: totalDaysCount,
-              percentage: pct,
-            }
-          });
-        } catch (syncErr) {
-          console.warn('[Trainer] Could not sync student stats:', syncErr);
-        }
+      const recordsToSave = attBatchStudents.map(s => ({
+        studentId: s.id,
+        student_id: s.id,
+        studentName: s.name,
+        rollNumber: s.rollNumber || s.id,
+        status: attStudentRecords[s.id] || 'Not Marked',
+        batchId: attBatchId,
+        date: attDate,
+        course_name: selectedAttBatch?.course_name || s.course || '',
       }));
 
-      showToast(`Attendance saved for ${selectedAttBatch?.name || 'Batch'} (${attDate}) ✓`);
+      await saveBatchAttendance(attBatchId, attDate, recordsToSave, {
+        batchId: attBatchId,
+        date: attDate,
+        markedBy: userProfile?.fullName || 'Trainer',
+        total: attSummary.total,
+        present: attSummary.present,
+        absent: attSummary.absent,
+      });
+
+      showToast('Attendance records saved successfully ✓');
       refetchSheets();
-      queryClient.invalidateQueries({ queryKey: ['attendance'] });
-      queryClient.invalidateQueries({ queryKey: ['studentAttendance'] });
     } catch (err) {
       console.error(err);
       alert(classifyFirestoreError(err).message);
@@ -423,16 +748,7 @@ const TrainerDashboard = () => {
     }
   };
 
-  // Calendar date selector & agenda
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date().toISOString().split('T')[0]);
-
-  // ─── 3. BATCH DETAILS MODAL ──────────────────────────────────────────────
-  const [selectedBatchDetails, setSelectedBatchDetails] = useState(null);
-
-  // ─── 4. STUDENT DETAILS MODAL ─────────────────────────────────────────────
-  const [selectedStudentDetails, setSelectedStudentDetails] = useState(null);
-
-  // ─── 5. LIVE CLASS MODAL ────────────────────────────────────────────────
+  // ─── 5. LIVE CLASS MANAGEMENT ────────────────────────────────────────────
   const [showLiveModal, setShowLiveModal] = useState(false);
   const [liveLectureName, setLiveLectureName] = useState('');
   const [liveCourseName, setLiveCourseName] = useState('');
@@ -446,7 +762,7 @@ const TrainerDashboard = () => {
   const handleScheduleLiveClass = async (e) => {
     e.preventDefault();
     if (!liveLectureName || !liveBatchId || !liveDate || !liveMeetLink) {
-      alert("Please fill in all required fields.");
+      alert('Please fill in all required fields.');
       return;
     }
     setSchedulingLive(true);
@@ -473,6 +789,8 @@ const TrainerDashboard = () => {
       showToast('Live Class scheduled successfully ✓');
       refetchLive();
       setShowLiveModal(false);
+      setLiveLectureName('');
+      setLiveMeetLink('');
     } catch (err) {
       console.error(err);
       alert(classifyFirestoreError(err).message);
@@ -483,7 +801,7 @@ const TrainerDashboard = () => {
 
   const handleDeleteLiveClass = async (id) => {
     if (!id) return;
-    if (!window.confirm("Are you sure you want to delete this live class session?")) return;
+    if (!window.confirm('Are you sure you want to delete this live class session?')) return;
     try {
       await deleteDocument('liveClasses', id);
       showToast('Live class deleted successfully ✓');
@@ -494,73 +812,7 @@ const TrainerDashboard = () => {
     }
   };
 
-  // ─── TRAINER UPLOAD RECORDING STATE & HANDLERS ─────────────────────────
-  const [trainerUploadClass, setTrainerUploadClass] = useState(null);
-  const [trainerRecordingUrl, setTrainerRecordingUrl] = useState('');
-  const [trainerRecordingDuration, setTrainerRecordingDuration] = useState('1h 00m');
-  const [trainerIsUploadingFile, setTrainerIsUploadingFile] = useState(false);
-  const [trainerUploadSaving, setTrainerUploadSaving] = useState(false);
-  const [trainerPreviewVideo, setTrainerPreviewVideo] = useState(null);
-
-  const handleOpenTrainerUploadModal = (lc) => {
-    setTrainerUploadClass(lc);
-    setTrainerRecordingUrl(lc.recording_url || lc.recordingUrl || '');
-    setTrainerRecordingDuration(lc.duration || '1h 00m');
-  };
-
-  const handleSaveTrainerRecording = async (e) => {
-    if (e) e.preventDefault();
-    if (!trainerUploadClass) return;
-    const targetId = trainerUploadClass.id || trainerUploadClass.uid || trainerUploadClass._id;
-    if (!trainerRecordingUrl.trim()) {
-      alert('Please enter a valid video link (YouTube, Google Drive, or MP4 URL).');
-      return;
-    }
-    setTrainerUploadSaving(true);
-    try {
-      await updateDocumentFields('liveClasses', targetId, {
-        recording_url: trainerRecordingUrl.trim(),
-        recordingUrl: trainerRecordingUrl.trim(),
-        duration: trainerRecordingDuration || '1h 00m',
-        recording_uploaded_at: new Date().toISOString(),
-        status: 'Completed'
-      });
-      showToast('Recording attached successfully ✓');
-      refetchLive();
-      setTrainerUploadClass(null);
-      setTrainerRecordingUrl('');
-    } catch (err) {
-      console.error(err);
-      alert(classifyFirestoreError(err).message);
-    } finally {
-      setTrainerUploadSaving(false);
-    }
-  };
-
-  const handleTrainerVideoFileUpload = async (file) => {
-    if (!file) return;
-    setTrainerIsUploadingFile(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/messages/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!res.ok) throw new Error('Upload failed');
-      const data = await res.json();
-      if (data.fileUrl) {
-        setTrainerRecordingUrl(data.fileUrl);
-      }
-    } catch (err) {
-      console.error('File upload error:', err);
-      alert('Could not upload video file. You can also paste a direct YouTube or Google Drive link.');
-    } finally {
-      setTrainerIsUploadingFile(false);
-    }
-  };
-
-  // ─── 6. RECORDED CLASS MODAL ─────────────────────────────────────────────
+  // ─── 6. RECORDED CLASSES & PLAYLISTS ─────────────────────────────────────
   const [showRecordedModal, setShowRecordedModal] = useState(false);
   const [trainerRecordedBatchFilter, setTrainerRecordedBatchFilter] = useState('');
   const [previewVideo, setPreviewVideo] = useState(null);
@@ -585,7 +837,7 @@ const TrainerDashboard = () => {
   const handleAddRecordedClass = async (e) => {
     e.preventDefault();
     if (!recTitle || !recVideoUrl) {
-      alert("Title and Video URL are required.");
+      alert('Title and Video URL are required.');
       return;
     }
     setSavingRecorded(true);
@@ -617,15 +869,12 @@ const TrainerDashboard = () => {
         created_at: new Date().toISOString()
       });
       showToast('Recorded Lesson added successfully ✓');
-      await refetchRecorded();
-      queryClient.invalidateQueries({ queryKey: ['trainerRecordedClasses'] });
-      queryClient.invalidateQueries({ queryKey: ['recordedClasses'] });
+      refetchRecorded();
       setShowRecordedModal(false);
       setRecTitle('');
       setRecVideoUrl('');
       setRecThumbnailUrl('');
       setRecDescription('');
-      setRecDuration('1h 30m');
     } catch (err) {
       console.error(err);
       alert(classifyFirestoreError(err).message);
@@ -636,20 +885,18 @@ const TrainerDashboard = () => {
 
   const handleDeleteRecordedClass = async (id) => {
     if (!id) return;
-    if (!window.confirm("Are you sure you want to permanently delete this recorded lesson?")) return;
+    if (!window.confirm('Are you sure you want to delete this recorded lesson?')) return;
     try {
       await deleteDocument('recordedClasses', id);
       showToast('Recorded lesson deleted successfully ✓');
-      await refetchRecorded();
-      queryClient.invalidateQueries({ queryKey: ['trainerRecordedClasses'] });
-      queryClient.invalidateQueries({ queryKey: ['recordedClasses'] });
+      refetchRecorded();
     } catch (err) {
       console.error(err);
       alert(classifyFirestoreError(err).message);
     }
   };
 
-  // ─── 7. ANNOUNCEMENT MODAL ───────────────────────────────────────────────
+  // ─── 7. ANNOUNCEMENTS ───────────────────────────────────────────────────
   const [showAnnModal, setShowAnnModal] = useState(false);
   const [annTitle, setAnnTitle] = useState('');
   const [annMessage, setAnnMessage] = useState('');
@@ -661,7 +908,7 @@ const TrainerDashboard = () => {
   const handleCreateAnnouncement = async (e) => {
     e.preventDefault();
     if (!annTitle || !annMessage || !annBatchId) {
-      alert("Title, Message, and Batch are required.");
+      alert('Title, Message, and Batch are required.');
       return;
     }
     setSavingAnn(true);
@@ -688,7 +935,7 @@ const TrainerDashboard = () => {
         attachmentName,
         date: new Date().toISOString().split('T')[0]
       });
-      showToast('Announcement & notifications broadcasted successfully ✓');
+      showToast('Announcement broadcasted successfully ✓');
       refetchAnnouncements();
       setShowAnnModal(false);
       setAnnTitle('');
@@ -702,163 +949,110 @@ const TrainerDashboard = () => {
     }
   };
 
-  // ─── 8. ACTIVITY SCORES MODAL ───────────────────────────────────────────
-  const [showActivityModal, setShowActivityModal] = useState(false);
-  const [actStudentId, setActStudentId] = useState('');
-  const [actPoints, setActPoints] = useState(10);
-  const [actType, setActType] = useState('Participation');
-  const [actRemarks, setActRemarks] = useState('');
-  const [savingActivity, setSavingActivity] = useState(false);
-
-  const handleAwardPoints = async (e) => {
-    e.preventDefault();
-    if (!actStudentId || !actPoints) {
-      alert("Student and Points are required.");
-      return;
-    }
-    setSavingActivity(true);
+  const handleDeleteAnnouncement = async (id) => {
+    if (!id) return;
+    if (!window.confirm('Delete this announcement?')) return;
     try {
-      const targetStudent = students.find(s => s.id === actStudentId);
-      await awardActivityScore({
-        studentId: actStudentId,
-        studentName: targetStudent?.name || 'Student',
-        batchId: targetStudent?.batch_id || targetStudent?.batchId || '',
-        batchName: targetStudent?.batch_name || targetStudent?.batchName || '',
-        date: new Date().toISOString().split('T')[0],
-        meeting: 'Trainer Portal Session',
-        activityType: actType,
-        points: Number(actPoints),
-        remarks: actRemarks,
-        awardedBy: userProfile?.fullName || 'Trainer'
-      });
-      showToast(`Awarded +${actPoints} points to ${targetStudent?.name || 'Student'} ✓`);
-      refetchStudents();
-      setShowActivityModal(false);
+      await deleteDocument('announcements', id);
+      showToast('Announcement deleted ✓');
+      refetchAnnouncements();
     } catch (err) {
       console.error(err);
       alert(classifyFirestoreError(err).message);
-    } finally {
-      setSavingActivity(false);
     }
   };
 
-  // ─── 9. PROFILE EDIT MODAL & AVATAR UPLOAD ──────────────────────────────
+  // ─── 8. SETTINGS & PROFILE ──────────────────────────────────────────────
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [editingPhone, setEditingPhone] = useState(userProfile?.phone || '');
-  const [editingName, setEditingName] = useState(userProfile?.fullName || userProfile?.name || '');
-  const [savingProfile, setSavingProfile] = useState(false);
 
-  useEffect(() => {
-    if (userProfile) {
-      setEditingName(userProfile.fullName || userProfile.name || '');
-      setEditingPhone(userProfile.phone || '');
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setErrorMessage('Please fill in all password fields.');
+      return;
     }
-  }, [userProfile]);
+    if (newPassword !== confirmPassword) {
+      setErrorMessage('New passwords do not match.');
+      return;
+    }
+    const val = validatePasswordStrength(newPassword);
+    if (!val.valid) {
+      setErrorMessage(val.errors.join(' '));
+      return;
+    }
+    setPasswordSaving(true);
+    setErrorMessage('');
+    try {
+      await changeOwnPassword(currentUser.uid, currentPassword, newPassword);
+      showToast('Password changed successfully ✓');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      if (refreshProfile) await refreshProfile();
+    } catch (err) {
+      console.error(err);
+      setErrorMessage(err.message || 'Password update failed.');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
 
   const handleAvatarChange = async (e) => {
-    const file = e.target.files?.[0];
+    const file = e.target.files[0];
     if (!file) return;
     setUploadingAvatar(true);
     try {
       const photoUrl = await uploadTrainerProfilePic(trainerUid, file);
-      applyProfilePatch({ profilePic: photoUrl, profile_pic: photoUrl });
-      showToast('Profile photo updated ✓');
+      if (applyProfilePatch) {
+        await applyProfilePatch({ profilePic: photoUrl, profile_pic: photoUrl });
+      }
+      showToast('Trainer profile picture updated ✓');
+      if (refreshProfile) await refreshProfile();
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Avatar upload failed.');
+      alert('Avatar upload failed: ' + err.message);
     } finally {
       setUploadingAvatar(false);
     }
   };
 
-  const handleSaveProfile = async (e) => {
-    e.preventDefault();
-    setSavingProfile(true);
-    try {
-      await updateDocumentFields('trainers', trainerUid, {
-        fullName: editingName,
-        name: editingName,
-        phone: editingPhone
-      });
-      applyProfilePatch({ fullName: editingName, name: editingName, phone: editingPhone });
-      showToast('Profile details updated ✓');
-    } catch (err) {
-      console.error(err);
-      alert(classifyFirestoreError(err).message);
-    } finally {
-      setSavingProfile(false);
-    }
-  };
-
-  // ─── 10. SETTINGS / PASSWORD CHANGE ─────────────────────────────────────
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPass1, setShowPass1] = useState(false);
-  const [showPass2, setShowPass2] = useState(false);
-  const [changingPass, setChangingPass] = useState(false);
-  const [passError, setPassError] = useState('');
-
-  const passValidation = useMemo(() => validatePasswordStrength(newPassword), [newPassword]);
-
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
-    setPassError('');
-    if (!currentPassword) {
-      setPassError('Current password is required.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPassError('New password and confirmation do not match.');
-      return;
-    }
-    if (!passValidation.isValid) {
-      setPassError(passValidation.message);
-      return;
-    }
-
-    setChangingPass(true);
-    try {
-      await changeOwnPassword(currentPassword, newPassword);
-      // Set mustChangePassword = false in Firestore
-      await updateDocumentFields('trainers', trainerUid, { mustChangePassword: false });
-      applyProfilePatch({ mustChangePassword: false });
-      showToast('Password updated successfully! Portal access unlocked ✓');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      handleTabChange('dashboard');
-    } catch (err) {
-      console.error(err);
-      setPassError(err.message || 'Failed to update password. Check your current password.');
-    } finally {
-      setChangingPass(false);
-    }
-  };
-
   return (
-    <div className="dashboard-layout">
+    <div className="admin-layout" style={{ display: 'flex', minHeight: '100vh', background: 'var(--surface-alt)' }}>
       {/* Toast Alert */}
       {toast && (
         <div style={{
-          position: 'fixed', top: 24, right: 24, background: '#121118', color: '#fff',
-          borderRadius: 12, padding: '12px 20px', fontSize: 13, fontWeight: 600, zIndex: 2000,
-          boxShadow: '0 16px 32px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: 8
+          position: 'fixed',
+          top: 24,
+          right: 24,
+          zIndex: 9999,
+          background: 'linear-gradient(135deg, #10B981, #059669)',
+          color: '#FFF',
+          padding: '12px 20px',
+          borderRadius: 12,
+          fontWeight: 700,
+          boxShadow: '0 10px 25px rgba(16,185,129,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10
         }}>
-          <CheckCircle size={16} color="#10B981" /> {toast}
+          <CheckCircle size={18} /> {toast}
         </div>
       )}
 
-      {/* Sidebar */}
+      {/* ─── SIDEBAR NAVIGATION (ADMIN GRADE) ──────────────────────────────── */}
       <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-        {/* Levlox Nova Signature Brand Card */}
+        {/* Levlox Signature Brand Card */}
         <div className="srms-sidebar-brand" style={{
           margin: sidebarCollapsed ? '10px 4px 16px' : '10px 14px 16px',
           padding: sidebarCollapsed ? '12px 6px' : '16px 14px',
           position: 'relative'
         }}>
-          <div className="srms-sidebar-brand-icon">
-            <GraduationCap size={sidebarCollapsed ? 20 : 26} color="#FFFFFF" strokeWidth={2.2} />
+          <div className="srms-sidebar-brand-icon" style={{ background: '#FFFFFF', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <img src={levloxLogo} alt="Levlox" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           {!sidebarCollapsed && (
             <>
@@ -891,60 +1085,102 @@ const TrainerDashboard = () => {
           </button>
         </div>
 
-        <div className="sidebar-section-label">Main Navigation</div>
+        <nav className="sidebar-menu" style={{ overflowY: 'auto' }}>
+          <span className="sidebar-section-label">Main Navigation</span>
+          
+          <button className={`sidebar-link ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => handleTabChange('dashboard')}>
+            <Clock size={18} />
+            <span className="sidebar-link-text">Dashboard</span>
+          </button>
 
-        <ul className="sidebar-menu">
-          {[
-            { key: 'dashboard', label: 'Dashboard', icon: GraduationCap },
-            { key: 'batches', label: 'My Batches', icon: BookOpen },
-            { key: 'students', label: 'My Students', icon: Users },
-            { key: 'attendance', label: 'Attendance', icon: CalendarCheck },
-            { key: 'live-classes', label: 'Live Classes', icon: Video },
-            { key: 'recorded-classes', label: 'Recorded Classes', icon: PlayCircle },
-            { key: 'announcements', label: 'Announcements', icon: Megaphone },
-            { key: 'assignments', label: 'Assignments', icon: FileText },
-            { key: 'chat', label: 'Batch Chat', icon: MessageSquare },
-            { key: 'activity-scores', label: 'Activity Scores', icon: Trophy },
-          ].map(item => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.key;
-            return (
-              <li key={item.key}>
-                <button 
-                  className={`sidebar-link ${isActive ? 'active' : ''}`}
-                  onClick={() => handleTabChange(item.key)}
-                  /* Always enabled for seamless navigation */
-                >
-                  <Icon size={18} />
-                  <span className="sidebar-link-text">{item.label}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+          <button className={`sidebar-link ${activeTab === 'batches' ? 'active' : ''}`} onClick={() => handleTabChange('batches')}>
+            <GraduationCap size={18} />
+            <span className="sidebar-link-text">Batch Management</span>
+          </button>
 
-        <div className="sidebar-section-label">Account & Preferences</div>
-        <ul className="sidebar-menu">
-          <li>
-            <button 
-              className={`sidebar-link ${activeTab === 'profile' ? 'active' : ''}`}
-              onClick={() => handleTabChange('profile')}
-              /* Always enabled */
-            >
-              <User size={18} />
-              <span className="sidebar-link-text">Profile</span>
-            </button>
-          </li>
-          <li>
-            <button 
-              className={`sidebar-link ${activeTab === 'settings' ? 'active' : ''}`}
-              onClick={() => handleTabChange('settings')}
-            >
-              <Settings size={18} />
-              <span className="sidebar-link-text">Settings</span>
-            </button>
-          </li>
-        </ul>
+          <button className={`sidebar-link ${activeTab === 'students' ? 'active' : ''}`} onClick={() => handleTabChange('students')}>
+            <Users size={18} />
+            <span className="sidebar-link-text">My Students</span>
+          </button>
+
+          <span className="sidebar-section-label">Academic & Learning</span>
+
+          <button className={`sidebar-link ${activeTab === 'courses' ? 'active' : ''}`} onClick={() => handleTabChange('courses')}>
+            <BookOpen size={18} />
+            <span className="sidebar-link-text">Courses & Curriculum</span>
+          </button>
+
+          <button className={`sidebar-link ${activeTab === 'live-classes' ? 'active' : ''}`} onClick={() => handleTabChange('live-classes')}>
+            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+              <Video size={18} />
+              {hasUpcomingLiveClasses && (
+                <span style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -3,
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: '#EF4444',
+                  boxShadow: '0 0 8px #EF4444',
+                  animation: 'pulse-dot 1.5s infinite'
+                }} />
+              )}
+            </div>
+            <span className="sidebar-link-text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              Live Classes
+              {hasUpcomingLiveClasses && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 800, color: '#EF4444', background: 'rgba(239,68,68,0.15)', padding: '2px 7px', borderRadius: 12 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#EF4444' }} /> LIVE
+                </span>
+              )}
+            </span>
+          </button>
+
+          <button className={`sidebar-link ${activeTab === 'recorded-classes' ? 'active' : ''}`} onClick={() => handleTabChange('recorded-classes')}>
+            <PlayCircle size={18} />
+            <span className="sidebar-link-text">Recorded Classes</span>
+          </button>
+
+          <span className="sidebar-section-label">Student Engagement</span>
+
+          <button className={`sidebar-link ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => handleTabChange('attendance')}>
+            <CalendarCheck size={18} />
+            <span className="sidebar-link-text">Attendance Sheet</span>
+          </button>
+
+          <button className={`sidebar-link ${activeTab === 'assignments' ? 'active' : ''}`} onClick={() => handleTabChange('assignments')}>
+            <FileText size={18} />
+            <span className="sidebar-link-text">Assignments</span>
+          </button>
+
+          <button className={`sidebar-link ${activeTab === 'announcements' ? 'active' : ''}`} onClick={() => handleTabChange('announcements')}>
+            <Megaphone size={18} />
+            <span className="sidebar-link-text">Announcements</span>
+          </button>
+
+          <button className={`sidebar-link ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => handleTabChange('chat')}>
+            <MessageSquare size={18} />
+            <span className="sidebar-link-text">Batch Chat</span>
+          </button>
+
+          <button className={`sidebar-link ${activeTab === 'activity-scores' ? 'active' : ''}`} onClick={() => handleTabChange('activity-scores')}>
+            <Trophy size={18} />
+            <span className="sidebar-link-text">Activity Scores</span>
+          </button>
+
+          <span className="sidebar-section-label">Account & Settings</span>
+
+          <button className={`sidebar-link ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => handleTabChange('profile')}>
+            <User size={18} />
+            <span className="sidebar-link-text">Trainer Profile</span>
+          </button>
+
+          <button className={`sidebar-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => handleTabChange('settings')}>
+            <Settings size={18} />
+            <span className="sidebar-link-text">Settings</span>
+          </button>
+        </nav>
 
         <div className="sidebar-footer">
           <button className="sidebar-link" onClick={logout} style={{ color: '#EF4444' }}>
@@ -954,274 +1190,711 @@ const TrainerDashboard = () => {
         </div>
       </aside>
 
-      {/* Main Content Body */}
-      <main className={`main-content ${sidebarCollapsed ? 'expanded' : ''}`}>
+      {/* ─── MAIN CONTENT BODY ────────────────────────────────────────────── */}
+      <main className={`main-content ${sidebarCollapsed ? 'expanded' : ''}`} style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
         {/* Sticky Topbar */}
-        <header className="top-navbar">
-          <div className="top-navbar-left">
+        <header className="top-navbar" style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FFF', padding: '16px 24px', borderRadius: 16, border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+          <div className="top-navbar-left" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <button className="sidebar-toggle-btn mobile-only" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
               <Menu size={20} />
             </button>
             <div>
-              <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Levlox Trainer Portal</h1>
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)' }}>
-                Teaching Management & Student Engagement
+              <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Levlox Trainer Portal</h1>
+              <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
+                Teaching Management, Batch Administration & Student Engagement
               </p>
             </div>
           </div>
 
-          <div className="navbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="navbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <button 
+              className="btn btn-outline btn-sm" 
+              onClick={openCreateBatchModal}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+            >
+              <Plus size={15} /> New Batch
+            </button>
+
+            <button 
+              className="btn btn-primary btn-sm" 
+              onClick={() => { setShowLiveModal(true); }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+            >
+              <Video size={15} /> Schedule Class
+            </button>
+
             <NotificationBell userId={currentUser?.uid} userRole="trainer" />
-            <div className="navbar-date-chip">
+            
+            <div className="navbar-date-chip" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--surface-alt)', padding: '6px 12px', borderRadius: 20 }}>
               <CalendarIcon size={14} />
               {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 12, borderLeft: '1.5px solid var(--border-color)' }}>
-              <img 
-                src={userProfile?.profilePic || userProfile?.profile_pic || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
-                alt="Trainer Profile" 
-                style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-color)' }}
-              />
+              <div style={{ width: 38, height: 38, borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--primary-color)' }}>
+                <img 
+                  src={userProfile?.profilePic || userProfile?.profile_pic || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+                  alt="Trainer Profile" 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: 13, fontWeight: 800, color: '#121118' }}>
                   {userProfile?.fullName || userProfile?.name || 'Trainer'}
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--primary-color)', fontWeight: 700 }}>
-                  ID: {userProfile?.trainerId || userProfile?.code || 'TRN001001'}
+                  ID: {userProfile?.trainerId || userProfile?.trainer_id || userProfile?.code || 'TRN001013'}
                 </span>
               </div>
             </div>
           </div>
         </header>
 
-        {/* FORCED PASSWORD CHANGE BANNER */}
+        {/* Dismissible Password Change Notice */}
         {mustChangePassword && activeTab !== 'settings' && (
-          <div style={{ background: '#FFFBEB', border: '1.5px solid #FCD34D', borderRadius: 16, padding: 16, marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ background: '#FFFBEB', border: '1.5px solid #FCD34D', borderRadius: 16, padding: '14px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <AlertCircle size={22} color="#D97706" />
               <div>
-                <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#92400E' }}>Temporary Password Change Required</h4>
+                <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#92400E' }}>Temporary Password Active</h4>
                 <p style={{ margin: '2px 0 0', fontSize: 12.5, color: '#B45309' }}>
-                  Welcome to your Trainer Operations Portal! You can update your temporary password anytime in Settings.
+                  For optimal security, you can customize your permanent trainer password anytime in Settings.
                 </p>
               </div>
             </div>
             <button className="btn btn-primary btn-sm" onClick={() => handleTabChange('settings')}>
-              Go to Settings
+              Update in Settings
             </button>
           </div>
         )}
 
-        {/* ─── MODULE 1: DASHBOARD OVERVIEW ─────────────────────────────────── */}
+        {/* ─── TAB 1: EXECUTIVE DASHBOARD OVERVIEW ───────────────────────────── */}
         {activeTab === 'dashboard' && (
           <div className="animate-fade-in">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18, marginBottom: 28 }}>
-              {[
-                { title: 'My Batches', count: stats.totalBatches, icon: LayersIcon, color: '#6C3CF0', bg: 'rgba(108,60,240,0.08)' },
-                { title: 'My Students', count: stats.totalStudents, icon: Users, color: '#3B82F6', bg: 'rgba(59,130,246,0.08)' },
-                { title: "Today's Classes", count: stats.todayClassesCount, icon: Video, color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
-                { title: 'Attendance Pending', count: stats.attendancePendingCount, icon: CalendarCheck, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)' },
-                { title: 'Upcoming Classes', count: stats.upcomingClassesCount, icon: Clock, color: '#8B5CF6', bg: 'rgba(139,92,246,0.08)' },
-                { title: 'Total Activity Points', count: stats.totalPoints, icon: Trophy, color: '#EC4899', bg: 'rgba(236,72,153,0.08)' },
-              ].map((card, idx) => {
-                const Icon = card.icon;
-                return (
-                  <div key={idx} style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 18, padding: 20, boxShadow: 'var(--shadow-card)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>{card.title}</span>
-                      <h2 style={{ fontSize: 26, fontWeight: 800, margin: '4px 0 0', color: '#121118' }}>{card.count}</h2>
-                    </div>
-                    <div style={{ width: 44, height: 44, borderRadius: 12, background: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon size={22} color={card.color} />
-                    </div>
+            {/* 6 Executive Stat Cards (Admin-Grade) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+              {/* Card 1: Assigned Batches */}
+              <div className="stat-card-premium" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '18px', borderRadius: '14px', background: '#FFF', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="stat-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span className="stat-card-label" style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>Assigned Batches</span>
+                  <div className="stat-card-icon" style={{ background: 'rgba(108, 60, 240, 0.08)', color: '#6C3CF0', padding: '8px', borderRadius: '8px' }}>
+                    <GraduationCap size={18} />
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Quick Actions & Assigned Batches Overview */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 }}>
-              <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 20, padding: 24, boxShadow: 'var(--shadow-card)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Assigned Batches Summary</h3>
-                  <button className="btn btn-ghost btn-sm" onClick={() => handleTabChange('batches')}>View All</button>
                 </div>
-                {batches.length === 0 ? (
-                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>No batches assigned yet.</p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {batches.slice(0, 4).map(b => (
-                      <div key={b.id} style={{ padding: 14, background: 'var(--surface-alt)', border: '1px solid var(--border-color)', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: '#121118' }}>{b.name}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Course: {b.course_name || 'N/A'} • {b.students_count || 0} Students</div>
-                        </div>
-                        <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', background: 'rgba(16,185,129,0.1)', color: '#10B981', borderRadius: 6 }}>
-                          {b.status || 'Active'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div>
+                  <h3 className="stat-card-value" style={{ fontSize: '26px', fontWeight: '800', margin: '4px 0', color: '#1E293B' }}>{stats.totalBatches}</h3>
+                  <span className="stat-card-footer" style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Active Cohorts</span>
+                </div>
               </div>
 
-              <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 20, padding: 24, boxShadow: 'var(--shadow-card)' }}>
-                <h3 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 16px' }}>Quick Teaching Tools</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <button className="btn btn-outline" style={{ height: 50, flexDirection: 'column', gap: 2, fontSize: 12 }} onClick={() => handleTabChange('attendance')}>
-                    <CalendarCheck size={18} color="var(--primary-color)" /> Take Attendance
-                  </button>
-                  <button className="btn btn-outline" style={{ height: 50, flexDirection: 'column', gap: 2, fontSize: 12 }} onClick={() => setShowLiveModal(true)}>
-                    <Video size={18} color="#10B981" /> Schedule Class
-                  </button>
-                  <button className="btn btn-outline" style={{ height: 50, flexDirection: 'column', gap: 2, fontSize: 12 }} onClick={() => setShowAnnModal(true)}>
-                    <Megaphone size={18} color="#F59E0B" /> Announcement
-                  </button>
-                  <button className="btn btn-outline" style={{ height: 50, flexDirection: 'column', gap: 2, fontSize: 12 }} onClick={() => setShowActivityModal(true)}>
-                    <Trophy size={18} color="#EC4899" /> Award Points
-                  </button>
+              {/* Card 2: Enrolled Learners */}
+              <div className="stat-card-premium" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '18px', borderRadius: '14px', background: '#FFF', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="stat-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span className="stat-card-label" style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>My Students</span>
+                  <div className="stat-card-icon" style={{ background: 'rgba(59, 130, 246, 0.08)', color: '#3B82F6', padding: '8px', borderRadius: '8px' }}>
+                    <Users size={18} />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="stat-card-value" style={{ fontSize: '26px', fontWeight: '800', margin: '4px 0', color: '#1E293B' }}>{stats.totalStudents}</h3>
+                  <span className="stat-card-footer" style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Enrolled Learners</span>
+                </div>
+              </div>
+
+              {/* Card 3: Today's Live Sessions */}
+              <div className="stat-card-premium" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '18px', borderRadius: '14px', background: '#FFF', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="stat-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span className="stat-card-label" style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>Today's Classes</span>
+                  <div className="stat-card-icon" style={{ background: 'rgba(16, 185, 129, 0.08)', color: '#10B981', padding: '8px', borderRadius: '8px' }}>
+                    <Video size={18} />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="stat-card-value" style={{ fontSize: '26px', fontWeight: '800', margin: '4px 0', color: '#1E293B' }}>{stats.todayClassesCount}</h3>
+                  <span className="stat-card-footer" style={{ fontSize: '11px', color: '#10B981', fontWeight: 600 }}>Scheduled Today</span>
+                </div>
+              </div>
+
+              {/* Card 4: Attendance Status */}
+              <div className="stat-card-premium" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '18px', borderRadius: '14px', background: '#FFF', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="stat-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span className="stat-card-label" style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>Attendance Pending</span>
+                  <div className="stat-card-icon" style={{ background: 'rgba(245, 158, 11, 0.08)', color: '#F59E0B', padding: '8px', borderRadius: '8px' }}>
+                    <CalendarCheck size={18} />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="stat-card-value" style={{ fontSize: '26px', fontWeight: '800', margin: '4px 0', color: stats.attendancePendingCount > 0 ? '#F59E0B' : '#10B981' }}>{stats.attendancePendingCount}</h3>
+                  <span className="stat-card-footer" style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Batches to mark</span>
+                </div>
+              </div>
+
+              {/* Card 5: Upcoming Sessions */}
+              <div className="stat-card-premium" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '18px', borderRadius: '14px', background: '#FFF', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="stat-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span className="stat-card-label" style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>Upcoming Classes</span>
+                  <div className="stat-card-icon" style={{ background: 'rgba(139, 92, 246, 0.08)', color: '#8B5CF6', padding: '8px', borderRadius: '8px' }}>
+                    <Clock size={18} />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="stat-card-value" style={{ fontSize: '26px', fontWeight: '800', margin: '4px 0', color: '#1E293B' }}>{stats.upcomingClassesCount}</h3>
+                  <span className="stat-card-footer" style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Next 7 days</span>
+                </div>
+              </div>
+
+              {/* Card 6: Activity Points */}
+              <div className="stat-card-premium" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '18px', borderRadius: '14px', background: '#FFF', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="stat-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span className="stat-card-label" style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>Points Awarded</span>
+                  <div className="stat-card-icon" style={{ background: 'rgba(236, 72, 153, 0.08)', color: '#EC4899', padding: '8px', borderRadius: '8px' }}>
+                    <Trophy size={18} />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="stat-card-value" style={{ fontSize: '26px', fontWeight: '800', margin: '4px 0', color: '#1E293B' }}>{stats.totalPoints}</h3>
+                  <span className="stat-card-footer" style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Total activity score</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Action Shortcuts Bar */}
+            <div style={{ background: '#FFF', border: '1px solid var(--border-color)', borderRadius: 16, padding: '16px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Sparkles size={18} color="var(--primary-color)" />
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#1E293B' }}>Quick Teaching Actions:</span>
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button className="btn btn-outline btn-sm" onClick={openCreateBatchModal}>
+                  <Plus size={14} /> Create Batch
+                </button>
+                <button className="btn btn-outline btn-sm" onClick={() => setShowLiveModal(true)}>
+                  <Video size={14} /> Schedule Class
+                </button>
+                <button className="btn btn-outline btn-sm" onClick={() => handleTabChange('attendance')}>
+                  <CalendarCheck size={14} /> Take Attendance
+                </button>
+                <button className="btn btn-outline btn-sm" onClick={() => setShowAnnModal(true)}>
+                  <Megaphone size={14} /> Broadcast Announcement
+                </button>
+                <button className="btn btn-outline btn-sm" onClick={() => handleTabChange('assignments')}>
+                  <FileText size={14} /> Create Assignment
+                </button>
+              </div>
+            </div>
+
+            {/* 2-Column Executive Dashboard */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '24px' }}>
+              {/* Left Column: Recent Learners (with real pictures!) */}
+              <div className="dashboard-card-section" style={{ background: '#FFF', border: '1px solid var(--border-color)', borderRadius: 16, padding: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 className="section-title-premium" style={{ margin: 0, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Users size={18} color="var(--primary-color)" /> Enrolled Learners Directory
+                  </h3>
+                  <button className="btn btn-ghost btn-sm" onClick={() => handleTabChange('students')}>View All</button>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table-premium" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                        <th style={{ padding: '10px 12px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Photo & Name</th>
+                        <th style={{ padding: '10px 12px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Roll No</th>
+                        <th style={{ padding: '10px 12px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Course</th>
+                        <th style={{ padding: '10px 12px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Batch</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {students.slice(0, 5).map(s => {
+                        const initials = s.name ? s.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ST';
+                        return (
+                          <tr key={s.id} style={{ borderBottom: '1px solid var(--border-light)', cursor: 'pointer' }} onClick={() => openStudentDetails(s)}>
+                            <td style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{ width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', background: 'linear-gradient(135deg, #EEF2FF, #E0E7FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid var(--border-color)', flexShrink: 0 }}>
+                                {(s.profile_pic || s.profilePhotoUrl) && (s.profile_pic || s.profilePhotoUrl).trim() !== '' ? (
+                                  <img src={s.profile_pic || s.profilePhotoUrl} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                ) : (
+                                  <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--primary-color)' }}>{initials}</span>
+                                )}
+                              </div>
+                              <div>
+                                <strong style={{ fontSize: 13, color: '#1E293B' }}>{s.name}</strong>
+                                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{s.email}</div>
+                              </div>
+                            </td>
+                            <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontWeight: 700 }}>{s.rollNumber || s.id}</td>
+                            <td style={{ padding: '10px 12px' }}>{s.course || 'Data Science & AI'}</td>
+                            <td style={{ padding: '10px 12px' }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', background: 'rgba(108,60,240,0.08)', color: 'var(--primary-color)', borderRadius: 6 }}>
+                                {s.batch_name || s.batchName || 'Assigned'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {students.length === 0 && (
+                        <tr>
+                          <td colSpan="4" style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            No students registered in assigned batches.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Right Column: Today's Live Sessions & Announcements */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {/* Section: Live Classes */}
+                <div style={{ background: '#FFF', border: '1px solid var(--border-color)', borderRadius: 16, padding: 20 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Video size={18} color="#10B981" /> Live Teaching Schedules
+                    </h3>
+                    <button className="btn btn-ghost btn-sm" onClick={() => handleTabChange('live-classes')}>Manage</button>
+                  </div>
+
+                  {liveClasses.length === 0 ? (
+                    <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-secondary)', background: 'var(--surface-alt)', borderRadius: 12 }}>
+                      No live sessions scheduled. Click "Schedule Class" above to set one up.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {liveClasses.slice(0, 3).map(lc => (
+                        <div key={lc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: 'var(--surface-alt)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: 13.5, color: '#1E293B' }}>{lc.title || lc.lectureName}</div>
+                            <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>
+                              📅 {lc.date} • ⏰ {lc.time || lc.startTime} • Batch: <strong>{lc.batchName || lc.batch_name || 'Assigned'}</strong>
+                            </div>
+                          </div>
+                          {lc.meetLink || lc.meet_link ? (
+                            <a href={lc.meetLink || lc.meet_link} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <ExternalLink size={13} /> Join
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>No link</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Section: Recent Announcements */}
+                <div style={{ background: '#FFF', border: '1px solid var(--border-color)', borderRadius: 16, padding: 20 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Megaphone size={18} color="#F59E0B" /> Latest Announcements
+                    </h3>
+                    <button className="btn btn-ghost btn-sm" onClick={() => handleTabChange('announcements')}>Broadcast</button>
+                  </div>
+
+                  {announcements.length === 0 ? (
+                    <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-secondary)', background: 'var(--surface-alt)', borderRadius: 12 }}>
+                      No announcements posted yet.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {announcements.slice(0, 3).map(ann => (
+                        <div key={ann.id} style={{ padding: '12px 14px', background: 'var(--surface-alt)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <strong style={{ fontSize: 13, color: '#1E293B' }}>{ann.title}</strong>
+                            <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: ann.priority === 'Urgent' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)', color: ann.priority === 'Urgent' ? '#EF4444' : '#3B82F6' }}>
+                              {ann.priority || 'Normal'}
+                            </span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                            {ann.message || ann.content}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ─── MODULE 2: MY BATCHES ─────────────────────────────────────────── */}
+        {/* ─── TAB 2: BATCH MANAGEMENT (FULL ADMIN RIGHTS) ──────────────────── */}
         {activeTab === 'batches' && (
           <div className="animate-fade-in">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>My Assigned Batches</h2>
+              <div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Batch Management Center</h2>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Create, configure, schedule, and oversee student cohorts
+                </p>
+              </div>
+              <button className="btn btn-primary" onClick={openCreateBatchModal} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                <Plus size={16} /> Create New Batch
+              </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
               {batches.map(b => (
-                <div key={b.id} style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 18, padding: 20, boxShadow: 'var(--shadow-card)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(108,60,240,0.1)', color: 'var(--primary-color)', padding: '4px 10px', borderRadius: 6 }}>
-                      {b.code || b.batchId || b.id}
-                    </span>
-                    <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', background: 'rgba(16,185,129,0.1)', color: '#10B981', borderRadius: 6 }}>
-                      {b.status || 'Active'}
-                    </span>
+                <div key={b.id} style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 18, padding: 22, boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(108,60,240,0.1)', color: 'var(--primary-color)', padding: '4px 10px', borderRadius: 6 }}>
+                        {b.code || b.batchId || b.id}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', background: b.status === 'Active' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: b.status === 'Active' ? '#10B981' : '#F59E0B', borderRadius: 6 }}>
+                        {b.status || 'Active'}
+                      </span>
+                    </div>
+
+                    <h3 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 6px', color: '#121118' }}>{b.name}</h3>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                      Course: <strong>{b.course_name || 'Data Science & AI'}</strong>
+                    </p>
+
+                    <div style={{ background: 'var(--surface-alt)', borderRadius: 12, padding: '10px 14px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Daily Timings:</span>
+                        <strong>{b.timing || '10:00 AM - 12:00 PM'}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Duration:</span>
+                        <strong>{b.duration_days || 50} Days</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Enrolled Learners:</span>
+                        <strong>{b.students_count || (Array.isArray(b.student_ids) ? b.student_ids.length : 0)} / {b.max_students || 30}</strong>
+                      </div>
+                    </div>
                   </div>
-                  <h3 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 4px', color: '#121118' }}>{b.name}</h3>
-                  <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '0 0 14px' }}>
-                    Course: <strong>{b.course_name || 'N/A'}</strong>
-                  </p>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: 12, marginBottom: 16 }}>
-                    <span>Students: <strong>{b.students_count || 0}</strong></span>
-                    <span>Schedule: <strong>{b.schedule || 'Regular'}</strong></span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <button className="btn btn-outline btn-sm" onClick={() => setSelectedBatchDetails(b)}>
-                      <Eye size={14} /> Batch Details
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
+                    <button className="btn btn-outline btn-sm" onClick={() => openEditBatchModal(b)} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                      <Pencil size={13} /> Edit Batch
                     </button>
-                    <button className="btn btn-primary btn-sm" onClick={() => { setAttBatchId(b.id); handleTabChange('attendance'); }}>
-                      <CalendarCheck size={14} /> Attendance
+                    <button className="btn btn-primary btn-sm" onClick={() => { setAttBatchId(b.id); handleTabChange('attendance'); }} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                      <CalendarCheck size={13} /> Attendance
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { setStudentBatchFilter(b.name || b.id); handleTabChange('students'); }} style={{ gridColumn: 'span 2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                      <Users size={13} /> View Enrolled Students
                     </button>
                   </div>
+                </div>
+              ))}
+              {batches.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', padding: 40, textAlign: 'center', background: '#FFF', borderRadius: 16, border: '1px solid var(--border-color)' }}>
+                  <GraduationCap size={48} color="var(--primary-color)" style={{ margin: '0 auto 12px' }} />
+                  <h3 style={{ margin: 0, fontWeight: 800 }}>No Batches Assigned or Created</h3>
+                  <p style={{ color: 'var(--text-secondary)', margin: '6px 0 16px' }}>Click "+ Create New Batch" to set up your first cohort.</p>
+                  <button className="btn btn-primary" onClick={openCreateBatchModal}>+ Create New Batch</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── TAB 3: MY STUDENTS (ADMIN-GRADE REGISTRY WITH REAL PICTURES) ──── */}
+        {activeTab === 'students' && (
+          <div className="animate-fade-in">
+            {/* Header & Export Action */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Student Accounts Registry</h2>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Complete directory of enrolled students across your training batches
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn btn-outline" onClick={handleExportStudentsCSV} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                  <Download size={15} /> Export CSV
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Bar (Search, Batch, Course, Status) */}
+            <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 16, padding: '16px 20px', marginBottom: 20, boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, alignItems: 'center' }}>
+                {/* Search Input */}
+                <div style={{ position: 'relative' }}>
+                  <Search size={16} color="var(--text-secondary)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search by name, email, roll no..."
+                    className="form-input"
+                    value={studentSearchQuery}
+                    onChange={(e) => setStudentSearchQuery(e.target.value)}
+                    style={{ paddingLeft: 36 }}
+                  />
+                </div>
+
+                {/* Batch Filter */}
+                <div>
+                  <select className="form-select" value={studentBatchFilter} onChange={(e) => setStudentBatchFilter(e.target.value)}>
+                    <option value="all">-- All Batches ({batches.length}) --</option>
+                    {batches.map(b => (
+                      <option key={b.id} value={b.name}>{b.name} ({b.code || b.batchId})</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Course Filter */}
+                <div>
+                  <select className="form-select" value={studentCourseFilter} onChange={(e) => setStudentCourseFilter(e.target.value)}>
+                    <option value="all">-- All Courses --</option>
+                    {courses.map(c => (
+                      <option key={c.id || c.title} value={c.title || c.name}>{c.title || c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status Filter */}
+                <div>
+                  <select className="form-select" value={studentStatusFilter} onChange={(e) => setStudentStatusFilter(e.target.value)}>
+                    <option value="all">-- All Account Statuses --</option>
+                    <option value="active">Active</option>
+                    <option value="pending">Pending</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: 'var(--text-secondary)' }}>
+                <span>Showing <strong>{filteredTrainerStudents.length}</strong> of {students.length} students</span>
+                {(studentSearchQuery || studentBatchFilter !== 'all' || studentCourseFilter !== 'all' || studentStatusFilter !== 'all') && (
+                  <button 
+                    className="btn btn-ghost btn-xs" 
+                    onClick={() => {
+                      setStudentSearchQuery('');
+                      setStudentBatchFilter('all');
+                      setStudentCourseFilter('all');
+                      setStudentStatusFilter('all');
+                    }}
+                    style={{ color: 'var(--primary-color)', fontWeight: 700 }}
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Students Table with Student Photos */}
+            <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow-card)' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13.5 }}>
+                  <thead style={{ background: 'var(--surface-alt)', borderBottom: '1.5px solid var(--border-color)' }}>
+                    <tr>
+                      <th style={{ padding: '14px 18px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: 11.5 }}>Learner Profile</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: 11.5 }}>Student ID</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: 11.5 }}>Contact</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: 11.5 }}>Course & Batch</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: 11.5 }}>Attendance</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: 11.5 }}>Activity</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: 11.5 }}>Status</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: 11.5 }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTrainerStudents.map(s => {
+                      const initials = s.name ? s.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ST';
+                      const attVal = Number(s.attendance || s.attendanceRate || 0);
+                      return (
+                        <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} className="table-row-hover">
+                          {/* Student Picture & Full Name */}
+                          <td style={{ padding: '14px 18px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <div style={{
+                                width: 42,
+                                height: 42,
+                                borderRadius: '50%',
+                                overflow: 'hidden',
+                                background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: '2px solid #FFFFFF',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                                flexShrink: 0
+                              }}>
+                                {(s.profile_pic || s.profilePhotoUrl) && (s.profile_pic || s.profilePhotoUrl).trim() !== '' ? (
+                                  <img 
+                                    src={s.profile_pic || s.profilePhotoUrl} 
+                                    alt={s.name} 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  />
+                                ) : (
+                                  <span style={{ fontSize: 13, fontWeight: 800, color: '#4F46E5', letterSpacing: 0.5 }}>{initials}</span>
+                                )}
+                              </div>
+                              <div>
+                                <div 
+                                  style={{ fontWeight: 800, color: '#1E293B', cursor: 'pointer' }}
+                                  onClick={() => openStudentDetails(s)}
+                                >
+                                  {s.name}
+                                </div>
+                                <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>{s.email}</div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Student ID / Roll Number */}
+                          <td style={{ padding: '14px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#4338CA' }}>
+                            {s.rollNumber || s.id}
+                          </td>
+
+                          {/* Contact Info (Mobile) */}
+                          <td style={{ padding: '14px 18px', fontSize: 12.5 }}>
+                            {s.phone ? (
+                              <a href={`tel:${s.phone}`} style={{ textDecoration: 'none', color: '#1E293B', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Phone size={12} color="var(--primary-color)" /> {s.phone}
+                              </a>
+                            ) : (
+                              <span style={{ color: 'var(--text-secondary)' }}>N/A</span>
+                            )}
+                          </td>
+
+                          {/* Course & Batch */}
+                          <td style={{ padding: '14px 18px' }}>
+                            <div style={{ fontWeight: 600, color: '#1E293B', fontSize: 12.5 }}>{s.course || 'Data Science & AI'}</div>
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', background: 'rgba(108,60,240,0.08)', color: 'var(--primary-color)', borderRadius: 6 }}>
+                              {s.batch_name || s.batchName || 'Assigned'}
+                            </span>
+                          </td>
+
+                          {/* Attendance Rate */}
+                          <td style={{ padding: '14px 18px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{ flex: 1, minWidth: 50, height: 6, background: '#E2E8F0', borderRadius: 3, overflow: 'hidden' }}>
+                                <div style={{ width: `${attVal}%`, height: '100%', background: attVal >= 75 ? '#10B981' : attVal >= 50 ? '#F59E0B' : '#EF4444' }} />
+                              </div>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: '#1E293B' }}>{attVal}%</span>
+                            </div>
+                          </td>
+
+                          {/* Activity Score */}
+                          <td style={{ padding: '14px 18px' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 800, fontSize: 12.5, color: '#EC4899', background: 'rgba(236,72,153,0.08)', padding: '3px 8px', borderRadius: 6 }}>
+                              <Trophy size={13} /> {s.activityPoints || 0} pts
+                            </span>
+                          </td>
+
+                          {/* Account Status */}
+                          <td style={{ padding: '14px 18px' }}>
+                            <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', background: s.status === 'Active' || s.status === 'active' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: s.status === 'Active' || s.status === 'active' ? '#10B981' : '#F59E0B', borderRadius: 6 }}>
+                              {s.status || 'Active'}
+                            </span>
+                          </td>
+
+                          {/* Actions */}
+                          <td style={{ padding: '14px 18px' }}>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button 
+                                className="btn btn-outline btn-sm" 
+                                onClick={() => openStudentDetails(s)} 
+                                title="View Full Profile Details"
+                                style={{ padding: '5px 8px' }}
+                              >
+                                <Eye size={14} /> Profile
+                              </button>
+                              <button 
+                                className="btn btn-outline btn-sm" 
+                                onClick={() => openEditStudentModal(s)} 
+                                title="Edit Student Info"
+                                style={{ padding: '5px 8px' }}
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button 
+                                className="btn btn-outline btn-sm" 
+                                onClick={() => { setAwardPointsStudent(s); }} 
+                                title="Award Activity Points"
+                                style={{ padding: '5px 8px', color: '#EC4899' }}
+                              >
+                                <Award size={14} />
+                              </button>
+                              {s.email && (
+                                <a
+                                  href={`mailto:${s.email}`}
+                                  className="btn btn-outline btn-sm"
+                                  style={{ padding: '5px 8px', textDecoration: 'none', color: 'var(--primary-color)' }}
+                                  title="Send Email"
+                                >
+                                  <Mail size={14} />
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {filteredTrainerStudents.length === 0 && (
+                      <tr>
+                        <td colSpan="8" style={{ padding: 36, textAlign: 'center', color: 'var(--text-secondary)' }}>
+                          No students matching your search criteria.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── TAB 4: COURSES & CURRICULUM ──────────────────────────────────── */}
+        {activeTab === 'courses' && (
+          <div className="animate-fade-in">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Courses & Academic Curriculum</h2>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Browse course structures, curriculum syllabi, and learning modules
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
+              {courses.map(c => (
+                <div key={c.id || c.title} style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 18, padding: 22, boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(59,130,246,0.1)', color: '#3B82F6', padding: '3px 8px', borderRadius: 6 }}>
+                      {c.category || 'Professional Track'}
+                    </span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, margin: '10px 0 6px', color: '#1E293B' }}>{c.title || c.name}</h3>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 14 }}>
+                      {c.description || 'Comprehensive industry curriculum with hands-on capstone projects and mentor-led labs.'}
+                    </p>
+
+                    <div style={{ background: 'var(--surface-alt)', borderRadius: 12, padding: '10px 14px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span>Modules: <strong>{c.modules?.length || 6} Chapters</strong></span>
+                      <span>Duration: <strong>{c.duration || '50 Days'}</strong></span>
+                    </div>
+                  </div>
+
+                  <button className="btn btn-outline btn-sm" onClick={() => { showToast(`Viewing syllabus for ${c.title || c.name}`); }} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <BookOpen size={14} /> Explore Curriculum
+                  </button>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* ─── MODULE 3: MY STUDENTS ────────────────────────────────────────── */}
-        {activeTab === 'students' && (() => {
-          const filteredTrainerStudents = students.filter(s => {
-            if (!studentSearchQuery.trim()) return true;
-            const q = studentSearchQuery.toLowerCase();
-            return (
-              (s.name || '').toLowerCase().includes(q) ||
-              (s.email || '').toLowerCase().includes(q) ||
-              (s.rollNumber || s.id || '').toLowerCase().includes(q)
-            );
-          });
-
-          return (
-            <div className="animate-fade-in">
-              <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 20, padding: 20, marginBottom: 24 }}>
-                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1, minWidth: 240 }} className="search-bar-container">
-                    <Search size={16} color="var(--text-secondary)" />
-                    <input
-                      type="text"
-                      placeholder="Search student by name or email..."
-                      className="search-bar-input"
-                      value={studentSearchQuery}
-                      onChange={(e) => setStudentSearchQuery(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-card)' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13.5 }}>
-                  <thead style={{ background: 'var(--surface-alt)', borderBottom: '1px solid var(--border-color)' }}>
-                    <tr>
-                      <th style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--text-secondary)' }}>Student Name</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--text-secondary)' }}>Student ID</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--text-secondary)' }}>Course</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--text-secondary)' }}>Batch</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--text-secondary)' }}>Activity Points</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--text-secondary)' }}>Status</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--text-secondary)' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTrainerStudents.map(s => (
-                      <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '14px 20px', fontWeight: 700 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <img src={s.profile_pic || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
-                            <div>
-                              <div>{s.name}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 400 }}>{s.email}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '14px 20px', fontFamily: 'monospace', fontWeight: 700 }}>{s.rollNumber || s.id}</td>
-                        <td style={{ padding: '14px 20px' }}>{s.course || 'Fullstack'}</td>
-                        <td style={{ padding: '14px 20px' }}>{s.batch_name || s.batchName || 'Assigned'}</td>
-                        <td style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--primary-color)' }}>{s.activityPoints || 0} pts</td>
-                        <td style={{ padding: '14px 20px' }}>
-                          <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', background: 'rgba(16,185,129,0.1)', color: '#10B981', borderRadius: 6 }}>
-                            {s.status || 'Active'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '14px 20px' }}>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            {s.email && (
-                              <a
-                                href={`mailto:${s.email}`}
-                                className="btn btn-outline btn-sm"
-                                style={{ padding: '4px 8px', textDecoration: 'none', color: 'var(--primary-color)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                                title="Send Mail"
-                              >
-                                <Mail size={14} />
-                              </a>
-                            )}
-                            <button className="btn btn-outline btn-sm" onClick={() => setSelectedStudentDetails(s)}>
-                              <Eye size={14} /> Profile
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* ─── MODULE 4: ATTENDANCE SHEET & CALENDAR ─────────────────────────── */}
+        {/* ─── TAB 5: ATTENDANCE MANAGEMENT ─────────────────────────────────── */}
         {activeTab === 'attendance' && (
           <div className="animate-fade-in">
-            {/* Top Selectors */}
-            <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 20, padding: 20, marginBottom: 24 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Attendance Management</h2>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Take daily class attendance, verify live session attendees, and track consistency
+                </p>
+              </div>
+            </div>
+
+            {/* Selectors */}
+            <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 18, padding: 20, marginBottom: 24 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
                 <div>
                   <label className="form-label">Select Assigned Batch *</label>
                   <select className="form-select" value={attBatchId} onChange={e => setAttBatchId(e.target.value)}>
@@ -1232,7 +1905,7 @@ const TrainerDashboard = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="form-label">Class Date *</label>
+                  <label className="form-label">Class Session Date *</label>
                   <input type="date" className="form-input" value={attDate} onChange={e => setAttDate(e.target.value)} />
                 </div>
               </div>
@@ -1240,7 +1913,6 @@ const TrainerDashboard = () => {
 
             {attBatchId && (
               <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 24, marginBottom: 32 }}>
-                {/* Left Attendance Sheet */}
                 <div>
                   {/* Summary Bar */}
                   <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 18, padding: 20, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -1249,7 +1921,7 @@ const TrainerDashboard = () => {
                       <div><span style={{ fontSize: 11, color: '#10B981', textTransform: 'uppercase', fontWeight: 800 }}>Present</span><h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#10B981' }}>{attSummary.present}</h3></div>
                       <div><span style={{ fontSize: 11, color: '#EF4444', textTransform: 'uppercase', fontWeight: 800 }}>Absent</span><h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#EF4444' }}>{attSummary.absent}</h3></div>
                       <div><span style={{ fontSize: 11, color: '#F59E0B', textTransform: 'uppercase', fontWeight: 800 }}>Not Marked</span><h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#F59E0B' }}>{attSummary.notMarked}</h3></div>
-                      <div><span style={{ fontSize: 11, color: 'var(--primary-color)', textTransform: 'uppercase', fontWeight: 800 }}>Attendance Rate</span><h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--primary-color)' }}>{attSummary.rate}%</h3></div>
+                      <div><span style={{ fontSize: 11, color: 'var(--primary-color)', textTransform: 'uppercase', fontWeight: 800 }}>Rate</span><h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--primary-color)' }}>{attSummary.rate}%</h3></div>
                     </div>
 
                     <div style={{ display: 'flex', gap: 8 }}>
@@ -1267,45 +1939,40 @@ const TrainerDashboard = () => {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
                       <thead style={{ background: 'var(--surface-alt)', borderBottom: '1px solid var(--border-color)' }}>
                         <tr>
+                          <th style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--text-secondary)' }}>Learner</th>
                           <th style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--text-secondary)' }}>Student ID</th>
-                          <th style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--text-secondary)' }}>Student Name</th>
                           <th style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--text-secondary)' }}>Attendance Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {attBatchStudents.map(s => {
                           const status = attStudentRecords[s.id] || 'Not Marked';
-                          const detail = attRecordDetails[s.id];
-                          const isAutoAttended = Boolean(detail?.attendedLive || detail?.attendance_mode === 'Auto') && status === 'Present';
                           return (
                             <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                              <td style={{ padding: '14px 20px', fontFamily: 'monospace', fontWeight: 700 }}>{s.rollNumber || s.id}</td>
-                              <td style={{ padding: '14px 20px', fontWeight: 700 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                  <span>{s.name}</span>
-                                  {isAutoAttended ? (
-                                    <span style={{ fontSize: 10.5, fontWeight: 750, color: '#065F46', background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '2px 8px', borderRadius: 12, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                                      ⚡ Auto (Live Class)
-                                    </span>
-                                  ) : status === 'Present' ? (
-                                    <span style={{ fontSize: 10.5, fontWeight: 700, color: '#1D4ED8', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '2px 8px', borderRadius: 12, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                                      ✍️ Manual
-                                    </span>
-                                  ) : null}
+                              <td style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{ width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', background: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)' }}>
+                                  {(s.profile_pic || s.profilePhotoUrl) ? (
+                                    <img src={s.profile_pic || s.profilePhotoUrl} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  ) : (
+                                    <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--primary-color)' }}>{s.name ? s.name[0] : 'S'}</span>
+                                  )}
                                 </div>
+                                <strong style={{ color: '#1E293B' }}>{s.name}</strong>
                               </td>
+                              <td style={{ padding: '14px 20px', fontFamily: 'monospace', fontWeight: 700 }}>{s.rollNumber || s.id}</td>
                               <td style={{ padding: '14px 20px' }}>
                                 <div style={{ display: 'flex', gap: 8 }}>
-                                  <button 
-                                    className={`btn btn-sm ${status === 'Present' ? 'btn-primary' : 'btn-outline'}`}
-                                    style={{ background: status === 'Present' ? '#10B981' : '', borderColor: status === 'Present' ? '#10B981' : '' }}
+                                  <button
+                                    className={`btn btn-sm ${status === 'Present' ? 'btn-success' : 'btn-outline'}`}
                                     onClick={() => handleMarkStudent(s.id, 'Present')}
+                                    style={{ padding: '4px 12px', fontSize: 12, fontWeight: 700 }}
                                   >
                                     Present
                                   </button>
-                                  <button 
+                                  <button
                                     className={`btn btn-sm ${status === 'Absent' ? 'btn-danger' : 'btn-outline'}`}
                                     onClick={() => handleMarkStudent(s.id, 'Absent')}
+                                    style={{ padding: '4px 12px', fontSize: 12, fontWeight: 700 }}
                                   >
                                     Absent
                                   </button>
@@ -1314,1165 +1981,989 @@ const TrainerDashboard = () => {
                             </tr>
                           );
                         })}
+                        {attBatchStudents.length === 0 && (
+                          <tr>
+                            <td colSpan="3" style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)' }}>
+                              No students found in this batch.
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                {/* Right Interactive Attendance Calendar & Agenda */}
+                {/* Right Column: Attendance Calendar / Batches list */}
                 <div>
-                  <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 20, padding: 20, boxShadow: 'var(--shadow-card)', marginBottom: 20 }}>
-                    <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 12px' }}>Class Calendar</h3>
-                    <input 
-                      type="date" 
-                      className="form-input" 
-                      value={selectedCalendarDate} 
-                      onChange={e => { setSelectedCalendarDate(e.target.value); setAttDate(e.target.value); }} 
-                    />
-                    <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: '#10B981' }}></span> Green = Attendance Completed</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: '#F59E0B' }}></span> Orange = Pending Sheet</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: '#9499AB' }}></span> Gray = No Schedule</div>
-                    </div>
-                  </div>
-
-                  <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 20, padding: 20, boxShadow: 'var(--shadow-card)' }}>
-                    <h4 style={{ fontSize: 13, fontWeight: 800, margin: '0 0 10px', color: 'var(--primary-color)' }}>AGENDA: {selectedCalendarDate}</h4>
-                    {liveClasses.filter(c => c.date === selectedCalendarDate).length === 0 ? (
-                      <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>No live class scheduled for this date.</p>
-                    ) : (
-                      liveClasses.filter(c => c.date === selectedCalendarDate).map(lc => (
-                        <div key={lc.id} style={{ padding: 10, background: 'var(--surface-alt)', borderRadius: 10, fontSize: 12, marginBottom: 8 }}>
-                          <div style={{ fontWeight: 800, color: '#121118' }}>{lc.title || lc.lectureName}</div>
-                          <div style={{ color: 'var(--text-secondary)' }}>Batch: {lc.batchName || lc.batchId}</div>
-                          <div style={{ color: 'var(--primary-color)', fontWeight: 700 }}>Time: {lc.time}</div>
+                  <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 18, padding: 18 }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800 }}>Assigned Cohorts</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {batches.map(b => (
+                        <div
+                          key={b.id}
+                          onClick={() => setAttBatchId(b.id)}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: 10,
+                            background: attBatchId === b.id ? 'rgba(108,60,240,0.08)' : 'var(--surface-alt)',
+                            border: attBatchId === b.id ? '1.5px solid var(--primary-color)' : '1px solid var(--border-color)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ fontWeight: 700, fontSize: 13, color: attBatchId === b.id ? 'var(--primary-color)' : '#1E293B' }}>{b.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{b.timing || '10:00 AM - 12:00 PM'}</div>
                         </div>
-                      ))
-                    )}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
             )}
-
-            {/* Attendance History Section */}
-            <div style={{ marginTop: 32 }}>
-              <h3 style={{ fontSize: 17, fontWeight: 800, marginBottom: 16 }}>Attendance History Log</h3>
-              <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-card)' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead style={{ background: 'var(--surface-alt)', borderBottom: '1px solid var(--border-color)' }}>
-                    <tr>
-                      <th style={{ padding: '12px 18px', fontWeight: 800 }}>Date</th>
-                      <th style={{ padding: '12px 18px', fontWeight: 800 }}>Batch</th>
-                      <th style={{ padding: '12px 18px', fontWeight: 800 }}>Course</th>
-                      <th style={{ padding: '12px 18px', fontWeight: 800 }}>Present</th>
-                      <th style={{ padding: '12px 18px', fontWeight: 800 }}>Absent</th>
-                      <th style={{ padding: '12px 18px', fontWeight: 800 }}>Attendance Rate</th>
-                      <th style={{ padding: '12px 18px', fontWeight: 800 }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {attendanceSheets.map(sh => (
-                      <tr key={sh.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '12px 18px', fontWeight: 700 }}>{sh.date}</td>
-                        <td style={{ padding: '12px 18px' }}>{sh.batchName || sh.batch_name || sh.batchId}</td>
-                        <td style={{ padding: '12px 18px' }}>{sh.courseName || sh.course_name || 'Course'}</td>
-                        <td style={{ padding: '12px 18px', color: '#10B981', fontWeight: 800 }}>{sh.presentCount || sh.present_count || 0}</td>
-                        <td style={{ padding: '12px 18px', color: '#EF4444', fontWeight: 800 }}>{sh.absentCount || sh.absent_count || 0}</td>
-                        <td style={{ padding: '12px 18px', fontWeight: 800, color: 'var(--primary-color)' }}>
-                          {sh.attendancePercentage || sh.attendance_percentage || 0}%
-                        </td>
-                        <td style={{ padding: '12px 18px' }}>
-                          <button className="btn btn-outline btn-sm" onClick={() => { setAttBatchId(sh.batchId || sh.batch_id); setAttDate(sh.date); }}>
-                            Edit Attendance
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </div>
         )}
 
-        {/* ─── MODULE 5: LIVE CLASSES ────────────────────────────────────────── */}
+        {/* ─── TAB 6: LIVE CLASSES ──────────────────────────────────────────── */}
         {activeTab === 'live-classes' && (
           <div className="animate-fade-in">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Assigned Live Classes</h2>
-              <button className="btn btn-primary" onClick={() => setShowLiveModal(true)}>
+              <div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Live Classes & Sessions</h2>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Schedule, broadcast, and launch interactive live classrooms
+                </p>
+              </div>
+              <button className="btn btn-primary" onClick={() => setShowLiveModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
                 <Plus size={16} /> Schedule Live Class
               </button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
               {liveClasses.map(lc => (
-                <div key={lc.id} style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 18, padding: 20, boxShadow: 'var(--shadow-card)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(16,185,129,0.1)', color: '#10B981', padding: '4px 10px', borderRadius: 6 }}>
-                      {lc.status || 'Upcoming'}
-                    </span>
-                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 700 }}>{lc.date}</span>
+                <div key={lc.id} style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 18, padding: 20, boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(16,185,129,0.1)', color: '#10B981', padding: '3px 8px', borderRadius: 6 }}>
+                        {lc.status || 'Upcoming'}
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                        📅 {lc.date}
+                      </span>
+                    </div>
+
+                    <h3 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 6px', color: '#1E293B' }}>{lc.title || lc.lectureName}</h3>
+                    <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                      Batch: <strong>{lc.batchName || lc.batch_name || 'Assigned Batch'}</strong>
+                    </p>
+
+                    <div style={{ background: 'var(--surface-alt)', borderRadius: 10, padding: '8px 12px', fontSize: 12, marginBottom: 14 }}>
+                      ⏰ <strong>{lc.time || `${lc.startTime} - ${lc.endTime}`}</strong>
+                    </div>
                   </div>
-                  <h3 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 6px', color: '#121118' }}>{lc.title || lc.lectureName}</h3>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 14 }}>
-                    Batch: <strong>{lc.batchName || lc.batchId}</strong> • Time: <strong>{lc.time}</strong>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                    {(lc.status || '').toLowerCase() === 'completed' ? (
-                      <>
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#2563EB', borderColor: '#2563EB' }}
-                          onClick={() => handleOpenTrainerUploadModal(lc)}
-                        >
-                          <UploadCloud size={14} /> {lc.recording_url || lc.recordingUrl ? 'Update Recording' : 'Upload Recording'}
-                        </button>
-                        {Boolean(lc.recording_url || lc.recordingUrl) && (
-                          <button
-                            type="button"
-                            className="btn btn-outline btn-sm"
-                            style={{ padding: '0 10px', height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                            onClick={() => setTrainerPreviewVideo({
-                              id: lc.id || lc.uid,
-                              title: lc.title || lc.lectureName,
-                              video_url: lc.recording_url || lc.recordingUrl
-                            })}
-                            title="Preview Recording"
-                          >
-                            <Play size={14} />
-                          </button>
-                        )}
-                      </>
+
+                  <div style={{ display: 'flex', gap: 8, borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
+                    {lc.meetLink || lc.meet_link ? (
+                      <a href={lc.meetLink || lc.meet_link} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm" style={{ flex: 1, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <ExternalLink size={14} /> Join / Start
+                      </a>
                     ) : (
-                      <>
-                        <a href={lc.meetLink || lc.meet_url || lc.meet_link} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm" style={{ flex: 1, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                          <ExternalLink size={14} /> Join Meeting
-                        </a>
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          style={{ padding: '0 10px', height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                          onClick={() => handleOpenTrainerUploadModal(lc)}
-                          title="Attach Recording"
-                        >
-                          <UploadCloud size={14} />
-                        </button>
-                      </>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>No meeting link</span>
                     )}
-                    <button
-                      type="button"
-                      className="btn btn-danger btn-sm"
-                      style={{ padding: '0 12px', height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                      onClick={() => handleDeleteLiveClass(lc.id || lc.uid)}
-                      title="Delete Live Class"
-                    >
+                    <button className="btn btn-outline btn-sm" onClick={() => handleDeleteLiveClass(lc.id)} style={{ color: '#EF4444' }}>
                       <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* ─── MODULE 6: RECORDED CLASSES ───────────────────────────────────── */}
-        {activeTab === 'recorded-classes' && (
-          <div className="animate-fade-in" style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 24,
-            background: 'linear-gradient(135deg, rgba(240, 249, 255, 0.65) 0%, rgba(245, 243, 255, 0.75) 45%, rgba(254, 243, 199, 0.35) 80%, rgba(236, 253, 245, 0.65) 100%)',
-            backdropFilter: 'blur(30px)',
-            WebkitBackdropFilter: 'blur(30px)',
-            border: '1px solid rgba(255, 255, 255, 0.9)',
-            borderRadius: 28,
-            padding: '28px 30px',
-            boxShadow: '0 20px 45px -10px rgba(99, 102, 241, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02)',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
-              <div>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(8px)', padding: '4px 12px', borderRadius: 999, border: '1px solid rgba(255, 255, 255, 0.95)', marginBottom: 6 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6366F1' }} />
-                  <span style={{ fontSize: 11, fontWeight: 750, color: '#4F46E5', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Trainer Studio</span>
+              {liveClasses.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', padding: 40, textAlign: 'center', background: '#FFF', borderRadius: 16, border: '1px solid var(--border-color)' }}>
+                  <Video size={48} color="var(--primary-color)" style={{ margin: '0 auto 12px' }} />
+                  <h3 style={{ margin: 0, fontWeight: 800 }}>No Live Classes Scheduled</h3>
+                  <p style={{ color: 'var(--text-secondary)', margin: '6px 0 16px' }}>Click below to create your first Google Meet or Zoom class.</p>
+                  <button className="btn btn-primary" onClick={() => setShowLiveModal(true)}>Schedule Live Class</button>
                 </div>
-                <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px', color: '#0F172A', letterSpacing: '-0.3px' }}>Course Recording Modules</h2>
-                <p style={{ fontSize: 13, color: '#64748B', margin: 0, fontWeight: 500 }}>
-                  Upload and manage Google Drive recordings organized by batch with in-portal DRM protection.
-                </p>
-              </div>
-              <button 
-                className="btn btn-primary" 
-                onClick={() => {
-                  const targetBId = trainerRecordedBatchFilter || (batches[0]?.id || '');
-                  setRecBatchId(targetBId);
-                  const bObj = batches.find(b => b.id === targetBId);
-                  if (bObj && bObj.course_name) setRecCourseName(bObj.course_name);
-                  setShowRecordedModal(true);
-                }}
-                style={{
-                  borderRadius: 999,
-                  padding: '9px 20px',
-                  fontWeight: 750,
-                  fontSize: '13px',
-                  background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <Plus size={16} /> Add Lesson to Batch
-              </button>
-            </div>
-
-            {/* Batch Filter Toolbar with frosted glass */}
-            <div style={{
-              display: 'flex',
-              gap: 12,
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              background: 'rgba(255, 255, 255, 0.85)',
-              backdropFilter: 'blur(10px)',
-              padding: '12px 18px',
-              borderRadius: 18,
-              border: '1px solid rgba(255, 255, 255, 0.95)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Users size={16} style={{ color: '#4F46E5' }} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Filter Batch:</span>
-              </div>
-              <select 
-                className="form-select" 
-                value={trainerRecordedBatchFilter} 
-                onChange={(e) => setTrainerRecordedBatchFilter(e.target.value)}
-                style={{
-                  minWidth: 240,
-                  height: 38,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  borderRadius: 12,
-                  border: '1px solid #CBD5E1',
-                  background: '#FFFFFF',
-                }}
-              >
-                <option value="">All Batches ({recordedClasses.length} recordings)</option>
-                {batches.map(b => {
-                  const bId = String(b.id || b.uid);
-                  const count = recordedClasses.filter(r => String(r.batch_id || r.batchId) === bId).length;
-                  return (
-                    <option key={bId} value={bId}>
-                      {b.name} ({b.course_name || 'Course'}) — {count} lessons
-                    </option>
-                  );
-                })}
-              </select>
-              {trainerRecordedBatchFilter && (
-                <button 
-                  type="button" 
-                  className="btn btn-outline btn-sm" 
-                  onClick={() => setTrainerRecordedBatchFilter('')}
-                  style={{ height: 36, fontSize: 12, borderRadius: 999 }}
-                >
-                  Clear Filter
-                </button>
               )}
-              <div style={{ marginLeft: 'auto', fontSize: 12.5, color: '#64748B' }}>
-                Showing <strong>{filteredRecordedClasses.length}</strong> of {recordedClasses.length} lessons
-              </div>
             </div>
-
-            {filteredRecordedClasses.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '50px 20px', background: 'rgba(255, 255, 255, 0.8)', borderRadius: 20, border: '1px solid rgba(255, 255, 255, 0.95)' }}>
-                <Video size={48} style={{ color: '#94A3B8', marginBottom: 12, opacity: 0.6 }} />
-                <h4 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 750, color: '#0F172A' }}>No Recorded Lessons For This Batch</h4>
-                <p style={{ margin: 0, fontSize: 13, color: '#64748B' }}>Click "Add Lesson to Batch" above to upload a Google Drive video.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 22 }}>
-                {filteredRecordedClasses.map((rc, idx) => {
-                  const thumb = rc.thumbnail || getResolvedThumbnail(rc.video_url || rc.embedUrl, '');
-                  const isDrive = Boolean(getGoogleDriveFileId(rc.video_url || rc.embedUrl));
-                  const rcId = rc.id || rc.uid || rc._id;
-                  const bName = rc.batchName || rc.batch_name || batches.find(b => String(b.id) === String(rc.batch_id || rc.batchId))?.name || 'All Batches';
-                  const theme = PLAYLIST_CARD_THEMES[idx % PLAYLIST_CARD_THEMES.length];
-
-                  return (
-                    <div 
-                      key={rcId} 
-                      style={{ 
-                        background: theme.bg, 
-                        border: `1.5px solid ${theme.border}`, 
-                        borderRadius: 24, 
-                        overflow: 'hidden',
-                        boxShadow: theme.shadow,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
-                        position: 'relative',
-                        backdropFilter: 'blur(20px)',
-                        WebkitBackdropFilter: 'blur(20px)',
-                      }}
-                      className="clickable-card-hover"
-                    >
-                      {/* Video Thumbnail Header with Inset */}
-                      <div style={{ padding: '12px 12px 0 12px' }}>
-                        <div style={{
-                          position: 'relative',
-                          width: '100%',
-                          height: 155,
-                          borderRadius: 18,
-                          overflow: 'hidden',
-                          background: '#0F172A',
-                          boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
-                        }}>
-                          <img 
-                            src={thumb} 
-                            alt={rc.title} 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                            }}
-                          />
-                          <div 
-                            onClick={() => setPreviewVideo(rc)}
-                            style={{ 
-                              position: 'absolute', 
-                              inset: 0, 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center',
-                              background: 'rgba(15, 23, 42, 0.28)',
-                              cursor: 'pointer',
-                              transition: 'background 0.2s',
-                            }}
-                          >
-                            <div style={{
-                              width: 46,
-                              height: 46,
-                              borderRadius: '50%',
-                              background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
-                              color: '#FFF',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: '0 4px 16px rgba(99, 102, 241, 0.5)',
-                            }}>
-                              <PlayCircle size={24} />
-                            </div>
-                          </div>
-
-                          {/* Top Badges */}
-                          <div style={{ position: 'absolute', top: 10, left: 10, display: 'flex', gap: 6 }}>
-                            {isDrive && (
-                              <span style={{ fontSize: 10.5, fontWeight: 800, background: 'rgba(16, 185, 129, 0.95)', color: '#FFF', padding: '3px 8px', borderRadius: 999, backdropFilter: 'blur(4px)', boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
-                                Drive Protected
-                              </span>
-                            )}
-                            <span style={{ fontSize: 10.5, fontWeight: 700, background: 'rgba(15, 23, 42, 0.85)', color: '#FFF', padding: '3px 8px', borderRadius: 999, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
-                              {rc.duration || '1h 30m'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Card Content with Pastel Theme */}
-                      <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between', gap: 12 }}>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 11, fontWeight: 750, color: theme.tagColor, background: theme.tagBg, padding: '3px 9px', borderRadius: 6 }}>
-                              {bName}
-                            </span>
-                            <span style={{ fontSize: 11.5, color: '#64748B', fontWeight: 600 }}>• {rc.module || 'Class Lesson'}</span>
-                          </div>
-                          <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 6px', color: '#0F172A', lineHeight: 1.3 }}>
-                            {rc.title}
-                          </h3>
-                          <p style={{
-                            fontSize: 12.5,
-                            color: '#475569',
-                            margin: 0,
-                            lineHeight: 1.45,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                          }}>
-                            {rc.description || 'Lesson recording video.'}
-                          </p>
-                        </div>
-
-                        {/* Actions */}
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.8)', paddingTop: 12, marginTop: 4 }}>
-                          <button 
-                            type="button" 
-                            className="btn btn-primary btn-sm" 
-                            style={{
-                              flex: 1,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 6,
-                              height: 36,
-                              fontSize: 12.5,
-                              borderRadius: 999,
-                              fontWeight: 750,
-                              background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
-                              border: 'none',
-                              boxShadow: '0 3px 10px rgba(99, 102, 241, 0.25)',
-                            }}
-                            onClick={() => setPreviewVideo(rc)}
-                          >
-                            <PlayCircle size={15} /> Watch in Portal
-                          </button>
-                          <button 
-                            type="button" 
-                            className="btn btn-outline btn-sm" 
-                            style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: '50%',
-                              padding: 0,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#DC2626',
-                              background: 'rgba(254, 226, 226, 0.8)',
-                              border: '1px solid #FECACA',
-                              cursor: 'pointer',
-                            }}
-                            onClick={() => handleDeleteRecordedClass(rcId)}
-                            title="Delete Recording"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         )}
 
-        {/* ─── MODULE 7: ANNOUNCEMENTS ──────────────────────────────────────── */}
-        {activeTab === 'announcements' && (
+        {/* ─── TAB 7: RECORDED CLASSES ──────────────────────────────────────── */}
+        {activeTab === 'recorded-classes' && (
           <div className="animate-fade-in">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Batch Announcements</h2>
-              <button className="btn btn-primary" onClick={() => setShowAnnModal(true)}>
-                <Plus size={16} /> Post Announcement
+              <div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Recorded Video Library</h2>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Upload, organize, and manage recorded video lectures and playlists
+                </p>
+              </div>
+              <button className="btn btn-primary" onClick={() => setShowRecordedModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                <Plus size={16} /> Add Recorded Lesson
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {announcements.map(an => (
-                <div key={an.id} style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 18, padding: 20, boxShadow: 'var(--shadow-card)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(245,158,11,0.1)', color: '#F59E0B', padding: '4px 10px', borderRadius: 6 }}>
-                      Batch: {an.batchName || an.batch_name || an.batchId || 'All Batches'}
-                    </span>
-                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{an.date}</span>
-                  </div>
-                  <h3 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 6px' }}>{an.title}</h3>
-                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, whiteSpace: 'pre-wrap' }}>{an.message || an.content}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
+              {filteredRecordedClasses.map((rc, idx) => {
+                const theme = PLAYLIST_CARD_THEMES[idx % PLAYLIST_CARD_THEMES.length];
+                return (
+                  <div key={rc.id} style={{ background: theme.bg, border: `1.5px solid ${theme.border}`, borderRadius: 18, padding: 20, boxShadow: theme.shadow, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, background: theme.tagBg, color: theme.tagColor, padding: '3px 8px', borderRadius: 6 }}>
+                          {rc.module || 'Lecture'}
+                        </span>
+                        <span style={{ fontSize: 11, color: theme.tagColor, fontWeight: 700 }}>
+                          ⏱ {rc.duration || '1h 30m'}
+                        </span>
+                      </div>
 
-                  {an.attachmentUrl && (
-                    <div style={{ marginTop: 12 }}>
-                      <a
-                        href={getDownloadUrl(an.attachmentUrl, an.attachmentName || 'Circular.pdf')}
-                        download={an.attachmentName || 'Circular.pdf'}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: '#2563EB',
-                          background: '#EFF6FF',
-                          border: '1px solid #BFDBFE',
-                          padding: '6px 12px',
-                          borderRadius: 8,
-                          textDecoration: 'none'
-                        }}
-                      >
-                        <Download size={13} />
-                        Download Attached Circular ({an.attachmentName || 'PDF Document'})
-                      </a>
+                      <h3 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 6px', color: '#1E293B' }}>{rc.title}</h3>
+                      <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                        Batch: <strong>{rc.batch_name || rc.batchName || 'Common Playlist'}</strong>
+                      </p>
                     </div>
-                  )}
+
+                    <div style={{ display: 'flex', gap: 8, borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 14 }}>
+                      <button className="btn btn-primary btn-sm" onClick={() => setPreviewVideo(rc)} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <Play size={14} /> Watch Lesson
+                      </button>
+                      <button className="btn btn-outline btn-sm" onClick={() => handleDeleteRecordedClass(rc.id)} style={{ color: '#EF4444' }}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredRecordedClasses.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', padding: 40, textAlign: 'center', background: '#FFF', borderRadius: 16, border: '1px solid var(--border-color)' }}>
+                  <PlayCircle size={48} color="var(--primary-color)" style={{ margin: '0 auto 12px' }} />
+                  <h3 style={{ margin: 0, fontWeight: 800 }}>No Recorded Lessons Yet</h3>
+                  <p style={{ color: 'var(--text-secondary)', margin: '6px 0 16px' }}>Attach lecture videos to batches for student self-paced study.</p>
+                  <button className="btn btn-primary" onClick={() => setShowRecordedModal(true)}>Add Recorded Lesson</button>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         )}
 
-        {/* ─── MODULE: ASSIGNMENTS & SUBMISSION EVALUATION ──────────────────── */}
+        {/* ─── TAB 8: ASSIGNMENTS (POWERED BY TRAINER ASSIGNMENTS VIEW) ──────── */}
         {activeTab === 'assignments' && (
           <div className="animate-fade-in">
-            <div style={{ marginBottom: 20 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Course Assignments & Submissions</h2>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
-                Assign capstone tasks with downloadable project briefs, review student ZIP/PDF uploads, and evaluate solutions.
-              </p>
-            </div>
             <TrainerAssignmentsView
               batches={batches}
               students={students}
               trainerUid={trainerUid}
-              trainerName={userProfile?.fullName || userProfile?.name || 'Dr. Sarah Jenkins'}
+              trainerName={userProfile?.fullName || 'Faculty Trainer'}
               showToast={showToast}
+              isAdmin={false}
             />
           </div>
         )}
 
-        {/* ─── BATCH CHAT MODULE ────────────────────────────────────────────── */}
-        {activeTab === 'chat' && (
-          <div className="animate-fade-in" style={{ width: '100%' }}>
-            <BatchChatPage
-              user={userProfile}
-              userProfile={userProfile}
-              batches={batches}
-            />
-          </div>
-        )}
-
-        {/* ─── MODULE 8: ACTIVITY SCORES ────────────────────────────────────── */}
-        {activeTab === 'activity-scores' && (
+        {/* ─── TAB 9: ANNOUNCEMENTS ─────────────────────────────────────────── */}
+        {activeTab === 'announcements' && (
           <div className="animate-fade-in">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Award Student Activity Points</h2>
-              <button className="btn btn-primary" onClick={() => setShowActivityModal(true)}>
-                <Plus size={16} /> Award Activity Points
+              <div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Announcements & Broadcasts</h2>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Send urgent notices, syllabus updates, and reminders to learners
+                </p>
+              </div>
+              <button className="btn btn-primary" onClick={() => setShowAnnModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                <Plus size={16} /> New Announcement
               </button>
             </div>
 
-            <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-card)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
+              {announcements.map(ann => (
+                <div key={ann.id} style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 18, padding: 20, boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <span style={{ fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: ann.priority === 'Urgent' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)', color: ann.priority === 'Urgent' ? '#EF4444' : '#3B82F6' }}>
+                        {ann.priority || 'Normal'}
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>📅 {ann.date}</span>
+                    </div>
+
+                    <h3 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 6px', color: '#1E293B' }}>{ann.title}</h3>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 14 }}>
+                      {ann.message || ann.content}
+                    </p>
+
+                    <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginBottom: 10 }}>
+                      Target: <strong>{ann.batchName || ann.batch_name || 'All Students'}</strong>
+                    </div>
+
+                    {ann.attachmentUrl && (
+                      <a href={ann.attachmentUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--primary-color)', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none', fontWeight: 700 }}>
+                        <Download size={13} /> {ann.attachmentName || 'Download Attachment'}
+                      </a>
+                    )}
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12, marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+                    <button className="btn btn-outline btn-sm" onClick={() => handleDeleteAnnouncement(ann.id)} style={{ color: '#EF4444' }}>
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {announcements.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', padding: 40, textAlign: 'center', background: '#FFF', borderRadius: 16, border: '1px solid var(--border-color)' }}>
+                  <Megaphone size={48} color="var(--primary-color)" style={{ margin: '0 auto 12px' }} />
+                  <h3 style={{ margin: 0, fontWeight: 800 }}>No Announcements Broadcasted</h3>
+                  <p style={{ color: 'var(--text-secondary)', margin: '6px 0 16px' }}>Click below to post an announcement to your students.</p>
+                  <button className="btn btn-primary" onClick={() => setShowAnnModal(true)}>New Announcement</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── TAB 10: BATCH CHAT ───────────────────────────────────────────── */}
+        {activeTab === 'chat' && (
+          <div className="animate-fade-in">
+            <BatchChatPage />
+          </div>
+        )}
+
+        {/* ─── TAB 11: ACTIVITY SCORES ──────────────────────────────────────── */}
+        {activeTab === 'activity-scores' && (
+          <div className="animate-fade-in">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Learner Gamification & Leaderboard</h2>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Recognize active participation, punctuality, and project excellence
+                </p>
+              </div>
+            </div>
+
+            <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 18, overflow: 'hidden', boxShadow: 'var(--shadow-card)' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <strong style={{ fontSize: 15, color: '#1E293B' }}>Class Leaderboard Rankings</strong>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Sorted by total activity points</span>
+              </div>
+
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
                 <thead style={{ background: 'var(--surface-alt)', borderBottom: '1px solid var(--border-color)' }}>
                   <tr>
-                    <th style={{ padding: '14px 20px', fontWeight: 800 }}>Student Name</th>
-                    <th style={{ padding: '14px 20px', fontWeight: 800 }}>Batch</th>
-                    <th style={{ padding: '14px 20px', fontWeight: 800 }}>Total Points</th>
-                    <th style={{ padding: '14px 20px', fontWeight: 800 }}>Quick Action</th>
+                    <th style={{ padding: '12px 18px', fontWeight: 800, color: 'var(--text-secondary)' }}>Rank</th>
+                    <th style={{ padding: '12px 18px', fontWeight: 800, color: 'var(--text-secondary)' }}>Learner</th>
+                    <th style={{ padding: '12px 18px', fontWeight: 800, color: 'var(--text-secondary)' }}>Batch</th>
+                    <th style={{ padding: '12px 18px', fontWeight: 800, color: 'var(--text-secondary)' }}>Points</th>
+                    <th style={{ padding: '12px 18px', fontWeight: 800, color: 'var(--text-secondary)' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {students.map(s => (
+                  {[...students].sort((a, b) => (Number(b.activityPoints) || 0) - (Number(a.activityPoints) || 0)).map((s, idx) => (
                     <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '14px 20px', fontWeight: 700 }}>{s.name}</td>
-                      <td style={{ padding: '14px 20px' }}>{s.batch_name || s.batchName || 'Assigned'}</td>
-                      <td style={{ padding: '14px 20px', fontWeight: 800, color: 'var(--primary-color)' }}>{s.activityPoints || 0} pts</td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <button className="btn btn-outline btn-sm" onClick={() => { setActStudentId(s.id); setShowActivityModal(true); }}>
-                          + Award Points
+                      <td style={{ padding: '12px 18px', fontWeight: 800 }}>
+                        {idx === 0 ? '🥇 #1' : idx === 1 ? '🥈 #2' : idx === 2 ? '🥉 #3' : `#${idx + 1}`}
+                      </td>
+                      <td style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', background: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {(s.profile_pic || s.profilePhotoUrl) ? (
+                            <img src={s.profile_pic || s.profilePhotoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--primary-color)' }}>{s.name ? s.name[0] : 'S'}</span>
+                          )}
+                        </div>
+                        <strong>{s.name}</strong>
+                      </td>
+                      <td style={{ padding: '12px 18px' }}>{s.batch_name || s.batchName || 'Assigned'}</td>
+                      <td style={{ padding: '12px 18px', fontWeight: 800, color: '#EC4899' }}>
+                        {s.activityPoints || 0} pts
+                      </td>
+                      <td style={{ padding: '12px 18px' }}>
+                        <button className="btn btn-outline btn-xs" onClick={() => setAwardPointsStudent(s)} style={{ color: '#EC4899', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <Award size={13} /> Award Points
                         </button>
                       </td>
                     </tr>
                   ))}
+                  {students.length === 0 && (
+                    <tr>
+                      <td colSpan="5" style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)' }}>No learners to display.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* ─── MODULE 9: PROFILE ────────────────────────────────────────────── */}
+        {/* ─── TAB 12: TRAINER PROFILE ──────────────────────────────────────── */}
         {activeTab === 'profile' && (
-          <div className="animate-fade-in" style={{ maxWidth: 640, margin: '0 auto' }}>
-            <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 24, padding: 32, boxShadow: 'var(--shadow-lg)' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
-                <div style={{ position: 'relative', marginBottom: 16 }}>
+          <div className="animate-fade-in" style={{ maxWidth: 700 }}>
+            <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 20, padding: 28, boxShadow: 'var(--shadow-card)' }}>
+              <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 16px', color: '#1E293B' }}>Trainer Faculty Profile</h2>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 24, paddingBottom: 20, borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ position: 'relative', width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', border: '3px solid var(--primary-color)' }}>
                   <img 
                     src={userProfile?.profilePic || userProfile?.profile_pic || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
-                    alt="Avatar" 
-                    style={{ width: 100, height: 100, borderRadius: '50%', objectFit: 'cover', border: '4px solid var(--primary-color)' }}
+                    alt="Trainer Avatar" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
-                  <label htmlFor="profile-avatar-input" style={{ position: 'absolute', bottom: 0, right: 0, background: 'var(--primary-color)', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                    <Camera size={16} />
-                  </label>
-                  <input type="file" id="profile-avatar-input" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} disabled={uploadingAvatar} />
                 </div>
-                <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>{userProfile?.fullName || userProfile?.name}</h2>
-                <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--primary-color)', background: 'rgba(108,60,240,0.1)', padding: '4px 12px', borderRadius: 20, marginTop: 6 }}>
-                  Trainer ID: {userProfile?.trainerId || userProfile?.code}
-                </span>
+                <div>
+                  <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Camera size={14} /> {uploadingAvatar ? 'Uploading...' : 'Change Photo'}
+                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} disabled={uploadingAvatar} />
+                  </label>
+                  <p style={{ margin: '6px 0 0', fontSize: 11.5, color: 'var(--text-secondary)' }}>JPG, PNG or WEBP (Max 5MB)</p>
+                </div>
               </div>
 
-              <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
                   <label className="form-label">Full Name</label>
-                  <input type="text" className="form-input" value={editingName} onChange={e => setEditingName(e.target.value)} required />
+                  <input type="text" className="form-input" value={userProfile?.fullName || userProfile?.name || ''} readOnly />
                 </div>
                 <div>
-                  <label className="form-label">Email Address (Auth ID)</label>
-                  <input type="email" className="form-input" value={userProfile?.email || ''} disabled style={{ opacity: 0.7 }} />
+                  <label className="form-label">Trainer Faculty ID</label>
+                  <input type="text" className="form-input" value={userProfile?.trainerId || userProfile?.code || 'TRN001013'} readOnly style={{ fontFamily: 'monospace', fontWeight: 700 }} />
                 </div>
                 <div>
-                  <label className="form-label">Phone Number</label>
-                  <input type="text" className="form-input" value={editingPhone} onChange={e => setEditingPhone(e.target.value)} placeholder="+91 9876543210" />
+                  <label className="form-label">Email Address</label>
+                  <input type="text" className="form-input" value={userProfile?.email || ''} readOnly />
                 </div>
-                <button type="submit" className="btn btn-primary" disabled={savingProfile} style={{ marginTop: 10 }}>
-                  <Save size={16} /> {savingProfile ? 'Saving...' : 'Save Profile Changes'}
-                </button>
-              </form>
+                <div>
+                  <label className="form-label">Mobile Number</label>
+                  <input type="text" className="form-input" value={userProfile?.phone || ''} readOnly />
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* ─── MODULE 10: SETTINGS (PASSWORD CHANGE) ────────────────────────── */}
+        {/* ─── TAB 13: SETTINGS ─────────────────────────────────────────────── */}
         {activeTab === 'settings' && (
-          <div className="animate-fade-in" style={{ maxWidth: 540, margin: '0 auto' }}>
-            <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 24, padding: 32, boxShadow: 'var(--shadow-lg)' }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 6px' }}>Account Settings & Security</h2>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 24px' }}>
-                Change your password and manage security preferences.
+          <div className="animate-fade-in" style={{ maxWidth: 650 }}>
+            <div style={{ background: '#FFF', border: '1.5px solid var(--border-color)', borderRadius: 20, padding: 28, boxShadow: 'var(--shadow-card)' }}>
+              <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 6px', color: '#1E293B' }}>Security & Credentials</h2>
+              <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-secondary)' }}>
+                Update your login password and manage account security
               </p>
 
-              {passError && (
-                <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: 600, marginBottom: 18 }}>
-                  {passError}
+              {errorMessage && (
+                <div style={{ background: '#FEE2E2', border: '1px solid #F87171', color: '#B91C1C', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 18 }}>
+                  {errorMessage}
                 </div>
               )}
 
-              <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
                   <label className="form-label">Current Password *</label>
                   <input type="password" className="form-input" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required />
                 </div>
                 <div>
                   <label className="form-label">New Password *</label>
-                  <input type="password" className="form-input" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
+                  <input type="password" className="form-input" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Minimum 6 characters" required />
                 </div>
                 <div>
                   <label className="form-label">Confirm New Password *</label>
                   <input type="password" className="form-input" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
                 </div>
 
-                <button type="submit" className="btn btn-primary" disabled={changingPass} style={{ marginTop: 10 }}>
-                  <Lock size={16} /> {changingPass ? 'Updating...' : 'Update Password'}
-                </button>
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 16, marginTop: 8 }}>
+                  <button type="submit" className="btn btn-primary" disabled={passwordSaving} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                    <Lock size={15} /> {passwordSaving ? 'Updating...' : 'Save New Password'}
+                  </button>
+                </div>
               </form>
             </div>
           </div>
         )}
       </main>
 
-      {/* ─── MODALS ───────────────────────────────────────────────────────── */}
-      {/* Schedule Live Class Modal */}
-      {showLiveModal && (
-        <CustomModal isOpen={showLiveModal} onClose={() => setShowLiveModal(false)} title="Schedule New Live Class">
-          <form onSubmit={handleScheduleLiveClass} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div><label className="form-label">Lecture Name *</label><input type="text" className="form-input" value={liveLectureName} onChange={e => setLiveLectureName(e.target.value)} required /></div>
+      {/* ─── MODAL 1: BATCH CREATION & EDIT MODAL ──────────────────────────── */}
+      {showBatchModal && (
+        <CustomModal 
+          isOpen={showBatchModal} 
+          onClose={() => { setShowBatchModal(false); resetBatchForm(); }} 
+          title={editingBatch ? `Edit Batch — ${editingBatch.name}` : 'Create New Training Batch'}
+        >
+          <form onSubmit={handleSaveBatch} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
-              <label className="form-label">Assign Batch *</label>
-              <select className="form-select" value={liveBatchId} onChange={e => setLiveBatchId(e.target.value)} required>
-                <option value="">-- Select Batch --</option>
-                {batches.map(b => <option key={b.id} value={b.id}>{b.name} ({b.course_name})</option>)}
+              <label className="form-label">Batch Name / Identifier *</label>
+              <input 
+                type="text" 
+                className="form-input" 
+                value={batchName} 
+                onChange={e => setBatchName(e.target.value)} 
+                placeholder="e.g. Gen AI & Data Science - Alpha" 
+                required 
+              />
+            </div>
+
+            <div>
+              <label className="form-label">Course Title *</label>
+              <select className="form-select" value={batchCourseName} onChange={e => setBatchCourseName(e.target.value)} required>
+                <option value="">-- Choose Course --</option>
+                {courses.map(c => (
+                  <option key={c.id || c.title} value={c.title || c.name}>{c.title || c.name}</option>
+                ))}
               </select>
             </div>
-            <div><label className="form-label">Class Date *</label><input type="date" className="form-input" value={liveDate} onChange={e => setLiveDate(e.target.value)} required /></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div><label className="form-label">Start Time</label><input type="time" className="form-input" value={liveStartTime} onChange={e => setLiveStartTime(e.target.value)} /></div>
-              <div><label className="form-label">End Time</label><input type="time" className="form-input" value={liveEndTime} onChange={e => setLiveEndTime(e.target.value)} /></div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label">Start Date *</label>
+                <input 
+                  type="date" 
+                  className="form-input" 
+                  value={batchStartDate} 
+                  onChange={e => {
+                    const d = e.target.value;
+                    setBatchStartDate(d);
+                    if (d && batchDurationDays) setBatchEndDate(addDaysToDate(d, batchDurationDays));
+                  }} 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="form-label">Duration (Days) *</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  max="365" 
+                  className="form-input" 
+                  value={batchDurationDays} 
+                  onChange={e => {
+                    const days = Math.max(1, parseInt(e.target.value, 10) || 1);
+                    setBatchDurationDays(days);
+                    if (batchStartDate) setBatchEndDate(addDaysToDate(batchStartDate, days));
+                  }} 
+                  required 
+                />
+              </div>
             </div>
-            <div><label className="form-label">Google Meet Link *</label><input type="url" className="form-input" value={liveMeetLink} onChange={e => setLiveMeetLink(e.target.value)} placeholder="https://meet.google.com/..." required /></div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-              <button type="button" className="btn btn-outline" onClick={() => setShowLiveModal(false)}>Cancel</button>
-              <button type="submit" disabled={schedulingLive} className="btn btn-primary">{schedulingLive ? 'Scheduling...' : 'Schedule Class'}</button>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label">Calculated End Date</label>
+                <input type="date" className="form-input" value={batchEndDate} readOnly style={{ background: 'var(--surface-alt)' }} />
+              </div>
+              <div>
+                <label className="form-label">Daily Timing *</label>
+                <input type="text" className="form-input" value={batchTiming} onChange={e => setBatchTiming(e.target.value)} placeholder="10:00 AM - 12:00 PM" required />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label">Max Students Capacity</label>
+                <input type="number" min="5" max="100" className="form-input" value={batchMaxStudents} onChange={e => setBatchMaxStudents(e.target.value)} />
+              </div>
+              <div>
+                <label className="form-label">Cohort Status</label>
+                <select className="form-select" value={batchStatus} onChange={e => setBatchStatus(e.target.value)}>
+                  <option value="Active">Active</option>
+                  <option value="Upcoming">Upcoming</option>
+                  <option value="Completed">Completed</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
+              <button type="button" className="btn btn-outline" onClick={() => { setShowBatchModal(false); resetBatchForm(); }}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={savingBatch}>
+                <Save size={14} /> {savingBatch ? 'Saving...' : editingBatch ? 'Update Batch' : 'Create Batch'}
+              </button>
             </div>
           </form>
         </CustomModal>
       )}
 
-      {/* Add Recorded Lesson Modal */}
-      {showRecordedModal && (
-        <CustomModal isOpen={showRecordedModal} onClose={() => setShowRecordedModal(false)} title="Add Recorded Class / Drive Lesson">
-          <form onSubmit={handleAddRecordedClass} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* ─── MODAL 2: STUDENT DETAILS (ADMIN LEVEL PERFECTION WITH REAL PHOTO & PASSWORD) ── */}
+      {selectedStudentDetails && (
+        <CustomModal 
+          isOpen={!!selectedStudentDetails} 
+          onClose={() => setSelectedStudentDetails(null)} 
+          title={`Student Profile Details — ${selectedStudentDetails.name}`}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 24, alignItems: 'start' }}>
+            {/* Left Column: Avatar & Quick Summary */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', background: 'var(--surface-alt)', border: '1px solid var(--border-color)', borderRadius: 16, padding: 20 }}>
+              <div style={{
+                width: 96,
+                height: 96,
+                borderRadius: '50%',
+                overflow: 'hidden',
+                background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '3px solid #FFFFFF',
+                boxShadow: '0 4px 14px rgba(79, 70, 229, 0.15)',
+                marginBottom: 10
+              }}>
+                {(selectedStudentDetails.profile_pic || selectedStudentDetails.profilePhotoUrl) && (selectedStudentDetails.profile_pic || selectedStudentDetails.profilePhotoUrl).trim() !== '' ? (
+                  <img 
+                    src={selectedStudentDetails.profile_pic || selectedStudentDetails.profilePhotoUrl} 
+                    alt={selectedStudentDetails.name} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  />
+                ) : (
+                  <span style={{ fontSize: 32, fontWeight: 800, color: '#4F46E5' }}>
+                    {selectedStudentDetails.name ? selectedStudentDetails.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ST'}
+                  </span>
+                )}
+              </div>
+
+              <label className="btn btn-outline btn-xs" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 12, fontSize: 11, padding: '4px 10px' }}>
+                <Camera size={13} /> {uploadingStudentPhoto ? 'Uploading...' : 'Change Photo'}
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  style={{ display: 'none' }} 
+                  onChange={(e) => handleUploadStudentPhoto(selectedStudentDetails.id, e.target.files[0])}
+                  disabled={uploadingStudentPhoto}
+                />
+              </label>
+
+              <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800, color: '#1E293B' }}>{selectedStudentDetails.name}</h3>
+              <code style={{ fontSize: 11.5, color: '#4338CA', display: 'block', marginBottom: 14 }}>{selectedStudentDetails.rollNumber || selectedStudentDetails.id}</code>
+
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, borderTop: '1px solid var(--border-color)', paddingTop: 14, textAlign: 'left' }}>
+                <div>
+                  <span style={{ fontSize: 10.5, textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700, display: 'block' }}>Attendance Rate</span>
+                  <strong style={{ fontSize: 13, color: 'var(--primary-color)' }}>{selectedStudentDetails.attendance || 0}% Rate</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: 10.5, textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700, display: 'block' }}>Fee Status</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: selectedStudentDetails.feesStatus === 'Paid' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', color: selectedStudentDetails.feesStatus === 'Paid' ? '#10B981' : '#EF4444' }}>
+                    {selectedStudentDetails.feesStatus || 'Pending'}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ fontSize: 10.5, textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700, display: 'block' }}>Activity Points</span>
+                  <strong style={{ fontSize: 13, color: '#EC4899' }}>{selectedStudentDetails.activityPoints || 0} pts</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Credentials & Personal Details */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Student Login Password Card (Eye Toggle & 1-Click Copy) */}
+              <div style={{ background: 'linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 100%)', border: '1.5px solid #C7D2FE', borderRadius: 12, padding: '12px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#4338CA', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    🔑 Student Login Credentials
+                  </span>
+                  <span style={{ fontSize: 10, background: '#E0E7FF', color: '#4338CA', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
+                    Trainer Access
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, marginBottom: 6 }}>
+                  <span style={{ color: '#64748B' }}>Login Email:</span>
+                  <code style={{ fontWeight: 700, color: '#1E293B' }}>{selectedStudentDetails.email}</code>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                  <span style={{ color: '#64748B' }}>Password:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <code style={{ fontWeight: 800, color: '#4F46E5', fontSize: 13 }}>
+                      {showStudentPassword 
+                        ? (selectedStudentDetails.password || selectedStudentDetails.tempPassword || selectedStudentDetails.initialPassword || selectedStudentDetails.rawPassword || 'Student@123') 
+                        : '••••••••••••'}
+                    </code>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowStudentPassword(!showStudentPassword)} 
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748B', display: 'flex', alignItems: 'center' }}
+                      title={showStudentPassword ? 'Hide Password' : 'Show Password'}
+                    >
+                      {showStudentPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const pwd = selectedStudentDetails.password || selectedStudentDetails.tempPassword || selectedStudentDetails.initialPassword || selectedStudentDetails.rawPassword || 'Student@123';
+                        navigator.clipboard.writeText(pwd);
+                        showToast('Student password copied to clipboard!');
+                      }}
+                      style={{ border: 'none', background: '#E0E7FF', color: '#4338CA', padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      <Copy size={12} /> Copy
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Academic & Contact Details Grid */}
+              <div>
+                <h4 style={{ fontSize: 12.5, textTransform: 'uppercase', color: 'var(--primary-color)', fontWeight: 800, margin: '0 0 10px', borderBottom: '1px solid var(--border-light)', paddingBottom: 4 }}>
+                  Academic & Contact Information
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12.5 }}>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: 11 }}>Mobile Number</span>
+                    <strong>{selectedStudentDetails.phone || 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: 11 }}>Course Enrolled</span>
+                    <strong>{selectedStudentDetails.course || 'Data Science & AI'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: 11 }}>Assigned Batch</span>
+                    <strong>{selectedStudentDetails.batch_name || selectedStudentDetails.batchName || 'Assigned'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: 11 }}>College / Institute</span>
+                    <strong>{selectedStudentDetails.college || 'Levlox Academy'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: 11 }}>Location</span>
+                    <strong>{selectedStudentDetails.current_location || selectedStudentDetails.location || 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: 11 }}>Guardian Contact</span>
+                    <strong>{selectedStudentDetails.guardian_phone || selectedStudentDetails.guardian_name || 'N/A'}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: 10, borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
+                <button 
+                  className="btn btn-primary btn-sm" 
+                  onClick={() => {
+                    const s = selectedStudentDetails;
+                    setSelectedStudentDetails(null);
+                    openEditStudentModal(s);
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Pencil size={13} /> Edit Student Details
+                </button>
+                <button 
+                  className="btn btn-outline btn-sm" 
+                  onClick={() => {
+                    const s = selectedStudentDetails;
+                    setSelectedStudentDetails(null);
+                    setAwardPointsStudent(s);
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#EC4899' }}
+                >
+                  <Award size={13} /> Award Points
+                </button>
+                {selectedStudentDetails.email && (
+                  <a 
+                    href={`mailto:${selectedStudentDetails.email}`} 
+                    className="btn btn-outline btn-sm" 
+                    style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <Mail size={13} /> Send Email
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </CustomModal>
+      )}
+
+      {/* ─── MODAL 3: EDIT STUDENT INFO & PHOTO (NO STUDENT CREATION) ──────── */}
+      {editingStudent && (
+        <CustomModal 
+          isOpen={!!editingStudent} 
+          onClose={() => setEditingStudent(null)} 
+          title={`Edit Student Account — ${editingStudent.name}`}
+        >
+          <form onSubmit={handleSaveStudentEdit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label">Full Name *</label>
+                <input type="text" className="form-input" value={editStudentName} onChange={e => setEditStudentName(e.target.value)} required />
+              </div>
+              <div>
+                <label className="form-label">Roll Number / Student ID (Read Only)</label>
+                <input type="text" className="form-input" value={editingStudent.rollNumber || editingStudent.id} readOnly style={{ background: 'var(--surface-alt)', fontFamily: 'monospace' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label">Email Address *</label>
+                <input type="email" className="form-input" value={editStudentEmail} onChange={e => setEditStudentEmail(e.target.value)} required />
+              </div>
+              <div>
+                <label className="form-label">Mobile Number *</label>
+                <input type="text" className="form-input" value={editStudentPhone} onChange={e => setEditStudentPhone(e.target.value)} required />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label">Course Title</label>
+                <select className="form-select" value={editStudentCourse} onChange={e => setEditStudentCourse(e.target.value)}>
+                  {courses.map(c => (
+                    <option key={c.id || c.title} value={c.title || c.name}>{c.title || c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Assign Batch</label>
+                <select className="form-select" value={editStudentBatchId} onChange={e => setEditStudentBatchId(e.target.value)}>
+                  <option value="">-- No Batch Assigned --</option>
+                  {batches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label">College / Institute</label>
+                <input type="text" className="form-input" value={editStudentCollege} onChange={e => setEditStudentCollege(e.target.value)} />
+              </div>
+              <div>
+                <label className="form-label">Current Location / City</label>
+                <input type="text" className="form-input" value={editStudentLocation} onChange={e => setEditStudentLocation(e.target.value)} />
+              </div>
+            </div>
+
             <div>
-              <label className="form-label">Recording Title *</label>
+              <label className="form-label">Permanent Address</label>
+              <input type="text" className="form-input" value={editStudentAddress} onChange={e => setEditStudentAddress(e.target.value)} />
+            </div>
+
+            <div>
+              <label className="form-label">Account Status</label>
+              <select className="form-select" value={editStudentStatus} onChange={e => setEditStudentStatus(e.target.value)}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="pending">Pending Verification</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
+              <button type="button" className="btn btn-outline" onClick={() => setEditingStudent(null)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={savingStudentEdit}>
+                <Save size={14} /> {savingStudentEdit ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </CustomModal>
+      )}
+
+      {/* ─── MODAL 4: AWARD ACTIVITY POINTS ────────────────────────────────── */}
+      {awardPointsStudent && (
+        <CustomModal 
+          isOpen={!!awardPointsStudent} 
+          onClose={() => setAwardPointsStudent(null)} 
+          title={`Award Points — ${awardPointsStudent.name}`}
+        >
+          <form onSubmit={handleAwardActivityPoints} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label className="form-label">Points to Award</label>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                {[5, 10, 15, 20, 25].map(pts => (
+                  <button 
+                    key={pts} 
+                    type="button" 
+                    className={`btn btn-sm ${pointsToAward === pts ? 'btn-primary' : 'btn-outline'}`} 
+                    onClick={() => setPointsToAward(pts)}
+                  >
+                    +{pts} pts
+                  </button>
+                ))}
+              </div>
               <input 
-                type="text" 
+                type="number" 
+                min="1" 
+                max="100" 
                 className="form-input" 
-                value={recTitle} 
-                onChange={e => setRecTitle(e.target.value)} 
-                placeholder="e.g. Masterclass on State Management & Hooks" 
+                value={pointsToAward} 
+                onChange={e => setPointsToAward(parseInt(e.target.value, 10) || 1)} 
                 required 
               />
             </div>
-            
+
+            <div>
+              <label className="form-label">Reason / Commendation</label>
+              <input 
+                type="text" 
+                className="form-input" 
+                value={awardReason} 
+                onChange={e => setAwardReason(e.target.value)} 
+                placeholder="e.g. Completed milestone project with top score" 
+                required 
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
+              <button type="button" className="btn btn-outline" onClick={() => setAwardPointsStudent(null)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={savingPoints}>
+                <Award size={14} /> {savingPoints ? 'Awarding...' : 'Award Score'}
+              </button>
+            </div>
+          </form>
+        </CustomModal>
+      )}
+
+      {/* ─── MODAL 5: SCHEDULE LIVE CLASS ──────────────────────────────────── */}
+      {showLiveModal && (
+        <CustomModal isOpen={showLiveModal} onClose={() => setShowLiveModal(false)} title="Schedule Live Teaching Class">
+          <form onSubmit={handleScheduleLiveClass} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label className="form-label">Lecture Title *</label>
+              <input type="text" className="form-input" value={liveLectureName} onChange={e => setLiveLectureName(e.target.value)} placeholder="e.g. Deep Learning & Transformers - Part 1" required />
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label className="form-label">Course / Module Title</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  value={recModule} 
-                  onChange={e => setRecModule(e.target.value)} 
-                  placeholder="e.g. Module 3 - React Deep Dive" 
-                />
+                <label className="form-label">Target Batch *</label>
+                <select className="form-select" value={liveBatchId} onChange={e => setLiveBatchId(e.target.value)} required>
+                  <option value="">-- Choose Batch --</option>
+                  {batches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="form-label">Assign Batch / Target Playlist *</label>
-                <select 
-                  className="form-select" 
-                  value={recBatchId} 
-                  onChange={e => {
-                    const bId = e.target.value;
-                    setRecBatchId(bId);
-                    if (bId === 'common') {
-                      setRecCourseName('Levlox Common Curriculum');
-                    } else {
-                      const bObj = batches.find(b => String(b.id) === String(bId));
-                      if (bObj && bObj.course_name) {
-                        setRecCourseName(bObj.course_name);
-                      }
-                    }
-                  }}
-                  required
-                >
-                  <option value="">-- Choose Batch / Playlist --</option>
-                  <option value="common">🌐 Common Playlist (All Students / Universal Access)</option>
-                  {batches.map(b => <option key={b.id} value={b.id}>{b.name} ({b.course_name})</option>)}
+                <label className="form-label">Date *</label>
+                <input type="date" className="form-input" value={liveDate} onChange={e => setLiveDate(e.target.value)} required />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label">Start Time *</label>
+                <input type="time" className="form-input" value={liveStartTime} onChange={e => setLiveStartTime(e.target.value)} required />
+              </div>
+              <div>
+                <label className="form-label">End Time *</label>
+                <input type="time" className="form-input" value={liveEndTime} onChange={e => setLiveEndTime(e.target.value)} required />
+              </div>
+            </div>
+
+            <div>
+              <label className="form-label">Google Meet or Zoom URL *</label>
+              <input type="url" className="form-input" value={liveMeetLink} onChange={e => setLiveMeetLink(e.target.value)} placeholder="https://meet.google.com/..." required />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
+              <button type="button" className="btn btn-outline" onClick={() => setShowLiveModal(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={schedulingLive}>
+                <Video size={14} /> {schedulingLive ? 'Scheduling...' : 'Schedule Class'}
+              </button>
+            </div>
+          </form>
+        </CustomModal>
+      )}
+
+      {/* ─── MODAL 6: ADD RECORDED LESSON ──────────────────────────────────── */}
+      {showRecordedModal && (
+        <CustomModal isOpen={showRecordedModal} onClose={() => setShowRecordedModal(false)} title="Upload / Add Recorded Class">
+          <form onSubmit={handleAddRecordedClass} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label className="form-label">Lecture Title *</label>
+              <input type="text" className="form-input" value={recTitle} onChange={e => setRecTitle(e.target.value)} placeholder="e.g. Masterclass: Neural Networks from Scratch" required />
+            </div>
+
+            <div>
+              <label className="form-label">Video URL (Google Drive, YouTube or Direct MP4) *</label>
+              <input type="url" className="form-input" value={recVideoUrl} onChange={e => setRecVideoUrl(e.target.value)} placeholder="https://drive.google.com/... or https://youtube.com/..." required />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label">Module / Topic</label>
+                <input type="text" className="form-input" value={recModule} onChange={e => setRecModule(e.target.value)} />
+              </div>
+              <div>
+                <label className="form-label">Duration</label>
+                <input type="text" className="form-input" value={recDuration} onChange={e => setRecDuration(e.target.value)} placeholder="1h 30m" />
+              </div>
+            </div>
+
+            <div>
+              <label className="form-label">Attach to Batch</label>
+              <select className="form-select" value={recBatchId} onChange={e => setRecBatchId(e.target.value)}>
+                <option value="common">Common Playlist (All Batches)</option>
+                {batches.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
+              <button type="button" className="btn btn-outline" onClick={() => setShowRecordedModal(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={savingRecorded}>
+                <Save size={14} /> {savingRecorded ? 'Saving...' : 'Add Recorded Class'}
+              </button>
+            </div>
+          </form>
+        </CustomModal>
+      )}
+
+      {/* ─── MODAL 7: BROADCAST ANNOUNCEMENT ───────────────────────────────── */}
+      {showAnnModal && (
+        <CustomModal isOpen={showAnnModal} onClose={() => setShowAnnModal(false)} title="Broadcast Announcement">
+          <form onSubmit={handleCreateAnnouncement} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label className="form-label">Announcement Title *</label>
+              <input type="text" className="form-input" value={annTitle} onChange={e => setAnnTitle(e.target.value)} placeholder="e.g. Schedule Update for Tomorrow's Session" required />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label">Target Cohort *</label>
+                <select className="form-select" value={annBatchId} onChange={e => setAnnBatchId(e.target.value)} required>
+                  <option value="">-- Choose Batch --</option>
+                  <option value="all">All Batches</option>
+                  {batches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Priority Tag</label>
+                <select className="form-select" value={annPriority} onChange={e => setAnnPriority(e.target.value)}>
+                  <option value="Normal">Normal</option>
+                  <option value="High">High</option>
+                  <option value="Urgent">Urgent</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="form-label">Google Drive Video Link / Video URL *</label>
-              <input 
-                type="url" 
-                className="form-input" 
-                value={recVideoUrl} 
-                onChange={e => {
-                  const val = e.target.value;
-                  setRecVideoUrl(val);
-                  if (!recThumbnailUrl) {
-                    const autoThumb = getResolvedThumbnail(val, '');
-                    if (autoThumb && !autoThumb.includes('unsplash')) {
-                      setRecThumbnailUrl(autoThumb);
-                    }
-                  }
-                }} 
-                placeholder="https://drive.google.com/file/d/... or YouTube link" 
-                required 
-              />
-              {getGoogleDriveFileId(recVideoUrl) && (
-                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#059669', background: '#ECFDF5', padding: '6px 10px', borderRadius: 6, border: '1px solid #A7F3D0' }}>
-                  <CheckCircle size={14} />
-                  <span><strong>Google Drive link verified:</strong> Video will stream directly inside portal with anti-download protection.</span>
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
-              <div>
-                <label className="form-label">Thumbnail URL (Optional)</label>
-                <input 
-                  type="url" 
-                  className="form-input" 
-                  value={recThumbnailUrl} 
-                  onChange={e => setRecThumbnailUrl(e.target.value)} 
-                  placeholder="https://... (auto-generated if empty)" 
-                />
-              </div>
-              <div>
-                <label className="form-label">Duration</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  value={recDuration} 
-                  onChange={e => setRecDuration(e.target.value)} 
-                  placeholder="e.g. 1h 30m" 
-                />
-              </div>
+              <label className="form-label">Announcement Message *</label>
+              <textarea rows={4} className="form-input" value={annMessage} onChange={e => setAnnMessage(e.target.value)} placeholder="Write announcement details..." required />
             </div>
 
             <div>
-              <label className="form-label">Lesson Description</label>
-              <textarea 
-                className="form-input" 
-                value={recDescription} 
-                onChange={e => setRecDescription(e.target.value)} 
-                placeholder="Detailed outline of topics covered in this recording session..." 
-                style={{ minHeight: 70 }} 
-              />
+              <label className="form-label">Attach File (Optional PDF, Document or Slide)</label>
+              <input type="file" className="form-input" onChange={e => setAnnFile(e.target.files[0])} />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-              <button type="button" className="btn btn-outline" onClick={() => setShowRecordedModal(false)}>Cancel</button>
-              <button type="submit" disabled={savingRecorded} className="btn btn-primary">{savingRecorded ? 'Saving Lesson...' : 'Save & Publish Recording'}</button>
-            </div>
-          </form>
-        </CustomModal>
-      )}
-
-      {/* Trainer Academia Modern In-Portal Course Viewer */}
-      {previewVideo && (() => {
-        const previewPlaylistObj = {
-          id: previewVideo.playlist_id || previewVideo.batch_id || 'trainer_preview',
-          name: previewVideo.course_title || previewVideo.title || 'Course Recordings',
-          title: previewVideo.title,
-          course_name: previewVideo.course_title,
-          batch_name: 'Trainer Course Preview',
-          lessons: [previewVideo],
-          study_materials: previewVideo.study_materials || []
-        };
-
-        return (
-          <div style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.75)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 9999,
-            overflowY: 'auto',
-            padding: '24px 20px',
-            display: 'flex',
-            justifyContent: 'center',
-          }}>
-            <div style={{
-              background: '#FFFFFF',
-              borderRadius: 24,
-              maxWidth: 1380,
-              width: '100%',
-              boxShadow: '0 25px 60px -15px rgba(0,0,0,0.3)',
-              position: 'relative',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              minHeight: '85vh',
-            }}>
-              {/* Header Bar */}
-              <div style={{
-                padding: '16px 24px',
-                borderBottom: '1px solid #E2E8F0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: '#FFFFFF',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{
-                    fontSize: 11.5,
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    color: '#6366F1',
-                    background: '#EEF2FF',
-                    padding: '4px 10px',
-                    borderRadius: 999,
-                  }}>
-                    Trainer Studio Preview
-                  </span>
-                  <span style={{ fontSize: 13, color: '#64748B' }}>
-                    Student DRM & Protected In-Portal Playback
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPreviewVideo(null)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '8px 16px',
-                    borderRadius: 999,
-                    border: '1.5px solid #E2E8F0',
-                    background: '#FFFFFF',
-                    color: '#0F172A',
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <X size={15} />
-                  <span>Close Viewer</span>
-                </button>
-              </div>
-
-              {/* Academia 2-Column Course Viewer Component */}
-              <div style={{ padding: '20px 24px 40px', flex: 1, background: '#F8FAFC' }}>
-                <AcademiaCourseViewer
-                  playlist={previewPlaylistObj}
-                  initialLessonId={previewVideo.id}
-                  onBack={() => setPreviewVideo(null)}
-                  userRole="trainer"
-                  userProfile={userProfile}
-                  currentUser={currentUser}
-                />
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Create Announcement Modal */}
-      {showAnnModal && (
-        <CustomModal isOpen={showAnnModal} onClose={() => setShowAnnModal(false)} title="Create Announcement">
-          <form onSubmit={handleCreateAnnouncement} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div><label className="form-label">Title *</label><input type="text" className="form-input" value={annTitle} onChange={e => setAnnTitle(e.target.value)} required /></div>
-            <div>
-              <label className="form-label">Target Batch *</label>
-              <select className="form-select" value={annBatchId} onChange={e => setAnnBatchId(e.target.value)} required>
-                <option value="">-- Select Batch --</option>
-                {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            </div>
-            <div><label className="form-label">Message Content *</label><textarea className="form-input" value={annMessage} onChange={e => setAnnMessage(e.target.value)} style={{ minHeight: 80 }} required /></div>
-            <div>
-              <label className="form-label">Attach File / Circular (Optional)</label>
-              <input
-                type="file"
-                className="form-input"
-                onChange={e => setAnnFile(e.target.files[0] || null)}
-              />
-              <span style={{ fontSize: 11, color: '#64748B' }}>Attach PDF, document, or resources for this circular</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
               <button type="button" className="btn btn-outline" onClick={() => setShowAnnModal(false)}>Cancel</button>
-              <button type="submit" disabled={savingAnn} className="btn btn-primary">{savingAnn ? 'Posting...' : 'Post Announcement'}</button>
+              <button type="submit" className="btn btn-primary" disabled={savingAnn}>
+                <Megaphone size={14} /> {savingAnn ? 'Broadcasting...' : 'Broadcast Announcement'}
+              </button>
             </div>
           </form>
         </CustomModal>
       )}
 
-      {/* Award Activity Points Modal */}
-      {showActivityModal && (
-        <CustomModal isOpen={showActivityModal} onClose={() => setShowActivityModal(false)} title="Award Student Activity Points">
-          <form onSubmit={handleAwardPoints} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div>
-              <label className="form-label">Select Student *</label>
-              <select className="form-select" value={actStudentId} onChange={e => setActStudentId(e.target.value)} required>
-                <option value="">-- Select Student --</option>
-                {students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.batch_name || 'Batch'})</option>)}
-              </select>
-            </div>
-            <div><label className="form-label">Points Amount *</label><input type="number" className="form-input" value={actPoints} onChange={e => setActPoints(e.target.value)} required /></div>
-            <div>
-              <label className="form-label">Activity Type</label>
-              <select className="form-select" value={actType} onChange={e => setActType(e.target.value)}>
-                <option value="Participation">Class Participation (+5)</option>
-                <option value="Quiz Winner">Quiz Winner (+15)</option>
-                <option value="Assignment Completed">Assignment (+10)</option>
-                <option value="Perfect Attendance">Perfect Attendance (+20)</option>
-              </select>
-            </div>
-            <div><label className="form-label">Remarks</label><input type="text" className="form-input" value={actRemarks} onChange={e => setActRemarks(e.target.value)} placeholder="e.g. Great answer during lecture" /></div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-              <button type="button" className="btn btn-outline" onClick={() => setShowActivityModal(false)}>Cancel</button>
-              <button type="submit" disabled={savingActivity} className="btn btn-primary">{savingActivity ? 'Awarding...' : 'Award Points'}</button>
-            </div>
-          </form>
-        </CustomModal>
-      )}
-
-      {/* Batch Details Modal */}
-      {selectedBatchDetails && (
-        <CustomModal isOpen={!!selectedBatchDetails} onClose={() => setSelectedBatchDetails(null)} title={`Batch Details — ${selectedBatchDetails.name}`}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ padding: 14, background: 'var(--surface-alt)', borderRadius: 12 }}>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Batch Code: <strong>{selectedBatchDetails.code || selectedBatchDetails.id}</strong></div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Course: <strong>{selectedBatchDetails.course_name}</strong></div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Schedule: <strong>{selectedBatchDetails.schedule || 'Regular'}</strong></div>
-            </div>
-            <h4 style={{ margin: '8px 0 0', fontSize: 14, fontWeight: 800 }}>Student Roster ({selectedBatchDetails.students_count || 0})</h4>
-            <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-              {students.filter(s => s.batch_id === selectedBatchDetails.id || (selectedBatchDetails.student_ids || []).includes(s.id)).map(st => (
-                <div key={st.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-color)', fontSize: 13 }}>
-                  <span>{st.name} ({st.rollNumber || st.id})</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>{st.email}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </CustomModal>
-      )}
-
-      {/* Student Details Modal */}
-      {selectedStudentDetails && (
-        <CustomModal isOpen={!!selectedStudentDetails} onClose={() => setSelectedStudentDetails(null)} title={`Student Profile — ${selectedStudentDetails.name}`}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <img src={selectedStudentDetails.profile_pic || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} alt="" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover' }} />
-              <div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{selectedStudentDetails.name}</h3>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>ID: {selectedStudentDetails.rollNumber || selectedStudentDetails.id}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Email: {selectedStudentDetails.email}</div>
-              </div>
-            </div>
-            <div style={{ padding: 14, background: 'var(--surface-alt)', borderRadius: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5 }}>
-              <div>Course: <strong>{selectedStudentDetails.course}</strong></div>
-              <div>Batch: <strong>{selectedStudentDetails.batch_name || 'Assigned'}</strong></div>
-              <div>Activity Score: <strong>{selectedStudentDetails.activityPoints || 0} pts</strong></div>
-              <div>Account Status: <strong>{selectedStudentDetails.status || 'Active'}</strong></div>
-            </div>
-          </div>
-        </CustomModal>
-      )}
-
-      {/* ═══ TRAINER UPLOAD CLASS RECORDING MODAL ═════════════════════ */}
-      {trainerUploadClass && (
-        <div className="modal-overlay" style={{ zIndex: 99998 }}>
-          <div className="modal-content" style={{ maxWidth: '540px' }}>
-            <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(37,99,235,0.1)', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Video size={20} />
-                </div>
-                <div>
-                  <h3 className="modal-title" style={{ margin: 0 }}>Upload Class Recording</h3>
-                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-                    Publish replay for batch: <strong>{trainerUploadClass.batchName || trainerUploadClass.batch_name || trainerUploadClass.batchId || 'All'}</strong>
-                  </p>
-                </div>
-              </div>
-              <button className="modal-close-red" onClick={() => setTrainerUploadClass(null)} aria-label="Close modal"><X size={18} /></button>
-            </div>
-
-            <form onSubmit={handleSaveTrainerRecording}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ background: 'var(--surface-alt)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontSize: '13.5px', fontWeight: 800, color: 'var(--text-primary)' }}>{trainerUploadClass.title || trainerUploadClass.lectureName}</div>
-                  <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: 4 }}>
-                    Date: <strong>{trainerUploadClass.date}</strong> ({trainerUploadClass.time})
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>
-                    Recording Video URL (YouTube / Google Drive / MP4 Link) *
-                  </label>
-                  <input
-                    type="url"
-                    required
-                    value={trainerRecordingUrl}
-                    onChange={(e) => setTrainerRecordingUrl(e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=... or Google Drive URL"
-                    className="form-input"
-                    style={{ height: '42px', fontSize: '13px' }}
-                  />
-                </div>
-
-                {/* Video file direct upload */}
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>
-                    Or Upload Video File Directly
-                  </label>
-                  <div style={{
-                    border: '1.5px dashed var(--border-color)',
-                    borderRadius: 10,
-                    padding: '16px',
-                    textAlign: 'center',
-                    background: 'var(--surface-alt)',
-                    cursor: 'pointer'
-                  }}>
-                    <input
-                      type="file"
-                      accept="video/*"
-                      style={{ display: 'none' }}
-                      id="trainer-recording-file-input"
-                      disabled={trainerIsUploadingFile}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleTrainerVideoFileUpload(file);
-                      }}
-                    />
-                    <label htmlFor="trainer-recording-file-input" style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                      <UploadCloud size={24} color="#2563EB" />
-                      <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 650 }}>
-                        {trainerIsUploadingFile ? 'Uploading video file to server...' : 'Click to select recorded video file (MP4 / WebM)'}
-                      </span>
-                      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Directly playable with DRM protection</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>Recording Duration</label>
-                  <input
-                    type="text"
-                    value={trainerRecordingDuration}
-                    onChange={(e) => setTrainerRecordingDuration(e.target.value)}
-                    placeholder="e.g. 1h 15m"
-                    className="form-input"
-                    style={{ height: '40px', fontSize: '13px' }}
-                  />
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" className="btn btn-outline" onClick={() => setTrainerUploadClass(null)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={trainerUploadSaving || trainerIsUploadingFile} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  {trainerUploadSaving ? 'Saving...' : <><UploadCloud size={15} /> Save & Attach Recording</>}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ TRAINER PREVIEW VIDEO MODAL ═════════════════════════════════ */}
-      {trainerPreviewVideo && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15, 23, 42, 0.88)',
-          backdropFilter: 'blur(8px)',
-          zIndex: 99999,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 20
-        }}>
-          <div style={{ width: '100%', maxWidth: 1040, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, color: '#FFFFFF' }}>
-            <div>
-              <span style={{ fontSize: 11, color: '#93C5FD', fontWeight: 700, textTransform: 'uppercase' }}>
-                Live Replay Preview
-              </span>
-              <h3 style={{ fontSize: 18, fontWeight: 800, margin: '2px 0 0', color: '#FFFFFF' }}>
-                {trainerPreviewVideo.title}
-              </h3>
-            </div>
-            <button
-              onClick={() => setTrainerPreviewVideo(null)}
-              style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div style={{ width: '100%', maxWidth: 1040, height: '620px', background: '#000', borderRadius: 16, overflow: 'hidden', boxShadow: '0 25px 60px -15px rgba(0,0,0,0.5)' }}>
+      {/* ─── MODAL 8: SECURE VIDEO PLAYER PREVIEW ──────────────────────────── */}
+      {previewVideo && (
+        <CustomModal isOpen={!!previewVideo} onClose={() => setPreviewVideo(null)} title={previewVideo.title || 'Video Player'}>
+          <div style={{ width: '100%', borderRadius: 12, overflow: 'hidden' }}>
             <SecureVideoPlayer
-              video={trainerPreviewVideo}
-              currentUser={{
-                name: userProfile?.fullName || userProfile?.name || 'Trainer',
-                email: userProfile?.email || 'trainer@levelox.com',
-                rollNumber: userProfile?.trainerId || 'TR-LEVO'
-              }}
+              videoUrl={previewVideo.video_url || previewVideo.videoUrl}
+              title={previewVideo.title}
+              onClose={() => setPreviewVideo(null)}
             />
           </div>
-        </div>
+        </CustomModal>
       )}
     </div>
   );
 };
-
-// Helper Icon for sidebar menu
-const LayersIcon = ({ size, color }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-    <polyline points="2 17 12 22 22 17" />
-    <polyline points="2 12 12 17 22 12" />
-  </svg>
-);
 
 export default TrainerDashboard;
