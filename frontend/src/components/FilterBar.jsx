@@ -36,7 +36,7 @@ const FilterBar = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const quickFilterOptions = ['Today', 'This Week', 'This Month', 'This Year', 'Custom Range'];
+  const quickFilterOptions = ['All', 'Today', 'This Week', 'This Month', 'This Year', 'Custom Range'];
 
   return (
     <div className="levlox-filter-bar animate-fade-in">

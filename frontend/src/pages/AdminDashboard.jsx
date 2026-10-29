@@ -320,6 +320,9 @@ const AdminDashboard = () => {
       p.set('tab', tab);
       return p;
     }, { replace: true });
+    try {
+      queryClient.invalidateQueries();
+    } catch (_) {}
   };
 
   useEffect(() => {
@@ -329,7 +332,7 @@ const AdminDashboard = () => {
     }
   }, [searchParams, location.state]);
   const [sessionSearch, setSessionSearch] = useState('');
-  const [dateFilter, setDateFilter] = useState('Today');
+  const [dateFilter, setDateFilter] = useState('All');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [notes, setNotes] = useState([]);
@@ -405,6 +408,19 @@ const AdminDashboard = () => {
     queryClient.invalidateQueries({ queryKey: ['trainerAssignmentsData'] });
     queryClient.invalidateQueries({ queryKey: ['trainerSubmissionsData'] });
   }, [activeTab, queryClient]);
+
+  const handleNavTabClick = (tab, extraFn) => {
+    setActiveTab(tab);
+    setMobileMenuOpen(false);
+    if (typeof extraFn === 'function') extraFn();
+    try {
+      refetchAdminData();
+      refetchAdminBatches();
+      queryClient.invalidateQueries();
+    } catch (e) {
+      console.warn('[Admin] Auto-refresh on nav tab failed:', e);
+    }
+  };
 
   // Derive named data from adminData
   const liveClasses = adminData?.liveClassList || EMPTY_LIST;
@@ -4337,22 +4353,22 @@ const AdminDashboard = () => {
 
         <nav className="sidebar-menu" style={{ overflowY: 'auto' }}>
           <span className="sidebar-section-label">Main Menu</span>
-          <button className={`sidebar-link ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => handleNavTabClick('dashboard')}>
             <Clock size={18} />
             <span className="sidebar-link-text">Dashboard</span>
           </button>
           
-          <button className={`sidebar-link ${activeTab === 'students' ? 'active' : ''}`} onClick={() => { setActiveTab('students'); setCurrentPage(1); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'students' ? 'active' : ''}`} onClick={() => handleNavTabClick('students', () => setCurrentPage(1))}>
             <Users size={18} />
             <span className="sidebar-link-text">Students</span>
           </button>
 
-          <button className={`sidebar-link ${activeTab === 'batches' ? 'active' : ''}`} onClick={() => { setActiveTab('batches'); fetchBatches(); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'batches' ? 'active' : ''}`} onClick={() => handleNavTabClick('batches', fetchBatches)}>
             <GraduationCap size={18} />
             <span className="sidebar-link-text">Batch Management</span>
           </button>
           
-          <button className={`sidebar-link ${activeTab === 'live-classes' ? 'active' : ''}`} onClick={() => { setActiveTab('live-classes'); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'live-classes' ? 'active' : ''}`} onClick={() => handleNavTabClick('live-classes')}>
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
               <Video size={18} />
               {hasUpcomingLiveClasses && (
@@ -4380,48 +4396,48 @@ const AdminDashboard = () => {
             </span>
           </button>
           
-          <button className={`sidebar-link ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => { setActiveTab('attendance'); setCurrentPage(1); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => handleNavTabClick('attendance', () => setCurrentPage(1))}>
             <Percent size={18} />
             <span className="sidebar-link-text">Attendance</span>
           </button>
           
-          <button className={`sidebar-link ${activeTab === 'recorded-classes' ? 'active' : ''}`} onClick={() => { setActiveTab('recorded-classes'); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'recorded-classes' ? 'active' : ''}`} onClick={() => handleNavTabClick('recorded-classes')}>
             <PlayCircle size={18} />
             <span className="sidebar-link-text">Recorded Classes</span>
           </button>
 
           
-          <button className={`sidebar-link ${activeTab === 'announcements' ? 'active' : ''}`} onClick={() => { setActiveTab('announcements'); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'announcements' ? 'active' : ''}`} onClick={() => handleNavTabClick('announcements')}>
             <Megaphone size={18} />
             <span className="sidebar-link-text">Announcements</span>
           </button>
           
-          <button className={`sidebar-link ${activeTab === 'assignments' ? 'active' : ''}`} onClick={() => { setActiveTab('assignments'); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'assignments' ? 'active' : ''}`} onClick={() => handleNavTabClick('assignments')}>
             <FileText size={18} />
             <span className="sidebar-link-text">Assignments</span>
           </button>
           
-          <button className={`sidebar-link ${activeTab === 'fees-management' ? 'active' : ''}`} onClick={() => { setActiveTab('fees-management'); setCurrentPage(1); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'fees-management' ? 'active' : ''}`} onClick={() => handleNavTabClick('fees-management', () => setCurrentPage(1))}>
             <Wallet size={18} />
             <span className="sidebar-link-text">Fees Management</span>
           </button>
           
-          <button className={`sidebar-link ${activeTab === 'activity-score' ? 'active' : ''}`} onClick={() => { setActiveTab('activity-score'); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'activity-score' ? 'active' : ''}`} onClick={() => handleNavTabClick('activity-score')}>
             <Trophy size={18} />
             <span className="sidebar-link-text">Activity Scores</span>
           </button>
 
-          <button className={`sidebar-link ${activeTab === 'trainer-management' ? 'active' : ''}`} onClick={() => { setActiveTab('trainer-management'); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'trainer-management' ? 'active' : ''}`} onClick={() => handleNavTabClick('trainer-management')}>
             <Users size={18} />
             <span className="sidebar-link-text">Trainer Management</span>
           </button>
 
-          <button className={`sidebar-link ${activeTab === 'master-data' ? 'active' : ''}`} onClick={() => { setActiveTab('master-data'); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'master-data' ? 'active' : ''}`} onClick={() => handleNavTabClick('master-data')}>
             <Shield size={18} />
             <span className="sidebar-link-text">Master Data</span>
           </button>
 
-          <button className={`sidebar-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setMobileMenuOpen(false); }}>
+          <button className={`sidebar-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => handleNavTabClick('settings')}>
             <Settings size={18} />
             <span className="sidebar-link-text">Settings</span>
           </button>
@@ -5433,7 +5449,9 @@ const AdminDashboard = () => {
             const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
             
-            if (dateFilter === 'Today') {
+            if (dateFilter === 'All' || !dateFilter) {
+              return true;
+            } else if (dateFilter === 'Today') {
               return classDate >= startOfToday && classDate <= endOfToday;
             } else if (dateFilter === 'This Week') {
               const firstDayOfWeek = new Date(now);

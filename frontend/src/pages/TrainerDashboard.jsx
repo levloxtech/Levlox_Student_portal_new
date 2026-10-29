@@ -157,6 +157,9 @@ const TrainerDashboard = () => {
     } else {
       navigate('/trainer/' + tabKey);
     }
+    try {
+      queryClient.invalidateQueries();
+    } catch (_) {}
   };
 
   const mustChangePassword = userProfile?.mustChangePassword === true;

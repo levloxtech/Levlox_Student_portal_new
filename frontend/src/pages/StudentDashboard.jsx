@@ -1288,6 +1288,9 @@ const StudentDashboard = () => {
                   setActiveTab(item.id);
                   setSelectedCourse(null);
                   setMobileMenuOpen(false);
+                  try {
+                    refetchAll();
+                  } catch (_) {}
                 }}
                 style={isDisabled ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
               >
