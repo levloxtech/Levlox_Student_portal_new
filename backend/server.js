@@ -820,8 +820,6 @@ app.get('/api/data/:collection/:id', (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-  }
-});
 
 app.post('/api/data/:collection', (req, res) => {
   try {
