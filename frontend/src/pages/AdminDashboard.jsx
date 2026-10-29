@@ -6419,11 +6419,10 @@ const AdminDashboard = () => {
               actionLabel="+ Add Recorded Class"
               onActionClick={() => {
                 setEditingRecordedClass(null);
-                const targetBId = recordedBatchFilter || (batches[0]?.id || '');
-                setSelectedBatchId(targetBId);
-                const foundBatch = batches.find(b => b.id === targetBId);
-                if (foundBatch && foundBatch.course_name) {
-                  setRecCourseTitle(foundBatch.course_name);
+                const targetPl = customPlaylists[0];
+                setSelectedBatchId(targetPl ? `playlist:${targetPl.id}` : '');
+                if (targetPl && targetPl.course_name) {
+                  setRecCourseTitle(targetPl.course_name);
                 }
                 setShowRecordedClassModal(true);
               }}
@@ -6497,7 +6496,11 @@ const AdminDashboard = () => {
                       className="btn btn-primary"
                       onClick={() => {
                         setEditingRecordedClass(null);
-                        setSelectedBatchId(batches[0] ? `batch:${batches[0].id}` : '');
+                        const targetPl = customPlaylists[0];
+                        setSelectedBatchId(targetPl ? `playlist:${targetPl.id}` : '');
+                        if (targetPl && targetPl.course_name) {
+                          setRecCourseTitle(targetPl.course_name);
+                        }
                         setShowRecordedClassModal(true);
                       }}
                       style={{
@@ -6523,299 +6526,15 @@ const AdminDashboard = () => {
                 {/* PLAYLIST CONTAINERS GRID */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '22px' }}>
                   
-                  {/* SECTION A: AUTOMATIC BATCH PLAYLISTS */}
-                  {batches.map((batch, idx) => {
-                    const bId = String(batch.id || batch.uid);
-                    const batchRecordings = recordedClasses.filter(r => String(r.batch_id || r.batchId) === bId || String(r.playlist_id) === bId);
-                    const batchDurationSec = batchRecordings.reduce((acc, r) => acc + parseDurationToSeconds(r.duration), 0);
-                    const batchThumb = batch.thumbnail || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=700&auto=format&fit=crop&q=80';
-                    const theme = PLAYLIST_CARD_THEMES[idx % PLAYLIST_CARD_THEMES.length];
-
-                    return (
-                      <div
-                        key={`batch-${bId}`}
-                        style={{
-                          background: theme.bg,
-                          border: `1.5px solid ${theme.border}`,
-                          borderRadius: 24,
-                          overflow: 'hidden',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          boxShadow: theme.shadow,
-                          transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
-                          position: 'relative',
-                          backdropFilter: 'blur(20px)',
-                          WebkitBackdropFilter: 'blur(20px)',
-                        }}
-                        className="clickable-card-hover"
-                      >
-                        {/* Top Banner with Inset & Image Clarity */}
-                        <div style={{ padding: '12px 12px 0 12px' }}>
-                          <div style={{
-                            height: 145,
-                            position: 'relative',
-                            borderRadius: 18,
-                            overflow: 'hidden',
-                            background: '#0F172A',
-                            boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
-                          }}>
-                            {/* Main Visual Image - Vibrant & Unobscured */}
-                            <img
-                              src={batchThumb}
-                              alt={batch.name}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                transition: 'transform 0.3s ease',
-                              }}
-                            />
-                            {/* Gentle glossy gradient overlay for badge readability */}
-                            <div style={{
-                              position: 'absolute',
-                              inset: 0,
-                              background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.05) 50%, rgba(15, 23, 42, 0.65) 100%)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              padding: '12px 14px',
-                            }}>
-                              {/* Top Bar on Banner */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{
-                                  fontSize: 11,
-                                  fontWeight: 750,
-                                  background: 'rgba(255, 255, 255, 0.88)',
-                                  backdropFilter: 'blur(10px)',
-                                  WebkitBackdropFilter: 'blur(10px)',
-                                  color: '#0F172A',
-                                  padding: '4px 12px',
-                                  borderRadius: 999,
-                                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 5,
-                                }}>
-                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: theme.accent }} />
-                                  {batch.course_name || 'Curriculum Track'}
-                                </span>
-
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{
-                                    fontSize: 11,
-                                    fontWeight: 800,
-                                    background: 'rgba(99, 102, 241, 0.9)',
-                                    backdropFilter: 'blur(8px)',
-                                    color: '#FFFFFF',
-                                    padding: '4px 10px',
-                                    borderRadius: 999,
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-                                  }}>
-                                    🎓 Batch
-                                  </span>
-
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      startEditBatch(batch);
-                                    }}
-                                    style={{
-                                      width: 28,
-                                      height: 28,
-                                      borderRadius: '50%',
-                                      background: 'rgba(255, 255, 255, 0.88)',
-                                      backdropFilter: 'blur(6px)',
-                                      border: 'none',
-                                      color: '#1E293B',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-                                    }}
-                                    title="Edit Batch Details"
-                                  >
-                                    <Pencil size={12} />
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deleteBatch(bId);
-                                    }}
-                                    style={{
-                                      width: 28,
-                                      height: 28,
-                                      borderRadius: '50%',
-                                      background: '#EF4444',
-                                      border: 'none',
-                                      color: '#FFFFFF',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                                    }}
-                                    title="Delete Batch & Playlist"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Bottom Row on Banner: Elevated Badge Tile + Batch Title */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <div style={{
-                                  width: 36,
-                                  height: 36,
-                                  borderRadius: 10,
-                                  background: '#FFFFFF',
-                                  boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  flexShrink: 0,
-                                  overflow: 'hidden',
-                                }}>
-                                  <img
-                                    src={batchThumb}
-                                    alt=""
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                    onError={(e) => { e.target.style.display = 'none'; }}
-                                  />
-                                </div>
-                                <h5 style={{
-                                  fontSize: '16px',
-                                  fontWeight: '800',
-                                  margin: 0,
-                                  color: '#FFFFFF',
-                                  textShadow: '0 2px 6px rgba(0,0,0,0.7)',
-                                  letterSpacing: '-0.2px',
-                                  lineHeight: 1.2,
-                                }}>
-                                  Batch: {batch.name}
-                                </h5>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Lower Body with Pastel Glass Styling */}
-                        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-                          {/* Instructor & Cohort Tag */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12.5px', color: '#475569' }}>
-                              <span style={{ fontWeight: 600 }}>Instructor:</span>
-                              <strong style={{ color: '#0F172A', fontWeight: 750 }}>{batch.trainer_name || 'Staff Instructor'}</strong>
-                            </div>
-                            <span style={{
-                              fontSize: '11px',
-                              fontWeight: 750,
-                              background: theme.tagBg,
-                              color: theme.tagColor,
-                              padding: '2px 8px',
-                              borderRadius: 6,
-                            }}>
-                              {batch.code || batch.batchId || 'BAT'}
-                            </span>
-                          </div>
-
-                          {/* Calculated Metrics Sub-box (Frosted Glass Widget) */}
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: 10,
-                            background: 'rgba(255, 255, 255, 0.75)',
-                            backdropFilter: 'blur(10px)',
-                            WebkitBackdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(255, 255, 255, 0.9)',
-                            padding: '10px 14px',
-                            borderRadius: 14,
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                          }}>
-                            <div>
-                              <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Videos</div>
-                              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginTop: 1 }}>
-                                {batchRecordings.length} Lessons
-                              </div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Duration</div>
-                              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginTop: 1 }}>
-                                {formatSecondsToDisplay(batchDurationSec)}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Bottom Actions */}
-                          <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 4 }}>
-                            <button
-                              type="button"
-                              className="btn"
-                              onClick={() => {
-                                setSelectedBatchId(`batch:${bId}`);
-                                if (batch.course_name) setRecCourseTitle(batch.course_name);
-                                setShowRecordedClassModal(true);
-                              }}
-                              style={{
-                                flex: 1,
-                                padding: '9px 12px',
-                                fontSize: '12px',
-                                borderRadius: 999,
-                                fontWeight: 750,
-                                background: 'rgba(255, 255, 255, 0.85)',
-                                border: '1px solid rgba(203, 213, 225, 0.8)',
-                                color: '#1E293B',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 5,
-                                transition: 'all 0.18s ease',
-                              }}
-                            >
-                              <Plus size={13} /> Add Video
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-primary"
-                              onClick={() => setSelectedPlaylistBatch({ ...batch, isCustom: false })}
-                              style={{
-                                flex: 1.3,
-                                padding: '9px 14px',
-                                fontSize: '12px',
-                                borderRadius: 999,
-                                fontWeight: 750,
-                                background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
-                                color: '#FFFFFF',
-                                border: 'none',
-                                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 6,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              <span>Open Playlist</span>
-                              <ArrowRight size={13} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* SECTION B: CUSTOM / MANUALLY CREATED PLAYLISTS */}
+                  {/* CURATED & CUSTOM PLAYLISTS */}
+                  
                   {customPlaylists.map((playlist, idx) => {
                     const plId = String(playlist.id || playlist.uid);
                     const plRecordings = recordedClasses.filter(r => String(r.playlist_id) === plId || String(r.batch_id) === plId);
                     const plDurationSec = plRecordings.reduce((acc, r) => acc + parseDurationToSeconds(r.duration), 0);
                     const isAll = playlist.access_type === 'all' || !playlist.batch_id;
                     const customThumb = playlist.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=700&auto=format&fit=crop&q=80';
-                    const theme = PLAYLIST_CARD_THEMES[(batches.length + idx) % PLAYLIST_CARD_THEMES.length];
+                    const theme = PLAYLIST_CARD_THEMES[idx % PLAYLIST_CARD_THEMES.length];
 
                     return (
                       <div
@@ -7097,6 +6816,63 @@ const AdminDashboard = () => {
                       </div>
                     );
                   })}
+
+                  {customPlaylists.length === 0 && (
+                    <div style={{
+                      gridColumn: '1 / -1',
+                      padding: '60px 24px',
+                      textAlign: 'center',
+                      background: 'rgba(255, 255, 255, 0.85)',
+                      borderRadius: 24,
+                      border: '1.5px dashed rgba(203, 213, 225, 0.9)',
+                      backdropFilter: 'blur(12px)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <div style={{
+                        width: 68,
+                        height: 68,
+                        borderRadius: '50%',
+                        background: 'rgba(99, 102, 241, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 16,
+                        color: '#4F46E5',
+                      }}>
+                        <PlayCircle size={36} />
+                      </div>
+                      <h4 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 6px', color: '#0F172A' }}>No Playlists Created Yet</h4>
+                      <p style={{ fontSize: 13, color: '#64748B', maxWidth: 440, margin: '0 0 20px', lineHeight: 1.5 }}>
+                        Create dedicated playlists for open access (all students) or restrict them to specific batch cohorts. Lessons are organized cleanly within playlists.
+                      </p>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          setEditingPlaylist(null);
+                          setPlaylistFormName('');
+                          setPlaylistFormCourse('');
+                          setPlaylistFormDescription('');
+                          setPlaylistFormThumbnail('');
+                          setPlaylistThumbnailType('url');
+                          setPlaylistFormAccess('all');
+                          setPlaylistFormBatchId('');
+                          setShowPlaylistModal(true);
+                        }}
+                        style={{
+                          borderRadius: 999,
+                          padding: '10px 24px',
+                          fontWeight: 750,
+                          fontSize: '13px',
+                        }}
+                      >
+                        <Plus size={15} /> Create First Playlist
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -7136,84 +6912,49 @@ const AdminDashboard = () => {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    {selectedPlaylistBatch.isCustom ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingPlaylist(selectedPlaylistBatch);
-                            setPlaylistFormName(selectedPlaylistBatch.name || '');
-                            setPlaylistFormCourse(selectedPlaylistBatch.course_name || '');
-                            setPlaylistFormDescription(selectedPlaylistBatch.description || '');
-                            setPlaylistFormThumbnail(selectedPlaylistBatch.thumbnail || '');
-                            setPlaylistThumbnailType(selectedPlaylistBatch.thumbnail ? 'url' : 'url');
-                            setPlaylistFormAccess(selectedPlaylistBatch.access_type || 'all');
-                            setPlaylistFormBatchId(selectedPlaylistBatch.batch_id || '');
-                            setShowPlaylistModal(true);
-                          }}
-                          className="btn btn-outline"
-                          style={{ borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: '13px' }}
-                        >
-                          <Pencil size={14} /> Edit Playlist
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePlaylist(selectedPlaylistBatch.id || selectedPlaylistBatch.uid)}
-                          style={{
-                            background: '#FEE2E2',
-                            color: '#DC2626',
-                            border: '1px solid #FECACA',
-                            borderRadius: 999,
-                            padding: '8px 16px',
-                            fontWeight: 700,
-                            fontSize: '13px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                          }}
-                        >
-                          <Trash2 size={14} /> Delete Playlist
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => startEditBatch(selectedPlaylistBatch)}
-                          className="btn btn-outline"
-                          style={{ borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: '13px' }}
-                        >
-                          <Pencil size={14} /> Edit Batch
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteBatch(selectedPlaylistBatch.id || selectedPlaylistBatch.uid)}
-                          style={{
-                            background: '#FEE2E2',
-                            color: '#DC2626',
-                            border: '1px solid #FECACA',
-                            borderRadius: 999,
-                            padding: '8px 16px',
-                            fontWeight: 700,
-                            fontSize: '13px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                          }}
-                        >
-                          <Trash2 size={14} /> Delete Batch
-                        </button>
-                      </>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingPlaylist(selectedPlaylistBatch);
+                        setPlaylistFormName(selectedPlaylistBatch.name || '');
+                        setPlaylistFormCourse(selectedPlaylistBatch.course_name || '');
+                        setPlaylistFormDescription(selectedPlaylistBatch.description || '');
+                        setPlaylistFormThumbnail(selectedPlaylistBatch.thumbnail || '');
+                        setPlaylistThumbnailType(selectedPlaylistBatch.thumbnail ? 'url' : 'url');
+                        setPlaylistFormAccess(selectedPlaylistBatch.access_type || 'all');
+                        setPlaylistFormBatchId(selectedPlaylistBatch.batch_id || '');
+                        setShowPlaylistModal(true);
+                      }}
+                      className="btn btn-outline"
+                      style={{ borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: '13px' }}
+                    >
+                      <Pencil size={14} /> Edit Playlist
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePlaylist(selectedPlaylistBatch.id || selectedPlaylistBatch.uid)}
+                      style={{
+                        background: '#FEE2E2',
+                        color: '#DC2626',
+                        border: '1px solid #FECACA',
+                        borderRadius: 999,
+                        padding: '8px 16px',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <Trash2 size={14} /> Delete Playlist
+                    </button>
 
                     <button
                       type="button"
                       className="btn btn-primary"
                       onClick={() => {
-                        const targetVal = selectedPlaylistBatch.isCustom ? `playlist:${selectedPlaylistBatch.id}` : `batch:${selectedPlaylistBatch.id}`;
-                        setSelectedBatchId(targetVal);
+                        setSelectedBatchId(`playlist:${selectedPlaylistBatch.id}`);
                         if (selectedPlaylistBatch.course_name) setRecCourseTitle(selectedPlaylistBatch.course_name);
                         setShowRecordedClassModal(true);
                       }}
@@ -10533,32 +10274,20 @@ const AdminDashboard = () => {
                       onChange={(e) => {
                         const val = e.target.value;
                         setSelectedBatchId(val);
-                        if (val.startsWith('playlist:')) {
-                          const plId = val.replace('playlist:', '');
-                          const plObj = customPlaylists.find(p => p.id === plId || p.uid === plId);
-                          if (plObj && plObj.course_name) setRecCourseTitle(plObj.course_name);
-                        } else {
-                          const rawBId = val.replace('batch:', '');
-                          const foundB = batches.find(b => b.id === rawBId || b.uid === rawBId);
-                          if (foundB && foundB.course_name) {
-                            setRecCourseTitle(foundB.course_name);
-                          }
-                        }
+                        const plId = val.replace('playlist:', '');
+                        const plObj = customPlaylists.find(p => p.id === plId || p.uid === plId);
+                        if (plObj && plObj.course_name) setRecCourseTitle(plObj.course_name);
                       }} 
                       required
                     >
                       <option value="">-- Choose Target Playlist --</option>
-                      <optgroup label="Automatic Batch Playlists">
-                        {batches.map(b => (
-                          <option key={b.id} value={`batch:${b.id}`}>Batch: {b.name} ({b.course_name || b.code})</option>
-                        ))}
-                      </optgroup>
-                      {customPlaylists.length > 0 && (
-                        <optgroup label="Custom / Manual Playlists">
-                          {customPlaylists.map(p => (
-                            <option key={p.id} value={`playlist:${p.id}`}>Playlist: {p.name} ({p.course_name || 'General'})</option>
-                          ))}
-                        </optgroup>
+                      {customPlaylists.map(p => (
+                        <option key={p.id} value={`playlist:${p.id}`}>
+                          {p.name} ({p.access_type === 'batch' ? `Batch: ${p.batch_name || p.batch_code || 'Cohort'}` : 'All Students'})
+                        </option>
+                      ))}
+                      {customPlaylists.length === 0 && (
+                        <option value="" disabled>No playlists available — click "+ New Playlist" above</option>
                       )}
                     </select>
                   </div>
