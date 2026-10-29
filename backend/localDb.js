@@ -88,7 +88,25 @@ function getDocuments(name, filterFn) {
 
 function getDocument(name, id) {
   const items = loadCollection(name);
-  return items.find((item) => String(item.id) === String(id) || String(item.uid) === String(id)) || null;
+  if (!id) return null;
+  const cleanId = String(id).trim();
+
+  // 1. Exact match by id, uid, or _id
+  let found = items.find((item) => String(item.id) === cleanId || String(item.uid) === cleanId || String(item._id) === cleanId);
+  if (found) return found;
+
+  // 2. Case-insensitive or prefix/suffix match (handles trailing typo or appended chars)
+  found = items.find((item) => {
+    const itemId = String(item.id || item.uid || item._id || '').trim();
+    if (!itemId) return false;
+    if (itemId.toLowerCase() === cleanId.toLowerCase()) return true;
+    if (itemId.length >= 6 && cleanId.length >= 6) {
+      if (cleanId.startsWith(itemId) || itemId.startsWith(cleanId)) return true;
+    }
+    return false;
+  });
+
+  return found || null;
 }
 
 function addDocument(name, data) {
@@ -110,18 +128,26 @@ function addDocument(name, data) {
 function setDocument(name, id, data, merge = true) {
   const items = loadCollection(name);
   const now = new Date().toISOString();
-  const index = items.findIndex((item) => String(item.id) === String(id) || String(item.uid) === String(id));
+  const cleanId = String(id || '').trim();
+  let index = items.findIndex((item) => String(item.id) === cleanId || String(item.uid) === cleanId || String(item._id) === cleanId);
+  if (index === -1 && cleanId.length >= 6) {
+    index = items.findIndex((item) => {
+      const itemId = String(item.id || item.uid || item._id || '').trim();
+      return itemId.length >= 6 && (cleanId.startsWith(itemId) || itemId.startsWith(cleanId));
+    });
+  }
 
   let finalDoc;
   if (index !== -1) {
+    const existingId = items[index].id || items[index].uid || cleanId;
     if (merge) {
-      finalDoc = { ...items[index], ...data, id, uid: id, updatedAt: now };
+      finalDoc = { ...items[index], ...data, id: existingId, uid: existingId, updatedAt: now };
     } else {
-      finalDoc = { ...data, id, uid: id, updatedAt: now };
+      finalDoc = { ...data, id: existingId, uid: existingId, updatedAt: now };
     }
     items[index] = finalDoc;
   } else {
-    finalDoc = { ...data, id, uid: id, createdAt: data.createdAt || now, updatedAt: now };
+    finalDoc = { ...data, id: cleanId, uid: cleanId, createdAt: data.createdAt || now, updatedAt: now };
     items.push(finalDoc);
   }
   saveCollection(name);
