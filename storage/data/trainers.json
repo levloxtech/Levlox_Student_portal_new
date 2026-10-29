@@ -1,22 +1,106 @@
 [
   {
-    "id": "trainer_sarah_001",
-    "uid": "trainer_sarah_001",
-    "name": "Dr. Sarah Jenkins",
-    "fullName": "Dr. Sarah Jenkins",
-    "email": "trainer@levlox.com",
-    "phone": "9876543210",
+    "id": "trainer_sudhan_001",
+    "uid": "trainer_sudhan_001",
+    "name": "sudhan",
+    "email": "rhariharasudhan0@gmail.com",
+    "phone": "9585838139",
+    "mobile": "9585838139",
+    "specialization": "Data Science & AI",
+    "course": "Data Science & AI",
+    "status": "Active",
+    "trainerId": "TRN001013",
+    "trainer_id": "TRN001013",
+    "code": "TRN001013",
     "role": "trainer",
-    "status": "active",
     "mustChangePassword": false,
-    "assigned_batch_ids": ["doc_1792663077641_40688aea"],
-    "assignedBatchIds": ["doc_1792663077641_40688aea"],
-    "assigned_course_ids": ["Fullstack Engineering"],
-    "profilePic": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80",
-    "profile_pic": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80",
-    "specialization": "Lead Machine Learning & AI Architect",
-    "bio": "Senior AI Trainer & Curriculum Specialist at Levlox.",
-    "createdAt": "2026-10-20T08:00:00.000Z",
-    "updatedAt": "2026-10-25T04:00:00.000Z"
+    "profilePic": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
+    "profile_pic": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
+    "assigned_batch_ids": [
+      "batch_ds_ai_01"
+    ],
+    "assigned_batches": [
+      "batch_ds_ai_01"
+    ],
+    "createdAt": "2026-10-29T05:07:25.042Z",
+    "updatedAt": "2026-10-29T05:07:25.042Z"
+  },
+  {
+    "id": "trainer_aakash_002",
+    "uid": "trainer_aakash_002",
+    "name": "Aakash Kumar",
+    "email": "aakash.trainer@levlox.com",
+    "phone": "9876543210",
+    "mobile": "9876543210",
+    "specialization": "Fullstack Web Development",
+    "course": "Fullstack Web Development",
+    "status": "Active",
+    "trainerId": "TRN001014",
+    "trainer_id": "TRN001014",
+    "code": "TRN001014",
+    "role": "trainer",
+    "mustChangePassword": false,
+    "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80",
+    "profile_pic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80",
+    "assigned_batch_ids": [
+      "batch_fsd_02"
+    ],
+    "assigned_batches": [
+      "batch_fsd_02"
+    ],
+    "createdAt": "2026-10-29T05:07:25.042Z",
+    "updatedAt": "2026-10-29T05:07:25.042Z"
+  },
+  {
+    "id": "trainer_sarah_003",
+    "uid": "trainer_sarah_003",
+    "name": "Dr. Sarah Jenkins",
+    "email": "sarah.jenkins@levlox.com",
+    "phone": "9876543211",
+    "mobile": "9876543211",
+    "specialization": "Cloud & DevOps Engineering",
+    "course": "Cloud & DevOps Engineering",
+    "status": "Active",
+    "trainerId": "TRN001015",
+    "trainer_id": "TRN001015",
+    "code": "TRN001015",
+    "role": "trainer",
+    "mustChangePassword": false,
+    "profilePic": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80",
+    "profile_pic": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80",
+    "assigned_batch_ids": [
+      "batch_cloud_03"
+    ],
+    "assigned_batches": [
+      "batch_cloud_03"
+    ],
+    "createdAt": "2026-10-29T05:07:25.042Z",
+    "updatedAt": "2026-10-29T05:07:25.042Z"
+  },
+  {
+    "id": "trainer_rajesh_004",
+    "uid": "trainer_rajesh_004",
+    "name": "Rajesh Sharma",
+    "email": "rajesh.sharma@levlox.com",
+    "phone": "9876543212",
+    "mobile": "9876543212",
+    "specialization": "Cyber Security & Ethical Hacking",
+    "course": "Cyber Security & Ethical Hacking",
+    "status": "Active",
+    "trainerId": "TRN001016",
+    "trainer_id": "TRN001016",
+    "code": "TRN001016",
+    "role": "trainer",
+    "mustChangePassword": false,
+    "profilePic": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80",
+    "profile_pic": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80",
+    "assigned_batch_ids": [
+      "batch_cyber_04"
+    ],
+    "assigned_batches": [
+      "batch_cyber_04"
+    ],
+    "createdAt": "2026-10-29T05:07:25.042Z",
+    "updatedAt": "2026-10-29T05:07:25.042Z"
   }
 ]

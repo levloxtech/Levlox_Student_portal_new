@@ -250,7 +250,7 @@ app.get('/health', (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 
 app.post('/api/auth/login', (req, res) => {
-  const { identifier, email, password } = req.body;
+  const { identifier, email, password } = req.body || {};
   const loginId = (identifier || email || '').trim().toLowerCase();
 
   if (!loginId || !password) {
@@ -2175,7 +2175,7 @@ async function startServer() {
     }
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, () => {
     console.info(`\n🚀 Levlox Backend Server running on port ${PORT}`);
     console.info(`   Health: http://localhost:${PORT}/health`);
     console.info(`   Database: 100% Local Database (storage/data/*.json)`);
