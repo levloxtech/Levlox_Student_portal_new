@@ -2163,11 +2163,11 @@ app.post('/api/messages/upload', (req, res) => {
 const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health')) {
-      return next();
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/uploads') && !req.path.startsWith('/health')) {
+      return res.sendFile(path.join(frontendDistPath, 'index.html'));
     }
-    res.sendFile(path.join(frontendDistPath, 'index.html'));
+    next();
   });
 }
 
