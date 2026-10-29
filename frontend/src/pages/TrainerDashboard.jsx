@@ -569,9 +569,19 @@ const TrainerDashboard = () => {
     });
   }, [students, studentSearchQuery, studentBatchFilter, studentCourseFilter, studentStatusFilter]);
 
-  const openStudentDetails = (student) => {
+  const openStudentDetails = async (student) => {
     setSelectedStudentDetails(student);
     setShowStudentPassword(false);
+    try {
+      const studentId = student.id || student.uid;
+      if (studentId) {
+        const res = await fetch(`/api/data/students/${studentId}`);
+        if (res.ok) {
+          const freshData = await res.json();
+          setSelectedStudentDetails(prev => ({ ...prev, ...freshData }));
+        }
+      }
+    } catch (_) {}
   };
 
   const openEditStudentModal = (student) => {
@@ -3363,7 +3373,7 @@ const TrainerDashboard = () => {
 
         {/* ─── TAB 10: BATCH CHAT ───────────────────────────────────────────── */}
         {activeTab === 'chat' && (
-          <div className="animate-fade-in">
+          <div className="animate-fade-in" style={{ height: 'calc(100vh - 120px)', maxHeight: 'calc(100vh - 120px)', overflow: 'hidden' }}>
             <BatchChatPage user={currentUser} userProfile={userProfile} batches={batches} />
           </div>
         )}

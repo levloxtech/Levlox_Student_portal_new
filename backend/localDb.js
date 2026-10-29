@@ -250,6 +250,17 @@ function verifySession(token) {
   const session = sessions.find((s) => s.token === token);
   if (!session) return null;
   if (Date.now() > session.expiresAt) {
+    revokeSession(token);
+    return null;
+  }
+  // Verify user still exists in users collection
+  const users = loadCollection('users');
+  const user = users.find((u) =>
+    (session.userId && (String(u.id) === String(session.userId) || String(u.uid) === String(session.userId))) ||
+    (session.email && (u.email || '').toLowerCase() === (session.email || '').toLowerCase())
+  );
+  if (!user) {
+    revokeSession(token);
     return null;
   }
   return session;
@@ -258,6 +269,19 @@ function verifySession(token) {
 function revokeSession(token) {
   const sessions = loadCollection('sessions');
   const filtered = sessions.filter((s) => s.token !== token);
+  cache['sessions'] = filtered;
+  saveCollection('sessions');
+}
+
+function revokeUserSessions(userId, email) {
+  const sessions = loadCollection('sessions');
+  const targetId = userId ? String(userId).trim() : null;
+  const targetEmail = email ? String(email).trim().toLowerCase() : null;
+  const filtered = sessions.filter((s) => {
+    if (targetId && (String(s.userId) === targetId || String(s.uid) === targetId)) return false;
+    if (targetEmail && (s.email || '').toLowerCase().trim() === targetEmail) return false;
+    return true;
+  });
   cache['sessions'] = filtered;
   saveCollection('sessions');
 }
@@ -279,6 +303,7 @@ module.exports = {
   createSession,
   verifySession,
   revokeSession,
+  revokeUserSessions,
   DEFAULT_ADMIN_EMAIL,
   DEFAULT_ADMIN_PASSWORD,
 };

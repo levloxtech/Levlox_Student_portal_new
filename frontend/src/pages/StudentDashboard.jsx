@@ -3190,7 +3190,9 @@ const StudentDashboard = () => {
         }>
           {/* BATCH CHAT TAB */}
           {activeTab === 'batch-chat-tab' && (
-            <BatchChatPage user={user} userProfile={userProfile} />
+            <div className="animate-fade-in" style={{ height: 'calc(100vh - 120px)', maxHeight: 'calc(100vh - 120px)', overflow: 'hidden' }}>
+              <BatchChatPage user={user} userProfile={userProfile} />
+            </div>
           )}
 
           {/* RECORDED CLASSES TAB */}

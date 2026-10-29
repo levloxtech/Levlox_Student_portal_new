@@ -83,6 +83,34 @@ export const AuthProvider = ({ children }) => {
       });
   }, []);
 
+  // Real-time Heartbeat: kicks out deleted users or revoked sessions immediately
+  useEffect(() => {
+    if (!currentUser) return;
+    const interval = setInterval(async () => {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.status === 401 || res.status === 403 || res.status === 404) {
+          console.warn('[AuthContext] Session revoked or user deleted by admin. Terminating session.');
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          localStorage.removeItem(PROFILE_KEY);
+          setCurrentUser(null);
+          setUserProfile(null);
+          setUserRole(null);
+          window.location.href = '/login?reason=session_revoked';
+        }
+      } catch (err) {
+        // Transient network error, ignore
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   const loginWithCredentials = useCallback(async (identifier, password) => {
     setAuthLoading(true);
     setAuthError(null);

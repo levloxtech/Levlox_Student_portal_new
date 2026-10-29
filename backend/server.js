@@ -210,8 +210,13 @@ async function requireAuth(req, res, next) {
 
       return next();
     } catch (err) {
-      return res.status(401).json({ error: 'Invalid or expired authentication token.' });
+      return res.status(401).json({ error: 'Invalid or expired authentication token.', revoked: true });
     }
+  }
+
+  // If a token was provided but failed both local session & Firebase verification
+  if (idToken) {
+    return res.status(401).json({ error: 'Session expired or user account deleted.', revoked: true });
   }
 
   // 3. In self-hosted mode without Firebase Admin, allow requests from authenticated dashboard
@@ -1431,12 +1436,12 @@ app.delete('/api/data/:collection/:id', (req, res) => {
   try {
     const { collection, id } = req.params;
     let targetEmail = null;
-    if (collection === 'students' || collection === 'trainers') {
+    if (collection === 'students' || collection === 'trainers' || collection === 'users') {
       const doc = localDb.getDocument(collection, id);
       if (doc?.email) targetEmail = String(doc.email).trim().toLowerCase();
     }
     const ok = localDb.deleteDocument(collection, id);
-    if (collection === 'students' || collection === 'trainers') {
+    if (collection === 'students' || collection === 'trainers' || collection === 'users') {
       localDb.deleteDocument('users', id);
       if (targetEmail) {
         const users = localDb.loadCollection('users');
@@ -1446,6 +1451,8 @@ app.delete('/api/data/:collection/:id', (req, res) => {
           fs.writeFileSync(userFilePath, JSON.stringify(filtered, null, 2), 'utf8');
         }
       }
+      // Revoke all active sessions for this user immediately
+      localDb.revokeUserSessions(id, targetEmail);
     }
 
     // If a batch is deleted, automatically delete all batch discussion messages

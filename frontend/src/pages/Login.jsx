@@ -86,7 +86,7 @@ const Login = () => {
     const params = new URLSearchParams(window.location.search);
     const reason = params.get('reason');
     const reasonMessages = {
-      session_revoked: ['Session Revoked', 'You have been logged out because this session was revoked.', 'warning'],
+      session_revoked: ['Session Revoked', 'Your user account has been removed or your session was terminated by the administrator.', 'warning'],
       session_expired: ['Session Expired', 'Your session has expired. Please sign in again.', 'info'],
       no_profile: ['Profile Not Found', 'Your sign-in succeeded but no portal profile is linked to this account. Please contact your Levlox administrator.', 'warning'],
     };
