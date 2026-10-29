@@ -48,3 +48,5 @@ database-debug.log
 
 # Backups
 storage/backups/
+storage/data/
+storage/uploads/
