@@ -830,73 +830,31 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
                       )}
                     </div>
 
-                    {/* Bottom Action Row: Direct Like / Emoji Buttons & Delete */}
-                    {!msg.isDeleted && (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        marginTop: 4,
-                        padding: '0 2px'
-                      }}>
-                        {/* 4 Quick Emoji Reactions / Likes */}
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          {['👍', '❤️', '🔥', '👏'].map(emoji => {
-                            const uids = msg.reactions?.[emoji] || [];
-                            const count = uids.length;
-                            const hasReacted = uids.includes(String(currentUserId));
-                            return (
-                              <button
-                                key={emoji}
-                                type="button"
-                                onClick={() => handleToggleReaction(msg.id, emoji)}
-                                style={{
-                                  background: hasReacted ? '#DCF8C6' : '#FFFFFF',
-                                  border: hasReacted ? '1px solid #00A884' : '1px solid #D1D7DB',
-                                  borderRadius: 14,
-                                  padding: '2px 7px',
-                                  fontSize: 12,
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 3,
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                title={`React with ${emoji}`}
-                              >
-                                <span>{emoji}</span>
-                                {count > 0 && (
-                                  <strong style={{ fontSize: 10, color: hasReacted ? '#075E54' : '#54656F' }}>
-                                    {count}
-                                  </strong>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* WhatsApp Delete for Everyone Button */}
-                        {canDelete && (
-                          <button
-                            type="button"
-                            onClick={() => setDeleteCandidate(msg)}
-                            title={isAdminOrTrainer ? 'Delete for everyone (Moderator)' : 'Delete for everyone (Within 2 hours)'}
-                            style={{
-                              background: '#FFFFFF',
-                              border: '1px solid #D1D7DB',
-                              color: '#EF4444',
-                              borderRadius: 14,
-                              padding: '3px 7px',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                            }}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        )}
+                    {/* Delete for Everyone Action */}
+                    {!msg.isDeleted && canDelete && (
+                      <div style={{ marginTop: 3 }}>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteCandidate(msg)}
+                          title={isAdminOrTrainer ? 'Delete for everyone (Moderator)' : 'Delete for everyone (Within 2 hours)'}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#94A3B8',
+                            borderRadius: 6,
+                            padding: '2px 4px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 3,
+                            fontSize: 11
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#EF4444'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
+                        >
+                          <Trash2 size={12} />
+                          <span>Delete</span>
+                        </button>
                       </div>
                     )}
                   </div>
