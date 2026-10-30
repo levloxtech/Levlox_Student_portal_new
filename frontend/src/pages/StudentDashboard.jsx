@@ -282,24 +282,12 @@ const StudentDashboard = () => {
   const [replayTarget, setReplayTarget] = useState(null);
   const [liveClassSubTab, setLiveClassSubTab] = useState('upcoming'); // 'upcoming' | 'completed'
   const [dashboardActiveVideo, setDashboardActiveVideo] = useState(null);
-  const [recentlyViewedVideos, setRecentlyViewedVideos] = useState(() => getRecentlyViewedVideos(uid));
   const [isMobileScreen, setIsMobileScreen] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.innerWidth < 1024 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   });
   const [bypassDesktopGate, setBypassDesktopGate] = useState(false);
 
-  useEffect(() => {
-    const handleSyncRecent = () => {
-      setRecentlyViewedVideos(getRecentlyViewedVideos(uid));
-    };
-    window.addEventListener('levlox_video_viewed', handleSyncRecent);
-    window.addEventListener('storage', handleSyncRecent);
-    return () => {
-      window.removeEventListener('levlox_video_viewed', handleSyncRecent);
-      window.removeEventListener('storage', handleSyncRecent);
-    };
-  }, [uid]);
 
   useEffect(() => {
     const checkScreen = () => {
@@ -1565,277 +1553,109 @@ const StudentDashboard = () => {
               </div>
             )}
 
-            {/* RECENTLY VIEWED VIDEOS & FEE STATUS HIGHLIGHT ROW */}
-            {(() => {
-              const allRecordings = recordedClasses || dashboardData?.recordedClasses || [];
-              const relevantRecordings = allRecordings.filter(r => {
-                if (!r) return false;
-                if (r.visibility === 'everyone') return true;
-                const rbId = String(r.batch_id || r.batchId || '').trim().toLowerCase();
-                if (studentBatchId && rbId === String(studentBatchId).trim().toLowerCase()) return true;
-                if (studentBatchName && r.batch_name && String(r.batch_name).trim().toLowerCase() === studentBatchName.toLowerCase()) return true;
-                return !rbId || rbId === 'all';
-              });
-
-              const primaryRecent = (recentlyViewedVideos && recentlyViewedVideos.length > 0)
-                ? recentlyViewedVideos[0]
-                : (relevantRecordings.length > 0
-                    ? {
-                        id: relevantRecordings[0].id || relevantRecordings[0].uid,
-                        title: relevantRecordings[0].title,
-                        courseTitle: relevantRecordings[0].course_title || relevantRecordings[0].course_name || studentCourseName,
-                        category: relevantRecordings[0].module || 'Core Lecture',
-                        thumbnail: relevantRecordings[0].thumbnail || getResolvedThumbnail(relevantRecordings[0].video_url),
-                        duration: relevantRecordings[0].duration || '1h 30m',
-                        percentage: 0,
-                        video_url: relevantRecordings[0].video_url,
-                      }
-                    : null
-                  );
-
-              return (
-                <div style={{ display: 'grid', gridTemplateColumns: '1.45fr 1fr', gap: 20, marginBottom: 22 }}>
-                  {/* Recently Viewed Videos Widget */}
-                  <div className="srms-card" style={{ padding: '18px 20px' }}>
-                    <div className="srms-card-header" style={{ marginBottom: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <PlayCircle size={18} color="#4568F5" />
-                        <h3 className="srms-card-title">Recently Viewed Videos</h3>
-                      </div>
-                      <button className="srms-card-link" onClick={() => setActiveTab('recorded-classes-tab')}>
-                        Browse All Courses <ArrowRight size={13} />
-                      </button>
+            {/* ACADEMIC COHORT & DYNAMIC FEE STATUS HIGHLIGHT ROW */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 20, marginBottom: 22 }}>
+              {/* Academic Cohort & Track Overview */}
+              <div className="srms-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div className="srms-card-header" style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <GraduationCap size={18} color="#4F46E5" />
+                      <h3 className="srms-card-title">Enrolled Academic Program</h3>
                     </div>
-
-                    {primaryRecent ? (
-                      <div style={{
-                        display: 'flex',
+                    <span className="srms-badge" style={{ background: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', fontWeight: 700 }}>
+                      Active Cohort
+                    </span>
+                  </div>
+                  
+                  <div style={{ background: '#F8FAFD', padding: '14px 16px', borderRadius: 14, border: '1px solid #EEF2F8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                    <div>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Course / Specialization</span>
+                      <h4 style={{ margin: '2px 0 4px', fontSize: 16, fontWeight: 800, color: '#0F172A' }}>{studentCourseName}</h4>
+                      <p style={{ margin: 0, fontSize: 12, color: '#475569' }}>
+                        Batch: <strong style={{ color: '#4F46E5' }}>{studentDoc?.batch || studentDoc?.batch_name || user?.batch_name || userProfile?.batch_name || 'Assigned Cohort'}</strong>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('recorded-classes-tab')}
+                      style={{
+                        background: '#4F46E5',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: 10,
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
                         alignItems: 'center',
-                        gap: 16,
-                        background: '#F8FAFD',
-                        padding: '12px 14px',
-                        borderRadius: 14,
-                        border: '1px solid #EEF2F8',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                      }}>
-                        {/* Video Thumbnail with Play Button Overlay */}
-                        <div
-                          onClick={() => setDashboardActiveVideo(primaryRecent)}
-                          style={{
-                            width: 110,
-                            height: 68,
-                            borderRadius: 10,
-                            overflow: 'hidden',
-                            position: 'relative',
-                            background: '#0F172A',
-                            cursor: 'pointer',
-                            flexShrink: 0,
-                            boxShadow: '0 3px 10px rgba(0,0,0,0.1)'
-                          }}
-                          title="Click to resume video"
-                        >
-                          <img 
-                            src={primaryRecent.thumbnail || 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=600&auto=format&fit=crop&q=80'} 
-                            alt={primaryRecent.title}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.88 }} 
-                          />
-                          <div style={{
-                            position: 'absolute',
-                            inset: 0,
-                            background: 'rgba(0,0,0,0.3)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            <div style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: '50%',
-                              background: '#4568F5',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: '0 2px 8px rgba(69, 104, 245, 0.6)'
-                            }}>
-                              <Play size={13} fill="#FFFFFF" color="#FFFFFF" style={{ marginLeft: 2 }} />
-                            </div>
-                          </div>
-                          <span style={{
-                            position: 'absolute',
-                            bottom: 4,
-                            right: 4,
-                            background: 'rgba(0,0,0,0.75)',
-                            color: '#FFFFFF',
-                            fontSize: 9.5,
-                            fontWeight: 700,
-                            padding: '1px 5px',
-                            borderRadius: 4
-                          }}>
-                            {primaryRecent.duration || '45m'}
-                          </span>
-                        </div>
+                        gap: 6,
+                        boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <PlayCircle size={14} /> Open Classes
+                    </button>
+                  </div>
+                </div>
 
-                        {/* Video Details */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                            <span style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              textTransform: 'uppercase',
-                              padding: '1px 6px',
-                              borderRadius: 4,
-                              background: '#EEF2FF',
-                              color: '#4F46E5',
-                              whiteSpace: 'nowrap'
-                            }}>
-                              {primaryRecent.courseTitle || studentCourseName}
-                            </span>
-                            <span style={{ fontSize: 11, color: '#94A3B8' }}>&bull;</span>
-                            <span style={{ fontSize: 11, color: '#64748B', whiteSpace: 'nowrap' }}>
-                              {primaryRecent.percentage ? `${primaryRecent.percentage}% completed` : 'Up next'}
-                            </span>
-                          </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: '#64748B', borderTop: '1px dashed #E2E8F0', paddingTop: 10, marginTop: 12 }}>
+                  <span>Student ID: <strong style={{ color: '#0F172A' }}>{currentStudent.student_id || currentStudent.id || 'Active'}</strong></span>
+                  <span>Joined: <strong style={{ color: '#0F172A' }}>{currentStudent.join_date || 'Enrolled'}</strong></span>
+                </div>
+              </div>
 
-                          <h4 style={{
-                            margin: '0 0 6px',
-                            fontSize: 13.5,
-                            fontWeight: 750,
-                            color: '#172033',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}>
-                            {primaryRecent.title}
-                          </h4>
-
-                          <div style={{ width: '100%', height: 5, background: '#E2E8F0', borderRadius: 999, overflow: 'hidden' }}>
-                            <div style={{
-                              width: `${Math.min(100, Math.max(10, primaryRecent.percentage || 20))}%`,
-                              height: '100%',
-                              background: 'linear-gradient(90deg, #4568F5, #6366F1)',
-                              borderRadius: 999
-                            }} />
-                          </div>
-                        </div>
-
-                        {/* Action Button */}
-                        <button
-                          onClick={() => setDashboardActiveVideo(primaryRecent)}
-                          style={{
-                            background: '#4568F5',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            padding: '8px 15px',
-                            borderRadius: 8,
-                            fontSize: 12,
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            flexShrink: 0,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            boxShadow: '0 2px 8px rgba(69, 104, 245, 0.3)'
-                          }}
-                        >
-                          <Play size={12} fill="#FFFFFF" /> Resume
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: '24px 16px', color: '#64748B', background: '#F8FAFD', borderRadius: 12 }}>
-                        <PlayCircle size={28} color="#94A3B8" style={{ marginBottom: 6 }} />
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>No video lessons posted for your batch yet.</p>
-                      </div>
-                    )}
-
-                    {/* Chips for other recent or available batch videos */}
-                    {((recentlyViewedVideos && recentlyViewedVideos.length > 1) || relevantRecordings.length > 1) && (
-                      <div style={{ display: 'flex', gap: 8, marginTop: 10, overflowX: 'auto', paddingBottom: 2 }}>
-                        {(recentlyViewedVideos && recentlyViewedVideos.length > 1 
-                          ? recentlyViewedVideos.slice(1, 5) 
-                          : relevantRecordings.slice(1, 5).map(r => ({
-                              id: r.id || r.uid,
-                              title: r.title,
-                              percentage: 0,
-                              video_url: r.video_url,
-                              thumbnail: r.thumbnail || getResolvedThumbnail(r.video_url),
-                              courseTitle: r.course_title || studentCourseName
-                            }))
-                        ).map((v, vi) => (
-                          <div
-                            key={v.id || vi}
-                            onClick={() => setDashboardActiveVideo(v)}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              padding: '5px 10px',
-                              background: '#FFFFFF',
-                              border: '1px solid #E2E8F0',
-                              borderRadius: 8,
-                              cursor: 'pointer',
-                              fontSize: 11.5,
-                              color: '#475569',
-                              whiteSpace: 'nowrap',
-                              transition: 'all 0.15s ease'
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#4568F5'; e.currentTarget.style.color = '#4568F5'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.color = '#475569'; }}
-                          >
-                            <PlayCircle size={12} color="#4568F5" />
-                            <span style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.title}</span>
-                            {v.percentage > 0 && <span style={{ fontSize: 10, color: '#94A3B8' }}>({v.percentage}%)</span>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+              {/* Fee & Enrollment Quick Ledger (100% Dynamic from Database) */}
+              <div className="srms-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div className="srms-card-header" style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Shield size={17} color="#10B981" />
+                      <h3 className="srms-card-title">Fees & Enrollment Ledger</h3>
+                    </div>
+                    <span 
+                      className="srms-badge" 
+                      style={{ 
+                        background: isPaid ? '#ECFDF5' : (isPartial ? '#FFFBEB' : '#FEF2F2'), 
+                        color: isPaid ? '#059669' : (isPartial ? '#D97706' : '#DC2626'), 
+                        border: `1px solid ${isPaid ? '#A7F3D0' : (isPartial ? '#FDE68A' : '#FECACA')}` 
+                      }}
+                    >
+                      {dynamicFeesStatus}
+                    </span>
                   </div>
 
-                  {/* Fee & Enrollment Quick Ledger (100% Dynamic from Database) */}
-                  <div className="srms-card" style={{ padding: '18px 20px' }}>
-                    <div className="srms-card-header" style={{ marginBottom: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Shield size={17} color="#10B981" />
-                        <h3 className="srms-card-title">Fees & Enrollment</h3>
-                      </div>
-                      <span 
-                        className="srms-badge" 
-                        style={{ 
-                          background: isPaid ? '#ECFDF5' : (isPartial ? '#FFFBEB' : '#FEF2F2'), 
-                          color: isPaid ? '#059669' : (isPartial ? '#D97706' : '#DC2626'), 
-                          border: `1px solid ${isPaid ? '#A7F3D0' : (isPartial ? '#FDE68A' : '#FECACA')}` 
-                        }}
-                      >
-                        {dynamicFeesStatus}
-                      </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, background: '#F8FAFD', padding: '12px 14px', borderRadius: 12, border: '1px solid #EEF2F8' }}>
+                    <div>
+                      <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Total Fee</span>
+                      <p style={{ margin: '2px 0 0', fontSize: 16, fontWeight: 800, color: '#172033' }}>
+                        ₹{dynamicFeesTotal.toLocaleString('en-IN')}
+                      </p>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, background: '#F8FAFD', padding: '12px 14px', borderRadius: 12, border: '1px solid #EEF2F8' }}>
-                      <div>
-                        <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Total Fee</span>
-                        <p style={{ margin: '2px 0 0', fontSize: 16, fontWeight: 800, color: '#172033' }}>
-                          ₹{dynamicFeesTotal.toLocaleString('en-IN')}
-                        </p>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Paid</span>
-                        <p style={{ margin: '2px 0 0', fontSize: 16, fontWeight: 800, color: '#10B981' }}>
-                          ₹{dynamicFeesPaid.toLocaleString('en-IN')}
-                        </p>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Due Balance</span>
-                        <p style={{ margin: '2px 0 0', fontSize: 15, fontWeight: 800, color: dynamicFeesRemaining > 0 ? '#DC2626' : '#10B981' }}>
-                          {dynamicFeesRemaining > 0 ? `₹${dynamicFeesRemaining.toLocaleString('en-IN')}` : 'Nil (Clear)'}
-                        </p>
-                      </div>
+                    <div>
+                      <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Paid</span>
+                      <p style={{ margin: '2px 0 0', fontSize: 16, fontWeight: 800, color: '#10B981' }}>
+                        ₹{dynamicFeesPaid.toLocaleString('en-IN')}
+                      </p>
                     </div>
-                    <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: '#64748B', borderTop: '1px dashed #E2E8F0', paddingTop: 8 }}>
-                      <span>Batch: <strong style={{ color: '#1E293B' }}>{studentDoc?.batch || studentDoc?.batch_name || user?.batch_name || userProfile?.batch_name || 'Assigned Cohort'}</strong></span>
-                      <span>Course: <strong style={{ color: '#2563EB' }}>{studentCourseName}</strong></span>
+                    <div>
+                      <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Due Balance</span>
+                      <p style={{ margin: '2px 0 0', fontSize: 15, fontWeight: 800, color: dynamicFeesRemaining > 0 ? '#DC2626' : '#10B981' }}>
+                        {dynamicFeesRemaining > 0 ? `₹${dynamicFeesRemaining.toLocaleString('en-IN')}` : 'Nil (Clear)'}
+                      </p>
                     </div>
                   </div>
                 </div>
-              );
-            })()}
+
+                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: '#64748B', borderTop: '1px dashed #E2E8F0', paddingTop: 10 }}>
+                  <span>Batch: <strong style={{ color: '#1E293B' }}>{studentDoc?.batch || studentDoc?.batch_name || user?.batch_name || userProfile?.batch_name || 'Assigned Cohort'}</strong></span>
+                  <span style={{ color: isPaid ? '#059669' : '#D97706', fontWeight: 700 }}>
+                    {isPaid ? '✓ Clearance Active' : 'Pending Clearance'}
+                  </span>
+                </div>
+              </div>
+            </div>
 
             {/* 2. FIVE COMPACT KPI STAT CARDS IN A SINGLE ROW (AquaAdmin Style) */}
             <SrmsKpiCardsRow

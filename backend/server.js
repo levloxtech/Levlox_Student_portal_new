@@ -2469,7 +2469,9 @@ app.post('/api/messages/batch/:batchId', (req, res) => {
 app.delete('/api/messages/:messageId', (req, res) => {
   try {
     const { messageId } = req.params;
-    const { userId, userRole, hardDelete } = req.query;
+    const effectiveUserId = req.query.userId || req.body?.userId;
+    const effectiveRole = (req.query.userRole || req.body?.userRole || '').toLowerCase();
+    const hardDelete = req.query.hardDelete || req.body?.hardDelete;
 
     const messages = localDb.loadCollection('messages');
     const targetIndex = messages.findIndex(m => String(m.id) === String(messageId));
@@ -2479,20 +2481,19 @@ app.delete('/api/messages/:messageId', (req, res) => {
     }
 
     const msg = messages[targetIndex];
-    const role = (userRole || '').toLowerCase();
-    const isModerator = role === 'admin' || role === 'super_admin' || role === 'trainer';
-    const isOwner = userId && String(msg.senderId) === String(userId);
+    const isModerator = effectiveRole === 'admin' || effectiveRole === 'super_admin' || effectiveRole === 'trainer';
+    const isOwner = effectiveUserId && String(msg.senderId).trim().toLowerCase() === String(effectiveUserId).trim().toLowerCase();
 
     if (!isModerator && !isOwner) {
       return res.status(403).json({ error: 'Forbidden: You can only delete your own messages.' });
     }
 
-    // Students have a strict 2-hour window for deleting messages
+    // Students have a 2-hour window for deleting messages
     if (!isModerator && isOwner) {
       const msgTime = new Date(msg.createdAt).getTime();
       const now = Date.now();
       const twoHoursMs = 2 * 60 * 60 * 1000;
-      if (now - msgTime > twoHoursMs) {
+      if (!isNaN(msgTime) && (now - msgTime > twoHoursMs)) {
         return res.status(400).json({ error: 'Messages can only be deleted for everyone within 2 hours of sending.' });
       }
     }
@@ -2500,10 +2501,10 @@ app.delete('/api/messages/:messageId', (req, res) => {
     if (hardDelete === 'true' && isModerator) {
       messages.splice(targetIndex, 1);
     } else {
-      // WhatsApp style tombstone "This message was deleted"
+      // Tombstone: "This message was deleted"
       msg.isDeleted = true;
       msg.deletedAt = new Date().toISOString();
-      msg.deletedBy = isModerator ? (role === 'trainer' ? 'Trainer' : 'Admin') : 'Sender';
+      msg.deletedBy = isModerator ? (effectiveRole === 'trainer' ? 'Trainer' : 'Admin') : 'Sender';
       msg.text = '🚫 This message was deleted';
       msg.mediaUrl = null;
       msg.mediaType = null;
