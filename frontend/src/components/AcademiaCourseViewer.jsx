@@ -28,6 +28,7 @@ const AcademiaCourseViewer = ({
   playlist,
   initialLessonId = null,
   onBack,
+  onClose,
   userRole = 'student', // 'student' | 'admin' | 'trainer'
   userProfile = null,
   currentUser = null,
@@ -37,6 +38,14 @@ const AcademiaCourseViewer = ({
 }) => {
   const studentId = userProfile?.id || userProfile?.uid || currentUser?.uid || 'student';
   const watermarkText = `${userProfile?.fullName || userProfile?.name || currentUser?.displayName || 'Student'} • ${userProfile?.rollNumber || userProfile?.studentId || 'LVX'}`;
+
+  const handleBack = () => {
+    if (typeof onBack === 'function') {
+      onBack();
+    } else if (typeof onClose === 'function') {
+      onClose();
+    }
+  };
 
   // Lessons list sorted strictly in sequential curriculum order (1, 2, 3...)
   const lessons = useMemo(() => {
@@ -317,29 +326,31 @@ const AcademiaCourseViewer = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <button
             type="button"
-            onClick={onBack}
+            onClick={handleBack}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              width: 38,
-              height: 38,
+              gap: 6,
+              padding: '8px 14px',
               borderRadius: 12,
-              border: '1.5px solid #E2E8F0',
+              border: '1.5px solid #CBD5E1',
               background: '#FFFFFF',
-              color: '#6366F1',
+              color: '#4F46E5',
               cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: 13,
               boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
               transition: 'all 0.18s ease',
             }}
             title="Back to Playlists"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} />
+            <span>Back</span>
           </button>
 
           <nav style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5 }}>
             <span
-              onClick={onBack}
+              onClick={handleBack}
               style={{ color: '#6366F1', fontWeight: 700, cursor: 'pointer' }}
             >
               Courses
@@ -359,31 +370,59 @@ const AcademiaCourseViewer = ({
           </nav>
         </div>
 
-        {/* Status pill badge on top right */}
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 10,
-          background: '#FFFFFF',
-          padding: '6px 14px',
-          borderRadius: 999,
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-          fontSize: 12.5,
-          fontWeight: 650,
-        }}>
-          <span style={{ color: '#64748B' }}>Course Progress:</span>
-          <span style={{ color: completedCount === lessons.length && lessons.length > 0 ? '#059669' : '#6366F1', fontWeight: 800 }}>
-            {completedCount} / {lessons.length} Completed
-          </span>
-          <div style={{ width: 60, height: 6, background: '#F1F5F9', borderRadius: 999, overflow: 'hidden' }}>
-            <div style={{
-              width: `${lessons.length > 0 ? Math.round((completedCount / lessons.length) * 100) : 0}%`,
-              height: '100%',
-              background: 'linear-gradient(90deg, #6366F1, #8B5CF6)',
-              borderRadius: 999,
-            }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {/* Status pill badge on top right */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 10,
+            background: '#FFFFFF',
+            padding: '6px 14px',
+            borderRadius: 999,
+            border: '1px solid #E2E8F0',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+            fontSize: 12.5,
+            fontWeight: 650,
+          }}>
+            <span style={{ color: '#64748B' }}>Course Progress:</span>
+            <span style={{ color: completedCount === lessons.length && lessons.length > 0 ? '#059669' : '#6366F1', fontWeight: 800 }}>
+              {completedCount} / {lessons.length} Completed
+            </span>
+            <div style={{ width: 60, height: 6, background: '#F1F5F9', borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{
+                width: `${lessons.length > 0 ? Math.round((completedCount / lessons.length) * 100) : 0}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #6366F1, #8B5CF6)',
+                borderRadius: 999,
+              }} />
+            </div>
           </div>
+
+          {(onBack || onClose) && (
+            <button
+              type="button"
+              onClick={handleBack}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: '#FFFFFF',
+                color: '#475569',
+                border: '1.5px solid #E2E8F0',
+                padding: '7px 14px',
+                borderRadius: 999,
+                fontSize: 12.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.02)',
+                transition: 'all 0.15s ease',
+              }}
+              title="Close Course Player"
+            >
+              <X size={14} />
+              <span>Close Player</span>
+            </button>
+          )}
         </div>
       </div>
 

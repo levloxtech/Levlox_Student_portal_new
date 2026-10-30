@@ -150,9 +150,11 @@ const TrainerDashboard = () => {
   useEffect(() => {
     const tabFromPath = location.pathname.replace('/trainer', '').replace('/', '') || 'dashboard';
     setActiveTab(tabFromPath);
+    setPreviewRecordedClass(null);
   }, [location.pathname]);
 
   const handleTabChange = (tabKey) => {
+    setPreviewRecordedClass(null);
     setActiveTab(tabKey);
     setMobileMenuOpen(false);
     if (tabKey === 'dashboard') {
@@ -2569,7 +2571,40 @@ const TrainerDashboard = () => {
 
         {/* ─── TAB 7: RECORDED CLASSES (ADMIN-PARITY TWO-LEVEL SYSTEM) ───────── */}
         {activeTab === 'recorded-classes' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+          previewRecordedClass ? (
+            (() => {
+              const targetId = String(selectedPlaylistBatch?.id || previewRecordedClass.playlist_id || previewRecordedClass.batch_id || 'preview_playlist');
+              const isCustom = selectedPlaylistBatch?.isCustom;
+              const currentLessons = (selectedPlaylistBatch)
+                ? (recordedClasses || []).filter(r => isCustom ? (String(r.playlist_id) === targetId || String(r.batch_id) === targetId) : (String(r.batch_id || r.batchId) === targetId || String(r.playlist_id) === targetId))
+                : (recordedClasses || []).filter(r => String(r.playlist_id || r.batch_id) === targetId);
+
+              const playerPlaylist = {
+                id: targetId,
+                name: selectedPlaylistBatch?.name || previewRecordedClass.course_title || 'Course Recordings',
+                title: selectedPlaylistBatch?.name || previewRecordedClass.title,
+                course_name: previewRecordedClass.course_title || selectedPlaylistBatch?.course_name,
+                description: selectedPlaylistBatch?.description || previewRecordedClass.description || '',
+                lessons: currentLessons.length > 0 ? currentLessons : [previewRecordedClass],
+                study_materials: selectedPlaylistBatch?.study_materials || previewRecordedClass?.study_materials || []
+              };
+
+              return (
+                <div style={{ width: '100%', minHeight: '80vh' }}>
+                  <AcademiaCourseViewer
+                    playlist={playerPlaylist}
+                    onBack={() => setPreviewRecordedClass(null)}
+                    onClose={() => setPreviewRecordedClass(null)}
+                    initialLessonId={previewRecordedClass.id}
+                    userRole="trainer"
+                    userProfile={userProfile}
+                    currentUser={currentUser}
+                  />
+                </div>
+              );
+            })()
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
             <FilterBar
               searchPlaceholder="Search Recorded Class"
               searchValue={recordedSearchQuery}
@@ -3291,7 +3326,8 @@ const TrainerDashboard = () => {
               </div>
             )}
           </div>
-        )}
+        )
+      )}
 
         {/* ─── TAB 8: ASSIGNMENTS (POWERED BY TRAINER ASSIGNMENTS VIEW) ──────── */}
         {activeTab === 'assignments' && (
@@ -4723,32 +4759,6 @@ const TrainerDashboard = () => {
           </form>
         </CustomModal>
       )}
-
-      {/* ─── FULL COURSE ACADEMIA VIEWER PLAYER MODAL ────────────────────── */}
-      {previewRecordedClass && (() => {
-        const targetId = String(selectedPlaylistBatch?.id || previewRecordedClass.playlist_id || previewRecordedClass.batch_id || 'preview_playlist');
-        const isCustom = selectedPlaylistBatch?.isCustom;
-        const currentLessons = (selectedPlaylistBatch)
-          ? (recordedClasses || []).filter(r => isCustom ? (String(r.playlist_id) === targetId || String(r.batch_id) === targetId) : (String(r.batch_id || r.batchId) === targetId || String(r.playlist_id) === targetId))
-          : (recordedClasses || []).filter(r => String(r.playlist_id || r.batch_id) === targetId);
-
-        const playerPlaylist = {
-          id: targetId,
-          name: selectedPlaylistBatch?.name || previewRecordedClass.course_title || 'Course Recordings',
-          title: selectedPlaylistBatch?.name || previewRecordedClass.title,
-          course_name: previewRecordedClass.course_title || selectedPlaylistBatch?.course_name,
-          description: selectedPlaylistBatch?.description || previewRecordedClass.description || '',
-          lessons: currentLessons.length > 0 ? currentLessons : [previewRecordedClass],
-          study_materials: selectedPlaylistBatch?.study_materials || previewRecordedClass?.study_materials || []
-        };
-        return (
-          <AcademiaCourseViewer
-            playlist={playerPlaylist}
-            onClose={() => setPreviewRecordedClass(null)}
-            initialLessonId={previewRecordedClass.id}
-          />
-        );
-      })()}
     </div>
   );
 };

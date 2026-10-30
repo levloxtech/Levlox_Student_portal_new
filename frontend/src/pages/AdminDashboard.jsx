@@ -316,6 +316,7 @@ const AdminDashboard = () => {
 
   const setActiveTab = (tab) => {
     setActiveTabState(tab);
+    setPreviewRecordedClass(null);
     setSearchParams(prev => {
       const p = new URLSearchParams(prev);
       p.set('tab', tab);
