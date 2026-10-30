@@ -87,29 +87,89 @@ const AcademiaCourseViewer = ({
   const [progressTick, setProgressTick] = useState(0);
 
   // Materials state (playlist-level + lesson-level)
-  const [materials, setMaterials] = useState(() => {
-    const list = [...(playlist?.study_materials || [])];
-    // Also aggregate from lessons
-    lessons.forEach(l => {
-      if (l.notes_url && !list.some(m => m.file_url === l.notes_url)) {
-        list.push({
-          id: `note_${l.id}`,
-          title: `${l.title} — Lecture Notes`,
-          file_url: l.notes_url,
+  const computeAllMaterials = () => {
+    const list = [];
+    const seenUrls = new Set();
+
+    const addMat = (m) => {
+      if (!m) return;
+      const url = m.file_url || m.url;
+      if (!url) return;
+      const key = `${url}_${m.title || m.name || ''}`;
+      if (seenUrls.has(key)) return;
+      seenUrls.add(key);
+      list.push({
+        id: m.id || `mat_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        title: m.title || m.name || 'Resource Document',
+        name: m.title || m.name || 'Resource Document',
+        file_url: url,
+        url: url,
+        type: m.type || 'file',
+        size: m.size || 'Resource Document',
+        uploaded_at: m.uploaded_at || m.createdAt || null
+      });
+    };
+
+    // 1. From playlist.study_materials
+    const pMats = playlist?.study_materials || playlist?.studyMaterials || [];
+    if (Array.isArray(pMats)) {
+      pMats.forEach(addMat);
+    }
+
+    // 2. From lessons
+    (lessons || []).forEach(l => {
+      const noteUrl = l.notes_url || l.notesUrl;
+      if (noteUrl) {
+        addMat({
+          id: `note_${l.id || l.uid}`,
+          title: `${l.title || 'Lecture'} — Lecture Notes`,
+          name: `${l.title || 'Lecture'} — Lecture Notes`,
+          file_url: noteUrl,
+          url: noteUrl,
           type: 'notes',
+          size: 'Lecture Notes',
           uploaded_at: l.created_at || l.createdAt || null
         });
       }
-      if (Array.isArray(l.study_materials)) {
-        l.study_materials.forEach(sm => {
-          if (sm && sm.file_url && !list.some(m => m.file_url === sm.file_url)) {
-            list.push(sm);
+      const lessonMats = l.study_materials || l.studyMaterials;
+      if (Array.isArray(lessonMats)) {
+        lessonMats.forEach(sm => {
+          if (sm) {
+            addMat({
+              ...sm,
+              title: sm.title || sm.name || `${l.title || 'Lecture'} Resource`,
+              name: sm.title || sm.name || `${l.title || 'Lecture'} Resource`,
+              file_url: sm.file_url || sm.url,
+              url: sm.file_url || sm.url
+            });
           }
         });
       }
+      if (l.assignment) {
+        const assignStr = String(l.assignment);
+        if (assignStr.startsWith('http')) {
+          addMat({
+            id: `assign_${l.id || l.uid}`,
+            title: `${l.title || 'Lecture'} — Assignment Task`,
+            name: `${l.title || 'Lecture'} — Assignment Task`,
+            file_url: assignStr,
+            url: assignStr,
+            type: 'task',
+            size: 'Assignment Doc'
+          });
+        }
+      }
     });
+
     return list;
-  });
+  };
+
+  const [materials, setMaterials] = useState(computeAllMaterials);
+
+  // Sync materials when playlist or lessons update
+  useEffect(() => {
+    setMaterials(computeAllMaterials());
+  }, [playlist, lessons]);
 
   // Material upload modal
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -1238,7 +1298,7 @@ const AcademiaCourseViewer = ({
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                         }}>
-                          {mat.title}
+                          {mat.title || mat.name || 'Resource File'}
                         </div>
                         <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
                           {mat.size || 'Resource Document'}
@@ -1248,7 +1308,7 @@ const AcademiaCourseViewer = ({
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                       <a
-                        href={mat.file_url}
+                        href={mat.file_url || mat.url}
                         target="_blank"
                         rel="noreferrer"
                         download
