@@ -1506,7 +1506,7 @@ app.post('/api/email/send', requireAuth, requireAdminOrTrainer, emailLimiter, as
 
     if (recipientUid) {
       const col = recipientType === 'trainer' ? 'trainers' : 'students';
-      if (db) {
+      if (typeof db !== 'undefined' && db) {
         await db.collection(col).doc(recipientUid).set({
           emailDeliveryStatus: 'Sent',
           emailSentAt: new Date().toISOString(),
@@ -1523,7 +1523,7 @@ app.post('/api/email/send', requireAuth, requireAdminOrTrainer, emailLimiter, as
       }
     }
 
-    if (db) {
+    if (typeof db !== 'undefined' && db) {
       await db.collection('emailLogs').add({
         to, subject,
         templateName: templateName || 'custom',

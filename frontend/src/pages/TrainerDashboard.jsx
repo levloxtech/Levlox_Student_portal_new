@@ -183,19 +183,6 @@ const TrainerDashboard = () => {
      userProfile.passwordChanged !== true)
   );
 
-  if (isNewTrainer) {
-    return (
-      <TrainerOnboardingView
-        userProfile={userProfile}
-        currentUser={currentUser}
-        logout={logout}
-        applyProfilePatch={applyProfilePatch}
-        refreshProfile={refreshProfile}
-        showToast={showToast}
-      />
-    );
-  }
-
   const [editingTrainerProfile, setEditingTrainerProfile] = useState(false);
   const [trainerProfileName, setTrainerProfileName] = useState('');
   const [trainerProfilePhone, setTrainerProfilePhone] = useState('');
@@ -1452,6 +1439,19 @@ const TrainerDashboard = () => {
       setUploadingAvatar(false);
     }
   };
+
+  if (isNewTrainer) {
+    return (
+      <TrainerOnboardingView
+        userProfile={userProfile}
+        currentUser={currentUser}
+        logout={logout}
+        applyProfilePatch={applyProfilePatch}
+        refreshProfile={refreshProfile}
+        showToast={showToast}
+      />
+    );
+  }
 
   return (
     <div className="admin-layout" style={{ display: 'flex', minHeight: '100vh', background: 'var(--surface-alt)' }}>

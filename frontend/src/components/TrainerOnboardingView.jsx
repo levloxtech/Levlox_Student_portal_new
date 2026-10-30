@@ -147,12 +147,19 @@ const TrainerOnboardingView = ({
         applyProfilePatch(profileUpdates);
       }
       if (refreshProfile) {
-        await refreshProfile();
+        try {
+          await refreshProfile();
+        } catch (_) {}
       }
 
       if (typeof showToast === 'function') {
         showToast('🎉 Welcome to Levlox! Your faculty profile has been activated.');
       }
+
+      // Hard redirect to clear out any stale component memory and load the dashboard cleanly
+      setTimeout(() => {
+        window.location.href = '/trainer';
+      }, 500);
     } catch (err) {
       console.error('[Trainer Onboarding Failure]:', err);
       setError(err?.message || 'Failed to complete setup. Please check your network and try again.');
