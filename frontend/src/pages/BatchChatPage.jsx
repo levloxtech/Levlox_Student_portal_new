@@ -5,8 +5,7 @@ import {
   FileText, Trash2, Search, RefreshCw, X, Shield,
   Users, CheckCheck, Download, ExternalLink, Sparkles, AlertCircle,
   Ban, Clock, ChevronRight, GraduationCap, Phone, Mail, User,
-  CheckCircle2, AlertTriangle, Layers, MoreVertical, Heart, Folder,
-  Link as LinkIcon, ChevronDown, Check, Eye
+  CheckCircle2, AlertTriangle, Layers, MoreVertical
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -47,10 +46,6 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
   const [batchSearch, setBatchSearch] = useState('');
   const [selectedBatchId, setSelectedBatchId] = useState('');
 
-  // Right sidebar view mode: 'chat_only' | 'shared_files' | 'participants'
-  const [activeRightTab, setActiveRightTab] = useState('shared_files');
-  const [showRightSidebar, setShowRightSidebar] = useState(true);
-
   // Fetch all batches dynamically from localDb
   useEffect(() => {
     fetch(`${API_BASE}/api/data/batches`)
@@ -89,7 +84,7 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
 
   const activeBatchObj = allBatches.find(b => String(b.id) === String(selectedBatchId) || String(b.uid) === String(selectedBatchId));
   const activeBatchName = activeBatchObj?.name || currentUser.batch_name || currentUser.batch || 'Batch Cohort';
-  const activeCourseName = activeBatchObj?.course_name || activeBatchObj?.courseName || activeBatchObj?.course || 'Data Science & AI';
+  const activeCourseName = activeBatchObj?.course_name || activeBatchObj?.courseName || activeBatchObj?.course || 'Academic Program';
 
   // Chat messages state
   const [messages, setMessages] = useState([]);
@@ -97,7 +92,7 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
   const [inputText, setInputText] = useState('');
   const [selectedSticker, setSelectedSticker] = useState(null);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
-  const [attachment, setAttachment] = useState(null);
+  const [attachment, setAttachment] = useState(null); // { file, previewUrl, mediaType, name, size }
   const [uploading, setUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMediaModal, setSelectedMediaModal] = useState(null);
@@ -108,7 +103,7 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
   const [previewStudent, setPreviewStudent] = useState(null);
   const [loadingStudent, setLoadingStudent] = useState(false);
 
-  // Delete Modal State
+  // WhatsApp-style Delete Modal State
   const [deleteCandidate, setDeleteCandidate] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -140,7 +135,7 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
   useEffect(() => {
     if (selectedBatchId) {
       fetchMessages();
-      const interval = setInterval(() => fetchMessages(true), 2500);
+      const interval = setInterval(() => fetchMessages(true), 2000);
       const onFocus = () => fetchMessages(true);
       window.addEventListener('focus', onFocus);
       return () => {
@@ -222,7 +217,7 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
       file = await compressImageBelow2MB(file);
       setUploading(false);
     } else if (file.size > MAX_BYTES) {
-      alert(`⚠️ File size exceeds the 2MB limit. (Selected file: ${(file.size / (1024 * 1024)).toFixed(2)} MB)\nPlease choose a file under 2MB.`);
+      alert(`⚠️ File size exceeds the 2MB limit. (Selected file: ${(file.size / (1024 * 1024)).toFixed(2)} MB)\nPlease choose a document under 2MB.`);
       e.target.value = '';
       return;
     }
@@ -316,11 +311,7 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
     try {
       const res = await fetch(
         `${API_BASE}/api/messages/${deleteCandidate.id}?userId=${encodeURIComponent(currentUserId)}&userRole=${encodeURIComponent(currentRole)}`,
-        {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: currentUserId, userRole: currentRole })
-        }
+        { method: 'DELETE' }
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Delete failed');
@@ -369,29 +360,26 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
     }
   };
 
-  // Instant Reaction Toggle (with optimistic update)
   const handleToggleReaction = async (msgId, emoji) => {
     setActiveReactionPickerId(null);
     const uidStr = String(currentUserId);
-
-    // Optimistic UI update
     setMessages(prev => prev.map(m => {
       if (String(m.id) !== String(msgId)) return m;
-      const currentReactions = { ...(m.reactions || {}) };
-      const list = [...(currentReactions[emoji] || [])];
-      const idx = list.indexOf(uidStr);
+      const reactions = { ...(m.reactions || {}) };
+      const arr = Array.isArray(reactions[emoji]) ? [...reactions[emoji]] : [];
+      const idx = arr.indexOf(uidStr);
       if (idx >= 0) {
-        list.splice(idx, 1);
-        if (list.length === 0) delete currentReactions[emoji];
-        else currentReactions[emoji] = list;
+        arr.splice(idx, 1);
+        if (arr.length === 0) delete reactions[emoji];
+        else reactions[emoji] = arr;
       } else {
-        list.push(uidStr);
-        currentReactions[emoji] = list;
+        arr.push(uidStr);
+        reactions[emoji] = arr;
       }
-      return { ...m, reactions: currentReactions };
+      return { ...m, reactions };
     }));
-
     try {
+      setActiveReactionPickerId(null);
       const res = await fetch(`${API_BASE}/api/messages/${msgId}/react`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -423,366 +411,227 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
     return (b.name && b.name.toLowerCase().includes(q)) || (b.course_name && b.course_name.toLowerCase().includes(q));
   });
 
-  // Calculate dynamic stats for right sidebar
-  const sharedDocs = messages.filter(m => m.mediaType === 'pdf' || m.mediaType === 'document');
-  const sharedImages = messages.filter(m => m.mediaType === 'image');
-  const allSharedCount = sharedDocs.length + sharedImages.length;
-
-  const currentUserName = currentUser.fullName || currentUser.name || currentUser.displayName || (isAdminOrTrainer ? (currentRole === 'trainer' ? 'Instructor' : 'Admin Director') : 'Student Scholar');
-
   return (
     <div style={{
       display: 'flex',
       height: 'calc(100vh - 120px)',
       maxHeight: 'calc(100vh - 120px)',
-      minHeight: 560,
+      minHeight: 520,
       width: '100%',
-      background: '#F8FAFC',
-      borderRadius: 24,
-      border: '1px solid #E2E8F0',
-      boxShadow: '0 10px 35px -5px rgba(0,0,0,0.05)',
+      background: '#F0F2F5',
+      borderRadius: 16,
+      border: '1px solid #D1D7DB',
+      boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
       overflow: 'hidden',
-      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      fontFamily: 'Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif'
     }}>
-      {/* ─── LEFT PANEL: PROFILE + SEARCH + COHORTS LIST ─── */}
-      <aside style={{
-        width: 290,
-        background: '#FFFFFF',
-        borderRight: '1px solid #EEF2F6',
-        display: 'flex',
-        flexDirection: 'column',
-        flexShrink: 0
-      }}>
-        {/* Top Header Card: User Avatar + Name + Available Status */}
-        <div style={{ padding: '18px 18px 14px', borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <span style={{ fontSize: 13, fontWeight: 750, color: '#64748B', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <MessageSquare size={16} color="#0D9488" /> Chat
-            </span>
-            <span style={{
-              fontSize: 11,
-              fontWeight: 800,
-              padding: '2px 8px',
-              borderRadius: 999,
-              background: '#F0FDFA',
-              color: '#0D9488',
-              border: '1px solid #CCFBF1'
-            }}>
-              {allBatches.length} Cohorts
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '4px 0 8px' }}>
-            <div style={{ position: 'relative', marginBottom: 8 }}>
-              <div style={{
-                width: 52,
-                height: 52,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)',
-                color: '#FFFFFF',
-                fontSize: 18,
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)',
-                overflow: 'hidden'
-              }}>
-                {currentUser.profile_pic || currentUser.profilePhotoUrl ? (
-                  <img src={currentUser.profile_pic || currentUser.profilePhotoUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  currentUserName.charAt(0).toUpperCase()
-                )}
-              </div>
-              <span style={{
-                position: 'absolute',
-                bottom: 1,
-                right: 1,
-                width: 12,
-                height: 12,
-                borderRadius: '50%',
-                background: '#10B981',
-                border: '2px solid #FFFFFF'
-              }} />
-            </div>
-
-            <h4 style={{ margin: '0 0 4px', fontSize: 14.5, fontWeight: 800, color: '#0F172A' }}>
-              {currentUserName}
-            </h4>
-
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              background: '#DCFCE7',
-              color: '#15803D',
-              padding: '2px 9px',
-              borderRadius: 999,
-              fontSize: 11,
-              fontWeight: 700
-            }}>
-              available <ChevronDown size={11} />
-            </div>
-          </div>
-
-          {/* Search Cohorts Input */}
-          <div style={{ position: 'relative', marginTop: 12 }}>
-            <input
-              type="text"
-              placeholder="Search..."
-              value={batchSearch}
-              onChange={e => setBatchSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 34px',
-                borderRadius: 999,
-                border: '1px solid #E2E8F0',
-                background: '#F8FAFC',
-                fontSize: 12.5,
-                outline: 'none',
-                color: '#1E293B',
-                boxSizing: 'border-box'
-              }}
-            />
-            <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-          </div>
-        </div>
-
-        {/* Cohort List Header */}
-        <div style={{ padding: '10px 18px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 12, fontWeight: 750, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-            Last chats
-          </span>
-          <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>{filteredBatches.length} active</span>
-        </div>
-
-        {/* Cohort Scrollable List */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {filteredBatches.map(b => {
-            const isSelected = String(b.id) === String(selectedBatchId) || String(b.uid) === String(selectedBatchId);
-            return (
-              <div
-                key={b.id || b.uid}
-                onClick={() => {
-                  if (isAdminOrTrainer) setSelectedBatchId(String(b.id || b.uid));
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '10px 12px',
-                  borderRadius: 14,
-                  cursor: isAdminOrTrainer ? 'pointer' : 'default',
-                  background: isSelected ? '#F1F5F9' : 'transparent',
-                  borderLeft: isSelected ? '4px solid #0D9488' : '4px solid transparent',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {/* Cohort Avatar */}
-                <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  background: isSelected ? '#CCFBF1' : '#F1F5F9',
-                  color: isSelected ? '#0D9488' : '#475569',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 800,
-                  fontSize: 14,
-                  flexShrink: 0
-                }}>
-                  {b.name ? b.name.charAt(0).toUpperCase() : 'B'}
-                </div>
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 }}>
-                    <h5 style={{
-                      margin: 0,
-                      fontSize: 13,
-                      fontWeight: isSelected ? 800 : 700,
-                      color: isSelected ? '#0F172A' : '#334155',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}>
-                      {b.name || 'Cohort Batch'}
-                    </h5>
-                    <span style={{ fontSize: 10.5, color: '#94A3B8', flexShrink: 0, marginLeft: 6 }}>
-                      {b.lastActive || '11:15'}
-                    </span>
-                  </div>
-                  <p style={{
-                    margin: 0,
-                    fontSize: 11.5,
-                    color: isSelected ? '#0D9488' : '#64748B',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    fontWeight: isSelected ? 600 : 500
-                  }}>
-                    {b.course_name || 'Academic Batch Discussion'}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </aside>
-
-      {/* ─── CENTER PANEL: GROUP CHAT FEED ─── */}
-      <section style={{
-        flex: 1,
-        minWidth: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        background: '#FFFFFF',
-        position: 'relative'
-      }}>
-        {/* Top Chat Header */}
-        <header style={{
-          height: 64,
-          padding: '0 24px',
-          borderBottom: '1px solid #EEF2F6',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+      {/* ─── LEFT PANEL: BATCH COHORT SELECTOR (ADMIN & TRAINER ONLY) ─── */}
+      {isAdminOrTrainer && (
+        <aside style={{
+          width: 320,
           background: '#FFFFFF',
+          borderRight: '1px solid #E9EDEF',
+          display: 'flex',
+          flexDirection: 'column',
           flexShrink: 0
         }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
-              {activeBatchName}
-            </h3>
-            <span style={{ fontSize: 12, color: '#64748B' }}>
-              {activeCourseName} &bull; Official Discussion
-            </span>
+          {/* Header */}
+          <div style={{ padding: '14px 16px', background: '#F0F2F5', borderBottom: '1px solid #E9EDEF' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Layers size={18} color="#00A884" />
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#111B21' }}>Chats</h3>
+              </div>
+              <span style={{ fontSize: 11, background: '#00A884', color: '#FFFFFF', padding: '2px 8px', borderRadius: 999, fontWeight: 700 }}>
+                {allBatches.length} Cohorts
+              </span>
+            </div>
+            {/* Search */}
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="Search or start new chat"
+                value={batchSearch}
+                onChange={e => setBatchSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '7px 12px 7px 34px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: '#FFFFFF',
+                  fontSize: 12.5,
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <Search size={14} color="#8696A0" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+            </div>
           </div>
 
-          {/* Right Header Navigation Pill Tabs */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Messages / Shared Files Toggle Tabs */}
+          {/* Batches List */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {filteredBatches.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 16px', color: '#8696A0', fontSize: 13 }}>
+                No cohorts found
+              </div>
+            ) : (
+              filteredBatches.map(b => {
+                const isSelected = String(b.id) === String(selectedBatchId) || String(b.uid) === String(selectedBatchId);
+                return (
+                  <button
+                    key={b.id || b.uid}
+                    onClick={() => setSelectedBatchId(String(b.id || b.uid))}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '12px 16px',
+                      border: 'none',
+                      borderBottom: '1px solid #F0F2F5',
+                      borderLeft: isSelected ? '4px solid #00A884' : '4px solid transparent',
+                      background: isSelected ? '#F0F2F5' : '#FFFFFF',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      transition: 'background 0.15s ease'
+                    }}
+                  >
+                    <div style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: '50%',
+                      background: isSelected ? 'linear-gradient(135deg, #00A884, #059669)' : '#E9EDEF',
+                      color: isSelected ? '#FFFFFF' : '#54656F',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: 14,
+                      flexShrink: 0
+                    }}>
+                      {b.name ? b.name.substring(0, 2).toUpperCase() : 'CO'}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                        <strong style={{ fontSize: 14, color: '#111B21', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {b.name}
+                        </strong>
+                      </div>
+                      <span style={{ fontSize: 12, color: '#667781', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {b.course_name || b.courseName || b.course || 'Data Science & AI'}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </aside>
+      )}
+
+      {/* ─── RIGHT PANEL: WHATSAPP ACTIVE CHAT ─── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100%', position: 'relative' }}>
+        
+        {/* Pinned Top WhatsApp Header */}
+        <header style={{
+          padding: '10px 18px',
+          background: '#F0F2F5',
+          borderBottom: '1px solid #D1D7DB',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 12,
+          flexShrink: 0
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
             <div style={{
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #00A884, #10B981)',
               display: 'flex',
               alignItems: 'center',
-              background: '#F1F5F9',
-              padding: 3,
-              borderRadius: 999
+              justifyContent: 'center',
+              color: '#FFFFFF',
+              boxShadow: '0 2px 8px rgba(0, 168, 132, 0.25)',
+              flexShrink: 0
             }}>
-              <button
-                type="button"
-                onClick={() => { setActiveRightTab('chat_only'); setShowRightSidebar(false); }}
-                style={{
-                  border: 'none',
-                  background: activeRightTab === 'chat_only' && !showRightSidebar ? '#0D9488' : 'transparent',
-                  color: activeRightTab === 'chat_only' && !showRightSidebar ? '#FFFFFF' : '#64748B',
-                  padding: '5px 14px',
-                  borderRadius: 999,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                Messages
-              </button>
-              <button
-                type="button"
-                onClick={() => { setActiveRightTab('shared_files'); setShowRightSidebar(true); }}
-                style={{
-                  border: 'none',
-                  background: showRightSidebar && activeRightTab === 'shared_files' ? '#0D9488' : 'transparent',
-                  color: showRightSidebar && activeRightTab === 'shared_files' ? '#FFFFFF' : '#64748B',
-                  padding: '5px 14px',
-                  borderRadius: 999,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                Shared Files
-              </button>
-              <button
-                type="button"
-                onClick={() => { setActiveRightTab('participants'); setShowRightSidebar(true); }}
-                style={{
-                  border: 'none',
-                  background: showRightSidebar && activeRightTab === 'participants' ? '#0D9488' : 'transparent',
-                  color: showRightSidebar && activeRightTab === 'participants' ? '#FFFFFF' : '#64748B',
-                  padding: '5px 14px',
-                  borderRadius: 999,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                Participants
-              </button>
+              <MessageSquare size={20} />
             </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111B21', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {activeBatchName}
+                </h3>
+                <span style={{ fontSize: 10.5, background: '#DCF8C6', color: '#075E54', padding: '1px 7px', borderRadius: 999, fontWeight: 700, flexShrink: 0 }}>
+                  Active Cohort
+                </span>
+              </div>
+              <p style={{ margin: '1px 0 0', fontSize: 12, color: '#667781', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {activeCourseName} &bull; Official Discussion Room
+              </p>
+            </div>
+          </div>
 
-            {/* Refresh Button */}
+          {/* Search in chat & Refresh */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            <div style={{ position: 'relative', width: 170 }}>
+              <input
+                type="text"
+                placeholder="Search chat..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{ width: '100%', padding: '6px 26px 6px 28px', borderRadius: 8, border: '1px solid #CBD5E1', background: '#FFFFFF', fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
+              />
+              <Search size={13} color="#8696A0" style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)' }} />
+              {searchQuery && (
+                <X size={13} color="#8696A0" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer' }} onClick={() => setSearchQuery('')} />
+              )}
+            </div>
             <button
               onClick={() => fetchMessages(false)}
               title="Refresh Messages"
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: '50%',
-                border: '1px solid #E2E8F0',
-                background: '#FFFFFF',
-                color: '#64748B',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #CBD5E1', background: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#54656F' }}
             >
               <RefreshCw size={14} />
             </button>
           </div>
         </header>
 
-        {/* Chat Message Scrollable Stream */}
+        {/* WhatsApp Chat Wallpaper & Scrollable Messages Feed (ONLY THIS SCROLLS) */}
         <div
           ref={chatScrollRef}
           style={{
             flex: 1,
             minHeight: 0,
             overflowY: 'auto',
-            padding: '24px 28px',
-            background: '#F8FAFC',
+            padding: '16px 22px',
+            background: '#EFEAE2',
+            backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px)',
+            backgroundSize: '16px 16px',
             display: 'flex',
             flexDirection: 'column',
-            gap: 16
+            gap: 10
           }}
         >
+          {/* Welcome Info Banner */}
+          <div style={{ alignSelf: 'center', background: '#FFFFFF', border: '1px solid #D1D7DB', borderRadius: 8, padding: '8px 16px', maxWidth: 520, textAlign: 'center', color: '#54656F', fontSize: 12, boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)' }}>
+            🔒 <strong>Messages are end-to-end recorded for batch academic learning.</strong> Tap any student name or avatar to view their detailed profile.
+          </div>
+
           {loading && messages.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748B' }}>
-              <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 10px', color: '#0D9488' }} />
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Loading cohort discussion...</p>
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748B' }}>
+              <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 10px' }} />
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Loading batch discussions...</p>
             </div>
           ) : filteredMessages.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 20px', color: '#64748B' }}>
-              <div style={{
-                width: 52,
-                height: 52,
-                borderRadius: '50%',
-                background: '#F0FDFA',
-                color: '#0D9488',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 12px'
-              }}>
-                <MessageSquare size={24} />
-              </div>
-              <h4 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 800, color: '#0F172A' }}>
-                {searchQuery ? 'No matching messages found' : `Welcome to ${activeBatchName}`}
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748B' }}>
+              <Users size={36} color="#8696A0" style={{ margin: '0 auto 12px' }} />
+              <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 750, color: '#111B21' }}>
+                {searchQuery ? 'No matching messages found' : `Welcome to ${activeBatchName}!`}
               </h4>
-              <p style={{ margin: 0, fontSize: 13, color: '#64748B' }}>
-                {searchQuery ? 'Try another keyword.' : 'Start the conversation with your instructor and cohort peers.'}
+              <p style={{ margin: 0, fontSize: 12.5, color: '#667781', maxWidth: 360, margin: '0 auto' }}>
+                {searchQuery ? 'Try another keyword.' : 'Say hello to your fellow batch students and instructor.'}
               </p>
             </div>
           ) : (
@@ -798,7 +647,7 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
               const canDelete = !msg.isDeleted && (isAdminOrTrainer || (isMe && isWithin2Hours));
 
               const timeDisplay = msg.createdAt
-                ? new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+                ? new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                 : '';
 
               const reactionEntries = Object.entries(msg.reactions || {}).filter(([_, uids]) => Array.isArray(uids) && uids.length > 0);
@@ -806,12 +655,11 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
               const isHovered = hoveredMessageId === msg.id;
               const isPickerOpen = activeReactionPickerId === msg.id;
 
-              const hasLiked = (msg.reactions?.['❤️'] || []).includes(String(currentUserId));
-
               if (isSystem) {
                 return (
-                  <div key={msg.id || idx} style={{ alignSelf: 'center', background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 999, padding: '6px 16px', color: '#64748B', fontSize: 12, fontWeight: 600 }}>
-                    {msg.text}
+                  <div key={msg.id || idx} style={{ alignSelf: 'center', background: '#FFFFFF', border: '1px solid #D1D7DB', borderRadius: 8, padding: '6px 14px', maxWidth: 500, textAlign: 'center', color: '#54656F', fontSize: 12, boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)' }}>
+                    <div style={{ fontWeight: 700, marginBottom: 2 }}>{msg.senderName}</div>
+                    <div>{msg.text}</div>
                   </div>
                 );
               }
@@ -824,335 +672,233 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
                   style={{
                     display: 'flex',
                     alignSelf: isMe ? 'flex-end' : 'flex-start',
-                    alignItems: 'flex-start',
-                    gap: 10,
-                    maxWidth: '78%',
+                    maxWidth: '75%',
                     position: 'relative',
                     marginBottom: hasReactions ? 10 : 2
                   }}
                 >
-                  {/* Left Avatar for Incoming Messages */}
-                  {!isMe && (
-                    <div
-                      onClick={() => {
-                        if (isAdminOrTrainer && isStudent) openStudentPreview(msg.senderId, msg.senderName);
-                      }}
-                      title={isAdminOrTrainer && isStudent ? "Click to view student profile" : msg.senderName}
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: '50%',
-                        background: isAdmin ? '#F5F3FF' : (isTrainer ? '#ECFDF5' : '#EEF2FF'),
-                        color: isAdmin ? '#7C3AED' : (isTrainer ? '#059669' : '#4F46E5'),
-                        fontSize: 13,
-                        fontWeight: 800,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        marginTop: 18,
-                        cursor: (isAdminOrTrainer && isStudent) ? 'pointer' : 'default',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      {msg.senderAvatar ? (
-                        <img src={msg.senderAvatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        (msg.senderName || 'U').charAt(0).toUpperCase()
-                      )}
-                    </div>
-                  )}
+                  {/* WhatsApp Message Bubble Container */}
+                  <div style={{
+                    position: 'relative',
+                    background: msg.isDeleted ? '#F0F2F5' : (isMe ? '#D9FDD3' : '#FFFFFF'),
+                    color: '#111B21',
+                    borderRadius: isMe ? '8px 8px 2px 8px' : '8px 8px 8px 2px',
+                    padding: '6px 10px 6px 12px',
+                    boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)',
+                    wordBreak: 'break-word',
+                    fontSize: 13.5,
+                    lineHeight: 1.45,
+                    border: msg.isDeleted ? '1px dashed #CBD5E1' : 'none',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}>
+                    {/* Header: Sender Name & Role (Only on incoming messages) */}
+                    {!isMe && !msg.isDeleted && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, fontSize: 12 }}>
+                        <span
+                          onClick={() => {
+                            if (isAdminOrTrainer && isStudent) openStudentPreview(msg.senderId, msg.senderName);
+                          }}
+                          style={{
+                            fontWeight: 700,
+                            color: isAdmin ? '#7C3AED' : (isTrainer ? '#059669' : '#4F46E5'),
+                            cursor: (isAdminOrTrainer && isStudent) ? 'pointer' : 'default',
+                            textDecoration: (isAdminOrTrainer && isStudent) ? 'underline' : 'none'
+                          }}
+                        >
+                          {msg.senderName}
+                        </span>
 
-                  {/* Main Bubble + Header Column */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', position: 'relative' }}>
-                    {/* Header: Author Name + Timestamp */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontSize: 11.5 }}>
-                      {isMe ? (
-                        <span style={{ color: '#94A3B8', fontWeight: 600 }}>You, {timeDisplay}</span>
-                      ) : (
-                        <>
-                          <span
-                            onClick={() => {
-                              if (isAdminOrTrainer && isStudent) openStudentPreview(msg.senderId, msg.senderName);
-                            }}
-                            style={{
-                              fontWeight: 750,
-                              color: '#0F172A',
-                              cursor: (isAdminOrTrainer && isStudent) ? 'pointer' : 'default'
-                            }}
-                          >
-                            {msg.senderName}
+                        {isAdmin && (
+                          <span style={{ fontSize: 9.5, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#EDE9FE', color: '#6D28D9' }}>
+                            🛡️ ADMIN
                           </span>
-                          {isAdmin && (
-                            <span style={{ fontSize: 9.5, fontWeight: 800, padding: '1px 6px', borderRadius: 4, background: '#EDE9FE', color: '#6D28D9' }}>
-                              ADMIN
-                            </span>
-                          )}
-                          {isTrainer && (
-                            <span style={{ fontSize: 9.5, fontWeight: 800, padding: '1px 6px', borderRadius: 4, background: '#D1FAE5', color: '#047857' }}>
-                              TRAINER
-                            </span>
-                          )}
-                          {isStudent && (
-                            <span style={{ fontSize: 9.5, fontWeight: 800, padding: '1px 6px', borderRadius: 4, background: '#E0E7FF', color: '#3730A3' }}>
-                              STUDENT
-                            </span>
-                          )}
-                          <span style={{ color: '#94A3B8' }}>{timeDisplay}</span>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Bubble Container */}
-                    <div style={{
-                      position: 'relative',
-                      background: msg.isDeleted ? '#F1F5F9' : (isMe ? '#EEF2FF' : '#FFFFFF'),
-                      color: '#0F172A',
-                      borderRadius: isMe ? '18px 4px 18px 18px' : '4px 18px 18px 18px',
-                      padding: '10px 14px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                      border: msg.isDeleted ? '1px dashed #CBD5E1' : (isMe ? '1px solid #E0E7FF' : '1px solid #EEF2F6'),
-                      wordBreak: 'break-word',
-                      fontSize: 13.5,
-                      lineHeight: 1.5,
-                      minWidth: 60
-                    }}>
-                      {/* Deleted Tombstone */}
-                      {msg.isDeleted ? (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontStyle: 'italic', fontSize: 12.5, color: '#94A3B8' }}>
-                          <Ban size={14} color="#94A3B8" /> This message was deleted
-                        </div>
-                      ) : (
-                        <>
-                          {/* Sticker */}
-                          {msg.sticker && (
-                            <div style={{ fontSize: 44, margin: '2px 0 4px', lineHeight: 1 }}>
-                              {msg.sticker}
-                            </div>
-                          )}
-
-                          {/* Media Attachment */}
-                          {msg.mediaUrl && (
-                            <div style={{ margin: '4px 0 6px' }}>
-                              {msg.mediaType === 'image' && (
-                                <img
-                                  src={msg.mediaUrl}
-                                  alt={msg.fileName || 'Attachment'}
-                                  onClick={() => setSelectedMediaModal(msg.mediaUrl)}
-                                  style={{ maxWidth: 320, maxHeight: 260, borderRadius: 12, cursor: 'pointer', objectFit: 'cover', display: 'block' }}
-                                />
-                              )}
-                              {msg.mediaType === 'pdf' && (
-                                <a
-                                  href={msg.mediaUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    background: isMe ? '#FFFFFF' : '#F8FAFC',
-                                    color: '#0F172A',
-                                    padding: '8px 12px',
-                                    borderRadius: 10,
-                                    border: '1px solid #E2E8F0',
-                                    textDecoration: 'none',
-                                    fontWeight: 600,
-                                    fontSize: 12.5
-                                  }}
-                                >
-                                  <FileText size={18} color="#EF4444" />
-                                  <span style={{ maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {msg.fileName || 'Document.pdf'}
-                                  </span>
-                                  <Download size={14} color="#64748B" />
-                                </a>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Message Text */}
-                          {msg.text && (
-                            <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
-                          )}
-
-                          {/* Read Receipts for Outgoing messages */}
-                          {isMe && (
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                              <span title={msg.isAllRead ? "Seen by all cohort members" : "Delivered"}>
-                                <CheckCheck size={14} color={msg.isAllRead ? "#0284C7" : "#94A3B8"} />
-                              </span>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Attached Reactions Badge */}
-                      {hasReactions && !msg.isDeleted && (
-                        <div
-                          onClick={() => setActiveReactionPickerId(isPickerOpen ? null : msg.id)}
-                          style={{
-                            position: 'absolute',
-                            bottom: -11,
-                            [isMe ? 'right' : 'left']: 8,
-                            background: '#FFFFFF',
-                            border: '1px solid #E2E8F0',
-                            borderRadius: 999,
-                            padding: '1px 7px',
-                            fontSize: 11,
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            zIndex: 2,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {reactionEntries.map(([emoji, uids]) => (
-                            <span key={emoji} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                              {emoji} {uids.length > 1 && <strong style={{ fontSize: 10, color: '#64748B' }}>{uids.length}</strong>}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* ─── ACTION TOOLBAR (LIKE, REACT, DELETE, INFO) ─── */}
-                    {!msg.isDeleted && (
-                      <div style={{
-                        position: 'absolute',
-                        top: -12,
-                        [isMe ? 'left' : 'right']: -8,
-                        transform: isMe ? 'translateX(-100%)' : 'translateX(100%)',
-                        display: (isHovered || isPickerOpen) ? 'flex' : 'none',
-                        alignItems: 'center',
-                        gap: 3,
-                        background: '#FFFFFF',
-                        border: '1px solid #E2E8F0',
-                        borderRadius: 999,
-                        padding: '2px 5px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                        zIndex: 10
-                      }}>
-                        {/* 1-Click Instant Like / Heart Button */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleReaction(msg.id, '❤️')}
-                          title={hasLiked ? "Unlike" : "Like with Heart"}
-                          style={{
-                            background: hasLiked ? '#FEE2E2' : 'transparent',
-                            border: 'none',
-                            color: hasLiked ? '#DC2626' : '#64748B',
-                            cursor: 'pointer',
-                            padding: '3px 4px',
-                            borderRadius: 6,
-                            display: 'flex',
-                            alignItems: 'center'
-                          }}
-                        >
-                          <Heart size={13} fill={hasLiked ? "#DC2626" : "none"} />
-                        </button>
-
-                        {/* Reaction Picker Popover Trigger */}
-                        <button
-                          type="button"
-                          onClick={() => setActiveReactionPickerId(isPickerOpen ? null : msg.id)}
-                          title="More reactions"
-                          style={{
-                            background: isPickerOpen ? '#F1F5F9' : 'transparent',
-                            border: 'none',
-                            color: '#64748B',
-                            cursor: 'pointer',
-                            padding: '3px 4px',
-                            borderRadius: 6,
-                            display: 'flex',
-                            alignItems: 'center'
-                          }}
-                        >
-                          <Smile size={13} />
-                        </button>
-
-                        {/* Admin/Trainer: View Student Dossier */}
-                        {isAdminOrTrainer && isStudent && (
-                          <button
-                            type="button"
-                            onClick={() => openStudentPreview(msg.senderId, msg.senderName)}
-                            title="View Student Profile"
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#0D9488',
-                              cursor: 'pointer',
-                              padding: '3px 4px',
-                              borderRadius: 6,
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                          >
-                            <Eye size={13} />
-                          </button>
                         )}
-
-                        {/* Delete For Everyone Button */}
-                        {canDelete && (
-                          <button
-                            type="button"
-                            onClick={() => setDeleteCandidate(msg)}
-                            title={isAdminOrTrainer ? "Delete for everyone (Moderator)" : "Delete for everyone (Within 2 hrs)"}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#EF4444',
-                              cursor: 'pointer',
-                              padding: '3px 4px',
-                              borderRadius: 6,
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                        {isTrainer && (
+                          <span style={{ fontSize: 9.5, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#D1FAE5', color: '#047857' }}>
+                            🎓 TRAINER
+                          </span>
+                        )}
+                        {isStudent && (
+                          <span style={{ fontSize: 9.5, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#E0E7FF', color: '#3730A3' }}>
+                            🎒 STUDENT
+                          </span>
                         )}
                       </div>
                     )}
 
-                    {/* Quick Reactions Strip Popover */}
-                    {isPickerOpen && !msg.isDeleted && (
-                      <div style={{
-                        position: 'absolute',
-                        top: -38,
-                        [isMe ? 'right' : 'left']: 0,
-                        background: '#FFFFFF',
-                        borderRadius: 999,
-                        boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
-                        border: '1px solid #E2E8F0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        padding: '4px 8px',
-                        zIndex: 20
-                      }}>
-                        {QUICK_REACTIONS.map(emoji => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={() => handleToggleReaction(msg.id, emoji)}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              fontSize: 16,
-                              cursor: 'pointer',
-                              padding: '2px 4px',
-                              transition: 'transform 0.1s ease'
-                            }}
-                          >
-                            {emoji}
-                          </button>
+                    {/* Deleted Tombstone */}
+                    {msg.isDeleted ? (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontStyle: 'italic', fontSize: 12.5, color: '#8696A0', padding: '2px 0' }}>
+                        <Ban size={14} color="#8696A0" /> This message was deleted
+                      </div>
+                    ) : (
+                      <>
+                        {/* Sticker */}
+                        {msg.sticker && (
+                          <div style={{ fontSize: 44, margin: '2px 0 4px', lineHeight: 1 }}>
+                            {msg.sticker}
+                          </div>
+                        )}
+
+                        {/* Media Attachment */}
+                        {msg.mediaUrl && (
+                          <div style={{ margin: '4px 0 6px' }}>
+                            {msg.mediaType === 'image' && (
+                              <img
+                                src={msg.mediaUrl}
+                                alt={msg.fileName || 'Attachment'}
+                                onClick={() => setSelectedMediaModal(msg.mediaUrl)}
+                                style={{ maxWidth: 280, maxHeight: 240, borderRadius: 6, cursor: 'pointer', objectFit: 'cover', display: 'block' }}
+                              />
+                            )}
+                            {msg.mediaType === 'pdf' && (
+                              <a
+                                href={msg.mediaUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  background: isMe ? 'rgba(0,0,0,0.05)' : '#F0F2F5',
+                                  color: '#111B21',
+                                  padding: '8px 12px',
+                                  borderRadius: 6,
+                                  textDecoration: 'none',
+                                  fontWeight: 600,
+                                  fontSize: 12.5
+                                }}
+                              >
+                                <FileText size={18} color="#EF4444" />
+                                <span style={{ maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {msg.fileName || 'Document.pdf'}
+                                </span>
+                                <Download size={14} color="#54656F" />
+                              </a>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Text & Inline Meta (Timestamp + Checkticks) */}
+                        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                          <span style={{ flex: 1, whiteSpace: 'pre-wrap' }}>{msg.text}</span>
+                          <span style={{ fontSize: 10.5, color: '#667781', alignSelf: 'flex-end', display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 'auto', paddingTop: 2 }}>
+                            {timeDisplay}
+                            {isMe && (
+                              <span title={msg.isAllRead ? "Seen by all batch members" : "Delivered"}>
+                                <CheckCheck size={14} color={msg.isAllRead ? "#53BDEB" : "#8696A0"} />
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </>
+                    )}
+
+                    {/* WhatsApp Attached Reactions Badge */}
+                    {hasReactions && !msg.isDeleted && (
+                      <div
+                        onClick={() => setActiveReactionPickerId(isPickerOpen ? null : msg.id)}
+                        style={{
+                          position: 'absolute',
+                          bottom: -9,
+                          [isMe ? 'right' : 'left']: 8,
+                          background: '#FFFFFF',
+                          border: '1px solid #D1D7DB',
+                          borderRadius: 12,
+                          padding: '1px 6px',
+                          fontSize: 11,
+                          boxShadow: '0 1px 2px rgba(11,20,26,0.15)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 3,
+                          zIndex: 2,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {reactionEntries.map(([emoji, uids]) => (
+                          <span key={emoji}>
+                            {emoji} {uids.length > 1 && <strong style={{ fontSize: 9.5 }}>{uids.length}</strong>}
+                          </span>
                         ))}
                       </div>
                     )}
                   </div>
+
+                  {/* Sleek Floating Hover Toolbar (WhatsApp Action Trigger) */}
+                  {(isHovered || isPickerOpen) && !msg.isDeleted && (
+                    <div style={{
+                      position: 'absolute',
+                      top: -18,
+                      [isMe ? 'left' : 'right']: -38,
+                      background: '#FFFFFF',
+                      borderRadius: 16,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                      border: '1px solid #E9EDEF',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '2px 4px',
+                      zIndex: 10
+                    }}>
+                      {/* React Button */}
+                      <button
+                        type="button"
+                        onClick={() => setActiveReactionPickerId(isPickerOpen ? null : msg.id)}
+                        title="React to message"
+                        style={{ background: 'none', border: 'none', color: '#54656F', cursor: 'pointer', padding: '3px 5px', display: 'flex', alignItems: 'center' }}
+                      >
+                        <Smile size={14} />
+                      </button>
+
+                      {/* WhatsApp Delete for Everyone Button */}
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteCandidate(msg)}
+                          title={isAdminOrTrainer ? 'Delete for everyone (Moderator)' : 'Delete for everyone (Within 2 hours)'}
+                          style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '3px 5px', display: 'flex', alignItems: 'center' }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* WhatsApp Quick Reaction Strip Popup */}
+                  {isPickerOpen && !msg.isDeleted && (
+                    <div style={{
+                      position: 'absolute',
+                      top: -36,
+                      [isMe ? 'right' : 'left']: 0,
+                      background: '#FFFFFF',
+                      borderRadius: 20,
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+                      border: '1px solid #E9EDEF',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '4px 8px',
+                      zIndex: 20
+                    }}>
+                      {QUICK_REACTIONS.map(emoji => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => handleToggleReaction(msg.id, emoji)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            fontSize: 18,
+                            cursor: 'pointer',
+                            padding: '2px 4px',
+                            transition: 'transform 0.1s ease'
+                          }}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -1160,11 +906,11 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Selected Sticker Badge */}
+        {/* Selected Sticker Badge Preview */}
         {selectedSticker && (
-          <div style={{ padding: '6px 20px', background: '#F8FAFC', borderTop: '1px solid #EEF2F6', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>Sticker attached:</span>
-            <span style={{ fontSize: 22, lineHeight: 1 }}>{selectedSticker}</span>
+          <div style={{ padding: '6px 18px', background: '#F0F2F5', borderTop: '1px solid #D1D7DB', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <span style={{ fontSize: 12, color: '#54656F', fontWeight: 600 }}>Sticker attached:</span>
+            <span style={{ fontSize: 24, lineHeight: 1 }}>{selectedSticker}</span>
             <button
               onClick={() => setSelectedSticker(null)}
               style={{ background: '#FEE2E2', border: 'none', color: '#DC2626', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
@@ -1176,7 +922,7 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
 
         {/* Attachment Preview */}
         {attachment && (
-          <div style={{ padding: '8px 20px', background: '#F8FAFC', borderTop: '1px solid #EEF2F6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div style={{ padding: '8px 18px', background: '#F0F2F5', borderTop: '1px solid #D1D7DB', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {attachment.mediaType === 'image' ? (
                 <img src={attachment.previewUrl} alt="Preview" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }} />
@@ -1184,8 +930,8 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
                 <FileText size={22} color="#EF4444" />
               )}
               <div>
-                <strong style={{ fontSize: 13, color: '#0F172A' }}>{attachment.name}</strong>
-                <span style={{ fontSize: 11, color: '#64748B', marginLeft: 8 }}>({attachment.size}) &bull; &lt;2MB ✓</span>
+                <strong style={{ fontSize: 13, color: '#111B21' }}>{attachment.name}</strong>
+                <span style={{ fontSize: 11, color: '#667781', marginLeft: 8 }}>({attachment.size}) &bull; Under 2MB ✓</span>
               </div>
             </div>
             <button
@@ -1197,9 +943,9 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
           </div>
         )}
 
-        {/* Sticker Picker Drawer */}
+        {/* Sticker Picker Popover */}
         {showStickerPicker && (
-          <div style={{ padding: '10px 18px', background: '#FFFFFF', borderTop: '1px solid #EEF2F6', display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0, maxHeight: 110, overflowY: 'auto' }}>
+          <div style={{ padding: '10px 18px', background: '#FFFFFF', borderTop: '1px solid #D1D7DB', display: 'flex', gap: 10, flexWrap: 'wrap', flexShrink: 0, maxHeight: 120, overflowY: 'auto' }}>
             {STICKERS.map(s => (
               <button
                 key={s.emoji}
@@ -1209,11 +955,11 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
                   setShowStickerPicker(false);
                 }}
                 style={{
-                  background: selectedSticker === s.emoji ? '#CCFBF1' : '#F8FAFC',
-                  border: selectedSticker === s.emoji ? '1.5px solid #0D9488' : '1px solid #E2E8F0',
-                  borderRadius: 8,
-                  fontSize: 20,
-                  padding: '5px 8px',
+                  background: selectedSticker === s.emoji ? '#DCF8C6' : '#F0F2F5',
+                  border: selectedSticker === s.emoji ? '1.5px solid #00A884' : '1px solid #E9EDEF',
+                  borderRadius: 10,
+                  fontSize: 22,
+                  padding: '6px 10px',
                   cursor: 'pointer'
                 }}
                 title={s.label}
@@ -1224,288 +970,225 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
           </div>
         )}
 
-        {/* ─── BOTTOM INPUT BAR: PILL DESIGN (MATCHING REFERENCE IMAGE) ─── */}
-        <div style={{ padding: '14px 20px', background: '#FFFFFF', borderTop: '1px solid #EEF2F6', flexShrink: 0 }}>
-          <form
-            onSubmit={handleSendMessage}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              background: '#F8FAFC',
-              border: '1px solid #E2E8F0',
-              borderRadius: 999,
-              padding: '6px 8px 6px 18px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-            }}
-          >
-            <input
-              type="text"
-              placeholder="Write your message..."
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              style={{
-                flex: 1,
-                border: 'none',
-                background: 'transparent',
-                outline: 'none',
-                fontSize: 13.5,
-                color: '#0F172A'
-              }}
-            />
-
-            {/* Sticker Button */}
-            <button
-              type="button"
-              onClick={() => setShowStickerPicker(!showStickerPicker)}
-              style={{
-                background: showStickerPicker ? '#CCFBF1' : 'transparent',
-                border: 'none',
-                color: showStickerPicker ? '#0D9488' : '#94A3B8',
-                cursor: 'pointer',
-                padding: '6px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Smile size={18} />
-            </button>
-
-            {/* Attachment Button */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              accept="image/*,.pdf,.doc,.docx,.zip"
-              style={{ display: 'none' }}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#94A3B8',
-                cursor: 'pointer',
-                padding: '6px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Paperclip size={18} />
-            </button>
-
-            {/* Solid Teal Send Button */}
-            <button
-              type="submit"
-              disabled={uploading || (!inputText.trim() && !attachment && !selectedSticker)}
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: '50%',
-                border: 'none',
-                background: (inputText.trim() || attachment || selectedSticker) ? '#0D9488' : '#CBD5E1',
-                color: '#FFFFFF',
-                cursor: (inputText.trim() || attachment || selectedSticker) ? 'pointer' : 'default',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: (inputText.trim() || attachment || selectedSticker) ? '0 2px 8px rgba(13, 148, 136, 0.3)' : 'none',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Send size={15} style={{ marginLeft: 2 }} />
-            </button>
-          </form>
-        </div>
-      </section>
-
-      {/* ─── RIGHT PANEL: "SHARED FILES" & BATCH PARTICIPANTS (MATCHING REFERENCE IMAGE) ─── */}
-      {showRightSidebar && (
-        <aside style={{
-          width: 280,
-          background: '#FFFFFF',
-          borderLeft: '1px solid #EEF2F6',
+        {/* Pinned WhatsApp Message Input Bar */}
+        <form onSubmit={handleSendMessage} style={{
+          padding: '10px 16px',
+          background: '#F0F2F5',
+          borderTop: '1px solid #D1D7DB',
           display: 'flex',
-          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 10,
           flexShrink: 0
         }}>
-          {/* Header */}
-          <div style={{ padding: '18px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color: '#0F172A' }}>
-              {activeRightTab === 'participants' ? 'Participants' : 'Shared files'}
-            </span>
-            <button
-              onClick={() => setShowRightSidebar(false)}
-              style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
-            >
-              <X size={16} />
-            </button>
-          </div>
+          {/* Sticker Button */}
+          <button
+            type="button"
+            onClick={() => setShowStickerPicker(!showStickerPicker)}
+            title="Attach Sticker"
+            style={{ background: showStickerPicker ? '#DCF8C6' : '#FFFFFF', border: 'none', color: '#54656F', borderRadius: '50%', width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }}
+          >
+            <Smile size={20} />
+          </button>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-            {/* Cohort Banner Card */}
-            <div style={{ textAlign: 'center', padding: '6px 0 12px', borderBottom: '1px solid #F1F5F9' }}>
-              <div style={{
-                width: 64,
-                height: 64,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-                color: '#FFFFFF',
-                fontSize: 20,
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 10px',
-                boxShadow: '0 4px 14px rgba(0,0,0,0.1)'
-              }}>
-                {activeBatchName.charAt(0).toUpperCase()}
-              </div>
-              <h4 style={{ margin: '0 0 3px', fontSize: 15, fontWeight: 800, color: '#0F172A' }}>
-                {activeBatchName}
-              </h4>
-              <span style={{ fontSize: 12, color: '#64748B' }}>
-                {activeBatchObj?.students?.length || 10} members
-              </span>
-            </div>
+          {/* Attachment Button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach Document or Image (Max 2MB)"
+            style={{ background: '#FFFFFF', border: 'none', color: '#54656F', borderRadius: '50%', width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }}
+          >
+            <Paperclip size={19} />
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            accept="image/*,.pdf,.doc,.docx"
+            style={{ display: 'none' }}
+          />
 
-            {/* Quick Metrics Cards (Green & Blue) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div style={{
-                background: '#F0FDFA',
-                border: '1px solid #CCFBF1',
-                borderRadius: 14,
-                padding: '12px 14px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#0D9488', marginBottom: 6 }}>
-                  <Folder size={16} />
-                  <span style={{ fontSize: 11, fontWeight: 700 }}>All files</span>
-                </div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>
-                  {allSharedCount}
-                </div>
-              </div>
+          {/* Rounded Pill Text Input */}
+          <input
+            type="text"
+            className="form-input"
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            placeholder={`Type a message in ${activeBatchName}...`}
+            style={{
+              flex: 1,
+              padding: '10px 16px',
+              borderRadius: 24,
+              border: 'none',
+              background: '#FFFFFF',
+              fontSize: 13.5,
+              outline: 'none',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+            }}
+          />
 
-              <div style={{
-                background: '#F8FAFC',
-                border: '1px solid #E2E8F0',
-                borderRadius: 14,
-                padding: '12px 14px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569', marginBottom: 6 }}>
-                  <LinkIcon size={16} />
-                  <span style={{ fontSize: 11, fontWeight: 700 }}>Resources</span>
-                </div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>
-                  {messages.filter(m => m.mediaUrl).length}
-                </div>
-              </div>
-            </div>
+          {/* Circular WhatsApp Send Button */}
+          <button
+            type="submit"
+            disabled={uploading || (!inputText.trim() && !attachment && !selectedSticker)}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              background: '#00A884',
+              color: '#FFFFFF',
+              border: 'none',
+              cursor: (uploading || (!inputText.trim() && !attachment && !selectedSticker)) ? 'not-allowed' : 'pointer',
+              opacity: (uploading || (!inputText.trim() && !attachment && !selectedSticker)) ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 6px rgba(0, 168, 132, 0.4)',
+              flexShrink: 0
+            }}
+          >
+            <Send size={17} />
+          </button>
+        </form>
+      </div>
 
-            {/* File Types Breakdown */}
-            <div>
-              <span style={{ fontSize: 11.5, fontWeight: 750, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block', marginBottom: 10 }}>
-                File type
-              </span>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {/* Documents */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: '#F8FAFC', borderRadius: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#EEF2FF', color: '#4F46E5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <FileText size={16} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 750, color: '#0F172A' }}>Documents</div>
-                      <div style={{ fontSize: 10.5, color: '#64748B' }}>{sharedDocs.length} files</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} color="#94A3B8" />
-                </div>
-
-                {/* Photos */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: '#F8FAFC', borderRadius: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#FEF3C7', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <ImageIcon size={16} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 750, color: '#0F172A' }}>Photos</div>
-                      <div style={{ fontSize: 10.5, color: '#64748B' }}>{sharedImages.length} files</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} color="#94A3B8" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </aside>
-      )}
-
-      {/* ─── MODAL 1: STUDENT PROFILE DOSSIER (ADMIN & TRAINER) ─── */}
+      {/* ─── MODAL 1: RICH STUDENT DETAILS (FOR ADMIN & TRAINER) ─── */}
       {previewStudent && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
-          <div style={{ width: '100%', maxWidth: 440, background: '#FFFFFF', borderRadius: 20, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', background: '#0F172A', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <GraduationCap size={18} color="#A7F3D0" />
-                <h4 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>Student Dossier</h4>
-              </div>
-              <button onClick={() => setPreviewStudent(null)} style={{ background: 'transparent', border: 'none', color: '#CBD5E1', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
-            </div>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(11, 20, 26, 0.6)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
+          <div style={{ width: '100%', maxWidth: 460, background: '#FFFFFF', borderRadius: 20, boxShadow: '0 20px 50px rgba(0,0,0,0.25)', padding: 24, position: 'relative' }}>
+            <button
+              onClick={() => setPreviewStudent(null)}
+              style={{ position: 'absolute', right: 16, top: 16, background: '#F0F2F5', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <X size={15} color="#54656F" />
+            </button>
 
-            <div style={{ padding: 22 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-                <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#0D9488', color: '#FFFFFF', fontSize: 18, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {(previewStudent.name || 'S').charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <h4 style={{ margin: '0 0 2px', fontSize: 16, fontWeight: 800, color: '#0F172A' }}>{previewStudent.name}</h4>
-                  <span style={{ fontSize: 12, color: '#64748B' }}>ID: {previewStudent.student_id || previewStudent.id || 'N/A'}</span>
-                </div>
+            {loadingStudent ? (
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 10px', color: '#00A884' }} />
+                <p style={{ margin: 0, fontSize: 13, color: '#667781' }}>Loading student profile...</p>
               </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
+                  <div style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #00A884, #059669)',
+                    color: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 20,
+                    fontWeight: 800,
+                    overflow: 'hidden',
+                    boxShadow: '0 4px 12px rgba(0, 168, 132, 0.25)'
+                  }}>
+                    {previewStudent.profile_pic || previewStudent.profilePhotoUrl ? (
+                      <img src={previewStudent.profile_pic || previewStudent.profilePhotoUrl} alt={previewStudent.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      previewStudent.name ? previewStudent.name.substring(0, 2).toUpperCase() : 'ST'
+                    )}
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#111B21' }}>{previewStudent.name}</h3>
+                    <code style={{ fontSize: 12, color: '#00A884', fontWeight: 700 }}>{previewStudent.rollNumber || previewStudent.id}</code>
+                  </div>
+                </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, background: '#F8FAFC', padding: 14, borderRadius: 12, border: '1px solid #E2E8F0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#64748B' }}>Enrolled Course:</span>
-                  <strong style={{ color: '#0F172A' }}>{previewStudent.course || activeCourseName}</strong>
+                {/* Details Table */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: '#F8FAFC', padding: 14, borderRadius: 12, border: '1px solid #E2E8F0', fontSize: 13, marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B', fontWeight: 600 }}>Email:</span>
+                    <a href={`mailto:${previewStudent.email}`} style={{ color: '#00A884', textDecoration: 'none', fontWeight: 700 }}>{previewStudent.email || '—'}</a>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B', fontWeight: 600 }}>Mobile:</span>
+                    <a href={`tel:${previewStudent.phone || previewStudent.mobile}`} style={{ color: '#111B21', textDecoration: 'none', fontWeight: 700 }}>{previewStudent.phone || previewStudent.mobile || '—'}</a>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B', fontWeight: 600 }}>Course:</span>
+                    <span style={{ fontWeight: 700, color: '#111B21' }}>{previewStudent.course || 'Data Science & AI'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B', fontWeight: 600 }}>Batch Cohort:</span>
+                    <span style={{ fontWeight: 700, color: '#00A884' }}>{previewStudent.batch_name || previewStudent.batch || activeBatchName}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B', fontWeight: 600 }}>Fee Status:</span>
+                    <span style={{ fontWeight: 700, color: (previewStudent.feesStatus === 'Paid') ? '#10B981' : '#EF4444' }}>
+                      {previewStudent.feesStatus || 'Pending'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B', fontWeight: 600 }}>Attendance:</span>
+                    <span style={{ fontWeight: 700, color: '#2563EB' }}>
+                      {previewStudent.attendance || 0}%
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B', fontWeight: 600 }}>Activity Score:</span>
+                    <span style={{ fontWeight: 700, color: '#EC4899' }}>
+                      {previewStudent.activityPoints || 0} pts
+                    </span>
+                  </div>
+                  {(previewStudent.guardian_phone || previewStudent.guardian_name) && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748B', fontWeight: 600 }}>Guardian:</span>
+                      <span style={{ fontWeight: 600, color: '#111B21' }}>
+                        {previewStudent.guardian_name || ''} {previewStudent.guardian_phone ? `(${previewStudent.guardian_phone})` : ''}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#64748B' }}>Batch Cohort:</span>
-                  <strong style={{ color: '#0D9488' }}>{previewStudent.batch || activeBatchName}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#64748B' }}>Fee Clearance:</span>
-                  <strong style={{ color: previewStudent.feesStatus === 'Paid' ? '#059669' : '#D97706' }}>
-                    {previewStudent.feesStatus || 'Clearance Active'}
-                  </strong>
-                </div>
+
+                {currentRole === 'admin' && (
+                  <button
+                    onClick={() => {
+                      const sId = previewStudent.id || previewStudent.uid;
+                      if (sId) {
+                        setPreviewStudent(null);
+                        navigate(`/admin/students/${sId}`);
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      background: 'linear-gradient(135deg, #00A884, #059669)',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      padding: '11px',
+                      borderRadius: 10,
+                      fontWeight: 750,
+                      fontSize: 13.5,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6
+                    }}
+                  >
+                    View Full Student Dossier <ChevronRight size={16} />
+                  </button>
+                )}
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* ─── MODAL 2: DELETE CONFIRMATION MODAL ─── */}
+      {/* ─── MODAL 2: WHATSAPP DELETE CONFIRMATION MODAL ─── */}
       {deleteCandidate && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
-          <div style={{ width: '100%', maxWidth: 380, background: '#FFFFFF', borderRadius: 18, boxShadow: '0 20px 40px rgba(0,0,0,0.2)', padding: 22 }}>
-            <h4 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 800, color: '#0F172A' }}>Delete message?</h4>
-            <p style={{ margin: '0 0 18px', fontSize: 13, color: '#64748B', lineHeight: 1.5 }}>
-              This message will be removed for everyone in the cohort and marked with a deleted tombstone.
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(11, 20, 26, 0.6)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
+          <div style={{ width: '100%', maxWidth: 380, background: '#FFFFFF', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.2)', padding: 22 }}>
+            <h4 style={{ margin: '0 0 10px', fontSize: 16, fontWeight: 800, color: '#111B21' }}>Delete message?</h4>
+            <p style={{ margin: '0 0 18px', fontSize: 13, color: '#667781', lineHeight: 1.5 }}>
+              Delete for everyone will permanently replace this message with a deleted tombstone in the cohort feed.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button
                 type="button"
                 onClick={() => setDeleteCandidate(null)}
-                style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#64748B', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}
+                style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#54656F', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}
               >
                 Cancel
               </button>
@@ -1531,7 +1214,7 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
           <img
             src={selectedMediaModal}
             alt="Enlarged"
-            style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.4)', objectFit: 'contain' }}
+            style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.4)', objectFit: 'contain' }}
           />
         </div>
       )}

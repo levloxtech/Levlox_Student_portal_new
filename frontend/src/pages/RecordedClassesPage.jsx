@@ -400,15 +400,16 @@ const RecordedClassesPage = ({
   return (
     <div className="levlox-courses-page" style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
 
-      {/* ─── 1. TOP LEARNING BANNER (UDEMY-INSPIRED EXPERIENCE) ─── */}
+      {/* ─── 1. TOP LEARNING BANNER (CLEAN MODERN WHITE/INDIGO HERO) ─── */}
       <div style={{
-        background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #1E293B 100%)',
+        background: '#FFFFFF',
         borderRadius: 20,
-        padding: '24px 30px',
-        color: '#FFFFFF',
+        padding: '24px 28px',
+        color: '#0F172A',
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: '0 8px 24px rgba(30, 27, 75, 0.15)',
+        border: '1px solid #E2E8F0',
+        boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.04)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -416,14 +417,14 @@ const RecordedClassesPage = ({
         gap: 20
       }}>
         <div style={{ zIndex: 2, maxWidth: 580 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255, 255, 255, 0.12)', backdropFilter: 'blur(8px)', padding: '4px 12px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, marginBottom: 12 }}>
-            <Sparkles size={13} color="#FBBF24" />
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#EEF2FF', border: '1px solid #C7D2FE', color: '#4338CA', padding: '4px 12px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, marginBottom: 12 }}>
+            <Sparkles size={13} color="#4F46E5" />
             <span>Welcome to Your Learning Campus</span>
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 850, margin: '0 0 8px', letterSpacing: '-0.4px', lineHeight: 1.25 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 850, margin: '0 0 8px', letterSpacing: '-0.4px', lineHeight: 1.25, color: '#0F172A' }}>
             Accelerate Your Technical Career
           </h1>
-          <p style={{ fontSize: 13.5, color: '#C7D2FE', margin: 0, lineHeight: 1.5 }}>
+          <p style={{ fontSize: 13.5, color: '#64748B', margin: 0, lineHeight: 1.5 }}>
             Explore on-demand lectures, practical code walkthroughs, and recorded sessions assigned to your batch.
           </p>
         </div>
@@ -492,11 +493,11 @@ const RecordedClassesPage = ({
                   height: 124,
                   borderRadius: 14,
                   position: 'relative',
-                  background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #0F172A 100%)',
+                  background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
                   cursor: 'pointer',
                   flexShrink: 0,
-                  boxShadow: '0 6px 16px rgba(30, 27, 75, 0.2)',
-                  border: '1px solid #4338CA',
+                  boxShadow: '0 4px 14px rgba(15, 23, 42, 0.15)',
+                  border: '1px solid #334155',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
@@ -852,7 +853,7 @@ const RecordedClassesPage = ({
                     minHeight: 135,
                     position: 'relative',
                     overflow: 'hidden',
-                    background: 'linear-gradient(135deg, #1E1B4B 0%, #0F172A 100%)',
+                    background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',

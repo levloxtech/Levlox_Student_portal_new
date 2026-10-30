@@ -209,59 +209,50 @@ export default function AssignmentsPage({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%' }}>
-      {/* ── TOP HERO BANNER ────────────────────────────────────────────── */}
+      {/* ── TOP HERO BANNER (CLEAN MODERN WHITE/LIGHT BLUE PALETTE) ── */}
       <div style={{
-        background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #1E3A8A 100%)',
+        background: '#FFFFFF',
         borderRadius: 20,
-        padding: '28px 32px',
-        color: '#FFFFFF',
+        padding: '24px 28px',
+        color: '#0F172A',
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: '0 12px 32px rgba(30, 27, 75, 0.25)'
+        border: '1px solid #E2E8F0',
+        boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.04)'
       }}>
-        <div style={{
-          position: 'absolute',
-          top: -50,
-          right: -50,
-          width: 200,
-          height: 200,
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, transparent 70%)',
-          pointerEvents: 'none'
-        }} />
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{
-              width: 50,
-              height: 50,
+              width: 48,
+              height: 48,
               borderRadius: 14,
-              background: 'rgba(255, 255, 255, 0.15)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.25)',
+              background: '#EEF2FF',
+              border: '1px solid #C7D2FE',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <FileText size={26} color="#FFFFFF" />
+              <FileText size={24} color="#4F46E5" />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: -0.4 }}>
+                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: -0.3 }}>
                   Assignments & Capstone Projects
                 </h2>
                 <span style={{
                   fontSize: 11,
                   fontWeight: 800,
-                  background: 'rgba(255, 255, 255, 0.2)',
+                  background: '#EEF2FF',
+                  color: '#4338CA',
+                  border: '1px solid #C7D2FE',
                   padding: '3px 9px',
                   borderRadius: 999,
-                  letterSpacing: 0.5
+                  letterSpacing: 0.3
                 }}>
-                  {studentBatchName ? `Batch ${studentBatchName}` : 'All Assigned Tasks'}
+                  {studentBatchName ? `Batch: ${studentBatchName}` : 'All Assigned Tasks'}
                 </span>
               </div>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#C7D2FE', maxWidth: 600 }}>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748B', maxWidth: 620 }}>
                 Review project briefs, download PDF specifications, complete implementation, and upload your ZIP or code packages for faculty grading.
               </p>
             </div>
@@ -277,15 +268,15 @@ export default function AssignmentsPage({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              background: 'rgba(255, 255, 255, 0.15)',
-              border: '1px solid rgba(255, 255, 255, 0.25)',
-              color: '#FFFFFF',
+              background: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              color: '#334155',
               borderRadius: 10,
               padding: '8px 14px',
               fontSize: 12.5,
               fontWeight: 700,
               cursor: 'pointer',
-              transition: 'background 0.15s ease'
+              transition: 'all 0.15s ease'
             }}
           >
             <RefreshCw size={14} /> Refresh Tasks
@@ -297,29 +288,29 @@ export default function AssignmentsPage({
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
           gap: 12,
-          marginTop: 22,
-          paddingTop: 18,
-          borderTop: '1px solid rgba(255, 255, 255, 0.15)'
+          marginTop: 20,
+          paddingTop: 16,
+          borderTop: '1px solid #F1F5F9'
         }}>
           <div>
-            <div style={{ fontSize: 11, color: '#A5B4FC', fontWeight: 600 }}>TOTAL ASSIGNED</div>
-            <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>{stats.total}</div>
+            <div style={{ fontSize: 11, color: '#64748B', fontWeight: 700 }}>TOTAL ASSIGNED</div>
+            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2, color: '#0F172A' }}>{stats.total}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: '#A5B4FC', fontWeight: 600 }}>APPROVED / GRADED</div>
-            <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2, color: '#6EE7B7' }}>{stats.approved}</div>
+            <div style={{ fontSize: 11, color: '#64748B', fontWeight: 700 }}>APPROVED / GRADED</div>
+            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2, color: '#059669' }}>{stats.approved}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: '#A5B4FC', fontWeight: 600 }}>UNDER REVIEW</div>
-            <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2, color: '#FDE047' }}>{stats.submitted}</div>
+            <div style={{ fontSize: 11, color: '#64748B', fontWeight: 700 }}>UNDER REVIEW</div>
+            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2, color: '#D97706' }}>{stats.submitted}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: '#A5B4FC', fontWeight: 600 }}>PENDING ACTION</div>
-            <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2, color: '#FCA5A5' }}>{stats.pending}</div>
+            <div style={{ fontSize: 11, color: '#64748B', fontWeight: 700 }}>PENDING ACTION</div>
+            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2, color: '#DC2626' }}>{stats.pending}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: '#A5B4FC', fontWeight: 600 }}>OVERALL GRADE</div>
-            <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2, color: '#FFFFFF' }}>{stats.avgScore}%</div>
+            <div style={{ fontSize: 11, color: '#64748B', fontWeight: 700 }}>OVERALL GRADE</div>
+            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2, color: '#4F46E5' }}>{stats.avgScore}%</div>
           </div>
         </div>
       </div>
