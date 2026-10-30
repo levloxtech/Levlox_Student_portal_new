@@ -423,7 +423,7 @@ const RecordedClassesPage = ({
               </span>
             </div>
 
-            {/* Content: Thumbnail + Info */}
+            {/* Content: Video Media Box + Info */}
             <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
               <div 
                 onClick={() => {
@@ -434,28 +434,48 @@ const RecordedClassesPage = ({
                 }}
                 style={{
                   width: 200,
-                  height: 120,
-                  borderRadius: 12,
-                  overflow: 'hidden',
+                  height: 124,
+                  borderRadius: 14,
                   position: 'relative',
-                  background: '#0F172A',
+                  background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #0F172A 100%)',
                   cursor: 'pointer',
                   flexShrink: 0,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  boxShadow: '0 6px 16px rgba(30, 27, 75, 0.2)',
+                  border: '1px solid #4338CA',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  boxSizing: 'border-box'
                 }}
               >
-                <img 
-                  src={currentlyLearningCourse.thumbnail} 
-                  alt={currentlyLearningCourse.title}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
-                    <Play size={20} fill="#2563EB" style={{ marginLeft: 2 }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(255,255,255,0.18)', color: '#FFFFFF', padding: '2px 8px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                    {currentlyLearningCourse.category || 'Curriculum'}
+                  </span>
+                  <span style={{ fontSize: 10.5, color: '#A5B4FC', fontWeight: 700 }}>
+                    {currentlyLearningCourse.duration}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: '50%',
+                    background: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#2563EB',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.25)'
+                  }}>
+                    <Play size={18} fill="#2563EB" style={{ marginLeft: 2 }} />
                   </div>
                 </div>
-                <div style={{ position: 'absolute', bottom: 6, right: 8, background: 'rgba(0,0,0,0.75)', color: '#FFFFFF', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>
-                  {currentlyLearningCourse.duration}
+
+                <div style={{ fontSize: 11, fontWeight: 750, color: '#E0E7FF', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {currentlyLearningCourse.title}
                 </div>
               </div>
 
@@ -772,44 +792,91 @@ const RecordedClassesPage = ({
                   }}
                   className="clickable-card-hover"
                 >
-                  {/* 16:9 Thumbnail with Overlay */}
-                  <div style={{ height: 140, position: 'relative', overflow: 'hidden', background: '#0F172A' }}>
-                    <img
-                      src={course.thumbnail}
-                      alt={course.title}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                    <div style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.65) 100%)'
-                    }} />
+                  {/* Sleek Typography Header - Zero Images, Premium Modern UI */}
+                  <div style={{
+                    minHeight: 135,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    background: 'linear-gradient(135deg, #1E1B4B 0%, #0F172A 100%)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    padding: '14px 16px',
+                    borderBottom: '1px solid #E2E8F0'
+                  }}>
+                    {/* Top Row: Category tag & Status badge */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 2 }}>
+                      <span style={{
+                        background: 'rgba(255, 255, 255, 0.15)',
+                        backdropFilter: 'blur(8px)',
+                        color: '#E0E7FF',
+                        fontSize: 10.5,
+                        fontWeight: 750,
+                        padding: '3px 10px',
+                        borderRadius: 999,
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                      }}>
+                        {course.category}
+                      </span>
 
-                    {/* Top Right Status Badge */}
-                    <div style={{ position: 'absolute', top: 10, right: 10 }}>
-                      {isCompleted ? (
-                        <span style={{ background: '#10B981', color: '#FFFFFF', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          <CheckCircle2 size={11} /> Completed
-                        </span>
-                      ) : isInProgress ? (
-                        <span style={{ background: '#2563EB', color: '#FFFFFF', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          <Play size={10} fill="#FFFFFF" /> In Progress
-                        </span>
-                      ) : (
-                        <span style={{ background: 'rgba(255,255,255,0.9)', color: '#475569', fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 999 }}>
-                          Not Started
-                        </span>
-                      )}
+                      <div>
+                        {isCompleted ? (
+                          <span style={{ background: '#10B981', color: '#FFFFFF', fontSize: 10.5, fontWeight: 800, padding: '3px 9px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <CheckCircle2 size={11} /> Completed
+                          </span>
+                        ) : isInProgress ? (
+                          <span style={{ background: '#2563EB', color: '#FFFFFF', fontSize: 10.5, fontWeight: 800, padding: '3px 9px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <Play size={10} fill="#FFFFFF" /> In Progress
+                          </span>
+                        ) : (
+                          <span style={{ background: 'rgba(255,255,255,0.15)', color: '#CBD5E1', fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.1)' }}>
+                            Not Started
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Duration badge bottom right */}
-                    <div style={{ position: 'absolute', bottom: 8, right: 10, background: 'rgba(0,0,0,0.75)', color: '#FFFFFF', fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 4 }}>
-                      {course.duration}
+                    {/* Center / Bottom: Book icon + Course Title */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative', zIndex: 2, margin: '10px 0 6px 0' }}>
+                      <div style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        background: 'rgba(255, 255, 255, 0.12)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <BookOpen size={18} color="#93C5FD" />
+                      </div>
+                      <h4 style={{
+                        fontSize: 15,
+                        fontWeight: 850,
+                        margin: 0,
+                        color: '#FFFFFF',
+                        lineHeight: 1.25,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                      }}>
+                        {course.title}
+                      </h4>
                     </div>
 
-                    {/* Category pill bottom left */}
-                    <div style={{ position: 'absolute', bottom: 8, left: 10, background: 'rgba(255,255,255,0.92)', color: '#1E293B', fontSize: 10.5, fontWeight: 750, padding: '2px 8px', borderRadius: 4 }}>
-                      {course.category}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', position: 'relative', zIndex: 2 }}>
+                      <span style={{
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        color: '#A5B4FC',
+                        background: 'rgba(0, 0, 0, 0.45)',
+                        padding: '2px 8px',
+                        borderRadius: 4
+                      }}>
+                        ⏱ {course.duration}
+                      </span>
                     </div>
                   </div>
 

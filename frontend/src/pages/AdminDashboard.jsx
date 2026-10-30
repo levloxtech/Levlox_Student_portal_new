@@ -4171,7 +4171,7 @@ const AdminDashboard = () => {
       name: playlistFormName.trim(),
       course_name: playlistFormCourse.trim() || 'General Curriculum',
       description: playlistFormDescription.trim(),
-      thumbnail: playlistFormThumbnail.trim(),
+      thumbnail: '',
       access_type: playlistFormAccess,
       batch_id: playlistFormAccess === 'batch' ? playlistFormBatchId : '',
       batch_name: playlistFormAccess === 'batch' ? (targetBatch?.name || '') : 'All Students',
@@ -4192,7 +4192,6 @@ const AdminDashboard = () => {
       setPlaylistFormCourse('');
       setPlaylistFormDescription('');
       setPlaylistFormThumbnail('');
-      setPlaylistThumbnailType('url');
       setPlaylistFormAccess('all');
       setPlaylistFormBatchId('');
       await refetchAdminData();
@@ -6521,7 +6520,6 @@ const AdminDashboard = () => {
                     const plRecordings = recordedClasses.filter(r => String(r.playlist_id) === plId || String(r.batch_id) === plId);
                     const plDurationSec = plRecordings.reduce((acc, r) => acc + parseDurationToSeconds(r.duration), 0);
                     const isAll = playlist.access_type === 'all' || !playlist.batch_id;
-                    const customThumb = playlist.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=700&auto=format&fit=crop&q=80';
                     const theme = PLAYLIST_CARD_THEMES[idx % PLAYLIST_CARD_THEMES.length];
 
                     return (
@@ -6542,179 +6540,157 @@ const AdminDashboard = () => {
                         }}
                         className="clickable-card-hover"
                       >
-                        {/* Top Banner with Inset & Image Clarity */}
+                        {/* Sleek Typography & Track Header - Zero Images, Modern Clean UI */}
                         <div style={{ padding: '12px 12px 0 12px' }}>
                           <div style={{
-                            height: 145,
+                            minHeight: 140,
                             position: 'relative',
                             borderRadius: 18,
                             overflow: 'hidden',
-                            background: '#0F172A',
-                            boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+                            background: `linear-gradient(135deg, ${theme.accent}2A 0%, #0F172A 100%)`,
+                            boxShadow: '0 6px 18px rgba(15, 23, 42, 0.12)',
+                            border: `1px solid ${theme.border}`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            padding: '16px 18px',
                           }}>
-                            {/* Main Visual Image - Vibrant & Unobscured */}
-                            <img
-                              src={customThumb || workspace3D}
-                              alt=""
-                              referrerPolicy="no-referrer"
-                              crossOrigin="anonymous"
-                              onError={(e) => {
-                                e.currentTarget.onerror = null;
-                                e.currentTarget.src = workspace3D;
-                              }}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                transition: 'transform 0.3s ease',
-                              }}
-                            />
-                            {/* Gentle glossy gradient overlay for badge readability */}
+                            {/* Decorative background subtle glow */}
                             <div style={{
                               position: 'absolute',
-                              inset: 0,
-                              background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.05) 50%, rgba(15, 23, 42, 0.65) 100%)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              padding: '12px 14px',
-                            }}>
-                              {/* Top Bar on Banner */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              right: -20,
+                              top: -20,
+                              width: 130,
+                              height: 130,
+                              borderRadius: '50%',
+                              background: theme.accent,
+                              opacity: 0.22,
+                              filter: 'blur(35px)',
+                              pointerEvents: 'none'
+                            }} />
+
+                            {/* Top Row: Track Badge + Access Pill + Action Buttons */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 2 }}>
+                              <span style={{
+                                fontSize: 11,
+                                fontWeight: 750,
+                                background: 'rgba(255, 255, 255, 0.15)',
+                                backdropFilter: 'blur(10px)',
+                                WebkitBackdropFilter: 'blur(10px)',
+                                color: '#FFFFFF',
+                                padding: '4px 12px',
+                                borderRadius: 999,
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                              }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: theme.accent, boxShadow: `0 0 8px ${theme.accent}` }} />
+                                {playlist.course_name || 'Curriculum Track'}
+                              </span>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span style={{
                                   fontSize: 11,
-                                  fontWeight: 750,
-                                  background: 'rgba(255, 255, 255, 0.88)',
-                                  backdropFilter: 'blur(10px)',
-                                  WebkitBackdropFilter: 'blur(10px)',
-                                  color: '#0F172A',
-                                  padding: '4px 12px',
+                                  fontWeight: 800,
+                                  background: isAll ? 'rgba(16, 185, 129, 0.25)' : 'rgba(124, 58, 237, 0.25)',
+                                  border: `1px solid ${isAll ? '#10B981' : '#A78BFA'}`,
+                                  color: isAll ? '#6EE7B7' : '#DDD6FE',
+                                  padding: '4px 10px',
                                   borderRadius: 999,
-                                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 5,
+                                  backdropFilter: 'blur(6px)',
                                 }}>
-                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: theme.accent }} />
-                                  {playlist.course_name || 'Curriculum Track'}
+                                  {isAll ? '🌐 All' : `🔒 ${playlist.batch_name || 'Cohort'}`}
                                 </span>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{
-                                    fontSize: 11,
-                                    fontWeight: 800,
-                                    background: isAll ? 'rgba(16, 185, 129, 0.9)' : 'rgba(124, 58, 237, 0.9)',
-                                    backdropFilter: 'blur(8px)',
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingPlaylist(playlist);
+                                    setPlaylistFormName(playlist.name || '');
+                                    setPlaylistFormCourse(playlist.course_name || '');
+                                    setPlaylistFormDescription(playlist.description || '');
+                                    setPlaylistFormAccess(playlist.access_type || 'all');
+                                    setPlaylistFormBatchId(playlist.batch_id || '');
+                                    setShowPlaylistModal(true);
+                                  }}
+                                  style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: '50%',
+                                    background: 'rgba(255, 255, 255, 0.18)',
+                                    backdropFilter: 'blur(6px)',
+                                    border: '1px solid rgba(255, 255, 255, 0.25)',
                                     color: '#FFFFFF',
-                                    padding: '4px 10px',
-                                    borderRadius: 999,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
                                     boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-                                  }}>
-                                    {isAll ? '🌐 All' : `🔒 ${playlist.batch_name || 'Cohort'}`}
-                                  </span>
+                                  }}
+                                  title="Edit Playlist"
+                                >
+                                  <Pencil size={12} />
+                                </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingPlaylist(playlist);
-                                      setPlaylistFormName(playlist.name || '');
-                                      setPlaylistFormCourse(playlist.course_name || '');
-                                      setPlaylistFormDescription(playlist.description || '');
-                                      setPlaylistFormThumbnail(playlist.thumbnail || '');
-                                      setPlaylistThumbnailType(playlist.thumbnail ? 'url' : 'url');
-                                      setPlaylistFormAccess(playlist.access_type || 'all');
-                                      setPlaylistFormBatchId(playlist.batch_id || '');
-                                      setShowPlaylistModal(true);
-                                    }}
-                                    style={{
-                                      width: 28,
-                                      height: 28,
-                                      borderRadius: '50%',
-                                      background: 'rgba(255, 255, 255, 0.88)',
-                                      backdropFilter: 'blur(6px)',
-                                      border: 'none',
-                                      color: '#1E293B',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-                                    }}
-                                    title="Edit Playlist"
-                                  >
-                                    <Pencil size={12} />
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeletePlaylist(plId);
-                                    }}
-                                    style={{
-                                      width: 28,
-                                      height: 28,
-                                      borderRadius: '50%',
-                                      background: '#EF4444',
-                                      border: 'none',
-                                      color: '#FFFFFF',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                                    }}
-                                    title="Delete Playlist"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeletePlaylist(plId);
+                                  }}
+                                  style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: '50%',
+                                    background: '#EF4444',
+                                    border: 'none',
+                                    color: '#FFFFFF',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                                  }}
+                                  title="Delete Playlist"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
                               </div>
+                            </div>
 
-                              {/* Bottom Row on Banner: Elevated Badge Tile + Playlist Title */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <div style={{
-                                  width: 36,
-                                  height: 36,
-                                  borderRadius: 10,
-                                  background: '#FFFFFF',
-                                  boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  flexShrink: 0,
-                                  overflow: 'hidden',
-                                }}>
-                                  {customThumb ? (
-                                    <img
-                                      src={customThumb}
-                                      alt=""
-                                      referrerPolicy="no-referrer"
-                                      crossOrigin="anonymous"
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                        if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'flex';
-                                      }}
-                                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                    />
-                                  ) : null}
-                                  <div style={{ display: customThumb ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
-                                    <BookOpen size={18} color="#6366F1" />
-                                  </div>
-                                </div>
-                                <h5 style={{
-                                  fontSize: '16px',
-                                  fontWeight: '800',
-                                  margin: 0,
-                                  color: '#FFFFFF',
-                                  textShadow: '0 2px 6px rgba(0,0,0,0.7)',
-                                  letterSpacing: '-0.2px',
-                                  lineHeight: 1.2,
-                                }}>
-                                  {playlist.name}
-                                </h5>
+                            {/* Bottom Row: Modern Tile Icon + Playlist Title */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 2, marginTop: 14 }}>
+                              <div style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 12,
+                                background: `linear-gradient(135deg, ${theme.accent} 0%, #1E293B 100%)`,
+                                border: '1px solid rgba(255, 255, 255, 0.25)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                              }}>
+                                <BookOpen size={19} color="#FFFFFF" />
                               </div>
+                              <h5 style={{
+                                fontSize: '17px',
+                                fontWeight: '850',
+                                margin: 0,
+                                color: '#FFFFFF',
+                                textShadow: '0 2px 6px rgba(0,0,0,0.7)',
+                                letterSpacing: '-0.3px',
+                                lineHeight: 1.25,
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden'
+                              }}>
+                                {playlist.name}
+                              </h5>
                             </div>
                           </div>
                         </div>
@@ -10022,148 +9998,6 @@ const AdminDashboard = () => {
                     onChange={(e) => setPlaylistFormDescription(e.target.value)}
                     placeholder="Describe what students will learn in this custom playlist..."
                   />
-                </div>
-
-                {/* Playlist Thumbnail (Cover Image) */}
-                <div className="form-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <label className="form-label" style={{ margin: 0 }}>Playlist Thumbnail (Cover Banner)</label>
-                    <span style={{ fontSize: 11, color: '#64748B' }}>Shown with transparent overlay</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 16, marginBottom: 8, marginTop: 4 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                      <input
-                        type="radio"
-                        name="playlistThumbType"
-                        value="url"
-                        checked={playlistThumbnailType === 'url'}
-                        onChange={() => setPlaylistThumbnailType('url')}
-                      />
-                      <span>Image URL / Link</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                      <input
-                        type="radio"
-                        name="playlistThumbType"
-                        value="upload"
-                        checked={playlistThumbnailType === 'upload'}
-                        onChange={() => setPlaylistThumbnailType('upload')}
-                      />
-                      <span>Upload Image File</span>
-                    </label>
-                  </div>
-
-                  {playlistThumbnailType === 'url' ? (
-                    <input
-                      type="url"
-                      className="form-input"
-                      value={playlistFormThumbnail}
-                      onChange={async (e) => {
-                        const val = e.target.value;
-                        const direct = resolveDirectImageUrl(val);
-                        setPlaylistFormThumbnail(direct);
-                        if (val.startsWith('http') && !/\.(png|jpe?g|svg|webp|gif)($|\?)/i.test(val)) {
-                          try {
-                            const r = await fetch(`/api/resolve-image?url=${encodeURIComponent(val)}`);
-                            if (r.ok) {
-                              const d = await r.json();
-                              if (d.directUrl && d.directUrl !== val) setPlaylistFormThumbnail(d.directUrl);
-                            }
-                          } catch (_) {}
-                        }
-                      }}
-                      placeholder="Paste image link, webpage (e.g. clipsafari), or direct URL"
-                    />
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="form-input"
-                        onChange={async (e) => {
-                          const file = e.target.files[0];
-                          if (!file) return;
-                          try {
-                            setPlaylistUploadingThumb(true);
-                            const url = await uploadFile(file, 'playlists');
-                            if (url) setPlaylistFormThumbnail(url);
-                          } catch (err) {
-                            showModal('Upload Error', err.message, 'error');
-                          } finally {
-                            setPlaylistUploadingThumb(false);
-                          }
-                        }}
-                      />
-                      {playlistUploadingThumb && (
-                        <span style={{ fontSize: 12, color: 'var(--primary-color)', fontWeight: 600 }}>
-                          Uploading thumbnail to local storage...
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Live Transparent Image Card Preview */}
-                  {playlistFormThumbnail ? (
-                    <div style={{
-                      marginTop: 10,
-                      borderRadius: 16,
-                      overflow: 'hidden',
-                      position: 'relative',
-                      height: 110,
-                      background: `linear-gradient(180deg, rgba(15, 23, 42, 0.25) 0%, rgba(15, 23, 42, 0.88) 100%), url(${resolveDirectImageUrl(playlistFormThumbnail)}) center / cover no-repeat`,
-                      border: '1px solid rgba(226, 232, 240, 0.8)',
-                      boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      padding: '12px 16px',
-                      color: '#FFFFFF',
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          background: 'rgba(255, 255, 255, 0.25)',
-                          backdropFilter: 'blur(8px)',
-                          WebkitBackdropFilter: 'blur(8px)',
-                          padding: '3px 9px',
-                          borderRadius: 999,
-                          letterSpacing: '0.4px',
-                          textTransform: 'uppercase',
-                        }}>
-                          Transparent Cover Preview
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setPlaylistFormThumbnail('')}
-                          style={{
-                            background: 'rgba(239, 68, 68, 0.85)',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            borderRadius: 999,
-                            padding: '3px 9px',
-                            fontSize: 11,
-                            cursor: 'pointer',
-                            fontWeight: 700,
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.6)' }}>
-                          {playlistFormName || 'Your Playlist Title'}
-                        </div>
-                        <div style={{ fontSize: 11.5, opacity: 0.9, marginTop: 1 }}>
-                          {playlistFormCourse || 'Curriculum Track'}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <span style={{ fontSize: 11, color: '#94A3B8', marginTop: 4, display: 'block' }}>
-                      Optional: Add a custom cover image or leave blank for dynamic tech gradient.
-                    </span>
-                  )}
                 </div>
 
                 <div className="form-group">
