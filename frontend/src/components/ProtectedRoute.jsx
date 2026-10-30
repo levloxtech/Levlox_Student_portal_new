@@ -9,14 +9,15 @@ import FullScreenLoader from './FullScreenLoader';
  */
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { currentUser, userRole, authLoading, logout } = useAuth();
+  const token = typeof window !== 'undefined' ? localStorage.getItem('levlox_auth_token') : null;
 
   // While Firebase auth state is initializing, show a full-screen loader
   if (authLoading) {
     return <FullScreenLoader label="Loading…" />;
   }
 
-  // Not authenticated → redirect to login
-  if (!currentUser) {
+  // Not authenticated or session revoked → redirect to login immediately with history replacement
+  if (!currentUser || !token) {
     return <Navigate to="/login" replace />;
   }
 

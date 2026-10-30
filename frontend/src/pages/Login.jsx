@@ -62,7 +62,17 @@ const Login = () => {
   const [isLocked, setIsLocked] = useState(false);
 
   const navigate = useNavigate();
-  const { loginWithCredentials } = useAuth();
+  const { loginWithCredentials, currentUser, userRole, authLoading } = useAuth();
+
+  /* ════ AUTO REDIRECT IF ALREADY AUTHENTICATED ════ */
+  useEffect(() => {
+    const token = localStorage.getItem('levlox_auth_token');
+    if (!authLoading && currentUser && token && userRole) {
+      if (userRole === 'admin') window.location.replace('/admin');
+      else if (userRole === 'trainer') window.location.replace('/trainer');
+      else window.location.replace('/student');
+    }
+  }, [currentUser, userRole, authLoading]);
 
   /* ════ LOAD REMEMBERED IDENTIFIER ════ */
   useEffect(() => {
@@ -201,9 +211,9 @@ const Login = () => {
         );
       }
 
-      if (role === 'admin') navigate('/admin', { replace: true });
-      else if (role === 'trainer') navigate('/trainer', { replace: true });
-      else navigate('/student', { replace: true });
+      if (role === 'admin') window.location.replace('/admin');
+      else if (role === 'trainer') window.location.replace('/trainer');
+      else window.location.replace('/student');
     } catch (err) {
       console.warn('[Login] Google sign-in failed:', err?.code || err?.message);
       if (err.code !== 'auth/popup-closed-by-user') {
@@ -318,10 +328,10 @@ const Login = () => {
       if (rememberMe) localStorage.setItem('rememberedIdentifier', rawInput);
       else localStorage.removeItem('rememberedIdentifier');
 
-      // Route user to appropriate portal dashboard
-      if (role === 'admin') navigate('/admin', { replace: true });
-      else if (role === 'trainer') navigate('/trainer', { replace: true });
-      else navigate('/student', { replace: true });
+      // Route user to appropriate portal dashboard with clean history replacement
+      if (role === 'admin') window.location.replace('/admin');
+      else if (role === 'trainer') window.location.replace('/trainer');
+      else window.location.replace('/student');
 
     } catch (err) {
       console.error('[Login] Authentication failed:', err.message);
@@ -377,7 +387,7 @@ const Login = () => {
         }} />
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: 440, zIndex: 1 }}>
-          <div style={{
+          <div className="login-card-container" style={{
             width: '100%',
             background: 'rgba(255, 255, 255, 0.04)',
             backdropFilter: 'blur(24px)',
@@ -496,7 +506,7 @@ const Login = () => {
                     disabled={isLocked}
                     autoComplete="current-password"
                     required
-                    style={{ cursor: isLocked ? 'not-allowed' : 'text' }}
+                    style={{ cursor: isLocked ? 'not-allowed' : 'text', paddingLeft: '48px', paddingRight: '48px' }}
                   />
                   <button
                     type="button"
@@ -843,6 +853,13 @@ const Login = () => {
           -webkit-text-fill-color: #ffffff !important;
           transition: background-color 999999s ease-in-out 0s;
           caret-color: white !important;
+        }
+
+        @media (max-width: 480px) {
+          .login-card-container {
+            padding: 32px 20px 24px !important;
+            border-radius: 20px !important;
+          }
         }
       `}</style>
     </>

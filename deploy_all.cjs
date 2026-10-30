@@ -4,7 +4,7 @@ const fs = require('fs');
 try {
   console.log('1. Git commit and push...');
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "fix(course-viewer): support back and close button in recorded classes, auto-close player on sidebar navigation"', { stdio: 'inherit' });
+  execSync('git commit -m "fix(security): prevent back navigation after logout, enforce session checks, and fix login input padding"', { stdio: 'inherit' });
   execSync('git push origin main', { stdio: 'inherit' });
 
   console.log('2. Git pull on remote server...');

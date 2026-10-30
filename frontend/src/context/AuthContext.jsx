@@ -111,6 +111,24 @@ export const AuthProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, [currentUser]);
 
+  // BFCache and popstate protection: kick unauthenticated users out immediately if they press browser Back
+  useEffect(() => {
+    const handleNavigationSecurity = () => {
+      const token = localStorage.getItem(TOKEN_KEY);
+      const pathname = window.location.pathname;
+      const isPublic = pathname === '/login' || pathname === '/reset-password' || pathname === '/verify-email';
+      if (!token && !isPublic) {
+        window.location.replace('/login');
+      }
+    };
+    window.addEventListener('pageshow', handleNavigationSecurity);
+    window.addEventListener('popstate', handleNavigationSecurity);
+    return () => {
+      window.removeEventListener('pageshow', handleNavigationSecurity);
+      window.removeEventListener('popstate', handleNavigationSecurity);
+    };
+  }, []);
+
   const loginWithCredentials = useCallback(async (identifier, password) => {
     setAuthLoading(true);
     setAuthError(null);
@@ -161,11 +179,15 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(PROFILE_KEY);
+    sessionStorage.clear();
     loadedUidRef.current = null;
     setCurrentUser(null);
     setUserProfile(null);
     setUserRole(null);
     setAuthError(null);
+
+    // Hard replace history state so pressing Back button cannot navigate back to authenticated session
+    window.location.replace('/login');
   }, []);
 
   const refreshProfile = useCallback(async () => {

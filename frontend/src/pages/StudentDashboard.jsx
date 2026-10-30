@@ -308,7 +308,6 @@ const StudentDashboard = () => {
 
   const handleLogout = async () => {
     await authLogout();
-    navigate('/login');
   };
 
   const handleProfileUpdate = (updatedData) => {

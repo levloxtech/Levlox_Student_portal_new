@@ -3109,7 +3109,6 @@ const AdminDashboard = () => {
 
   const handleLogout = async () => {
     await authLogout();
-    navigate('/login');
   };
 
   const fetchStats = () => {

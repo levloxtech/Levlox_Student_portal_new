@@ -52,10 +52,11 @@ const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
  */
 const RootRedirect = () => {
   const { currentUser, userRole, authLoading } = useAuth();
+  const token = typeof window !== 'undefined' ? localStorage.getItem('levlox_auth_token') : null;
 
   if (authLoading) return <FullScreenLoader />;
 
-  if (!currentUser) return <Navigate to="/login" replace />;
+  if (!currentUser || !token) return <Navigate to="/login" replace />;
   if (userRole === 'admin') return <Navigate to="/admin" replace />;
   if (userRole === 'trainer') return <Navigate to="/trainer" replace />;
   if (userRole === 'student') return <Navigate to="/student" replace />;
