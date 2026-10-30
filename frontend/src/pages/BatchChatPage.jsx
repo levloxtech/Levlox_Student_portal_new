@@ -672,231 +672,261 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
                   style={{
                     display: 'flex',
                     alignSelf: isMe ? 'flex-end' : 'flex-start',
-                    maxWidth: '75%',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    maxWidth: '82%',
                     position: 'relative',
-                    marginBottom: hasReactions ? 10 : 2
+                    marginBottom: 12
                   }}
                 >
-                  {/* WhatsApp Message Bubble Container */}
-                  <div style={{
-                    position: 'relative',
-                    background: msg.isDeleted ? '#F0F2F5' : (isMe ? '#D9FDD3' : '#FFFFFF'),
-                    color: '#111B21',
-                    borderRadius: isMe ? '8px 8px 2px 8px' : '8px 8px 8px 2px',
-                    padding: '6px 10px 6px 12px',
-                    boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)',
-                    wordBreak: 'break-word',
-                    fontSize: 13.5,
-                    lineHeight: 1.45,
-                    border: msg.isDeleted ? '1px dashed #CBD5E1' : 'none',
-                    display: 'flex',
-                    flexDirection: 'column'
-                  }}>
-                    {/* Header: Sender Name & Role (Only on incoming messages) */}
-                    {!isMe && !msg.isDeleted && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, fontSize: 12 }}>
-                        <span
-                          onClick={() => {
-                            if (isAdminOrTrainer && isStudent) openStudentPreview(msg.senderId, msg.senderName);
-                          }}
-                          style={{
-                            fontWeight: 700,
-                            color: isAdmin ? '#7C3AED' : (isTrainer ? '#059669' : '#4F46E5'),
-                            cursor: (isAdminOrTrainer && isStudent) ? 'pointer' : 'default',
-                            textDecoration: (isAdminOrTrainer && isStudent) ? 'underline' : 'none'
-                          }}
-                        >
-                          {msg.senderName}
-                        </span>
-
-                        {isAdmin && (
-                          <span style={{ fontSize: 9.5, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#EDE9FE', color: '#6D28D9' }}>
-                            🛡️ ADMIN
-                          </span>
-                        )}
-                        {isTrainer && (
-                          <span style={{ fontSize: 9.5, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#D1FAE5', color: '#047857' }}>
-                            🎓 TRAINER
-                          </span>
-                        )}
-                        {isStudent && (
-                          <span style={{ fontSize: 9.5, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#E0E7FF', color: '#3730A3' }}>
-                            🎒 STUDENT
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Deleted Tombstone */}
-                    {msg.isDeleted ? (
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontStyle: 'italic', fontSize: 12.5, color: '#8696A0', padding: '2px 0' }}>
-                        <Ban size={14} color="#8696A0" /> This message was deleted
-                      </div>
-                    ) : (
-                      <>
-                        {/* Sticker */}
-                        {msg.sticker && (
-                          <div style={{ fontSize: 44, margin: '2px 0 4px', lineHeight: 1 }}>
-                            {msg.sticker}
-                          </div>
-                        )}
-
-                        {/* Media Attachment */}
-                        {msg.mediaUrl && (
-                          <div style={{ margin: '4px 0 6px' }}>
-                            {msg.mediaType === 'image' && (
-                              <img
-                                src={msg.mediaUrl}
-                                alt={msg.fileName || 'Attachment'}
-                                onClick={() => setSelectedMediaModal(msg.mediaUrl)}
-                                style={{ maxWidth: 280, maxHeight: 240, borderRadius: 6, cursor: 'pointer', objectFit: 'cover', display: 'block' }}
-                              />
-                            )}
-                            {msg.mediaType === 'pdf' && (
-                              <a
-                                href={msg.mediaUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 8,
-                                  background: isMe ? 'rgba(0,0,0,0.05)' : '#F0F2F5',
-                                  color: '#111B21',
-                                  padding: '8px 12px',
-                                  borderRadius: 6,
-                                  textDecoration: 'none',
-                                  fontWeight: 600,
-                                  fontSize: 12.5
-                                }}
-                              >
-                                <FileText size={18} color="#EF4444" />
-                                <span style={{ maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {msg.fileName || 'Document.pdf'}
-                                </span>
-                                <Download size={14} color="#54656F" />
-                              </a>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Text & Inline Meta (Timestamp + Checkticks) */}
-                        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                          <span style={{ flex: 1, whiteSpace: 'pre-wrap' }}>{msg.text}</span>
-                          <span style={{ fontSize: 10.5, color: '#667781', alignSelf: 'flex-end', display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 'auto', paddingTop: 2 }}>
-                            {timeDisplay}
-                            {isMe && (
-                              <span title={msg.isAllRead ? "Seen by all batch members" : "Delivered"}>
-                                <CheckCheck size={14} color={msg.isAllRead ? "#53BDEB" : "#8696A0"} />
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                      </>
-                    )}
-
-                    {/* WhatsApp Attached Reactions Badge */}
-                    {hasReactions && !msg.isDeleted && (
-                      <div
-                        onClick={() => setActiveReactionPickerId(isPickerOpen ? null : msg.id)}
-                        style={{
-                          position: 'absolute',
-                          bottom: -9,
-                          [isMe ? 'right' : 'left']: 8,
-                          background: '#FFFFFF',
-                          border: '1px solid #D1D7DB',
-                          borderRadius: 12,
-                          padding: '1px 6px',
-                          fontSize: 11,
-                          boxShadow: '0 1px 2px rgba(11,20,26,0.15)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 3,
-                          zIndex: 2,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {reactionEntries.map(([emoji, uids]) => (
-                          <span key={emoji}>
-                            {emoji} {uids.length > 1 && <strong style={{ fontSize: 9.5 }}>{uids.length}</strong>}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Sleek Floating Hover Toolbar (WhatsApp Action Trigger) */}
-                  {(isHovered || isPickerOpen) && !msg.isDeleted && (
-                    <div style={{
-                      position: 'absolute',
-                      top: -18,
-                      [isMe ? 'left' : 'right']: -38,
-                      background: '#FFFFFF',
-                      borderRadius: 16,
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                      border: '1px solid #E9EDEF',
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '2px 4px',
-                      zIndex: 10
-                    }}>
-                      {/* React Button */}
-                      <button
-                        type="button"
-                        onClick={() => setActiveReactionPickerId(isPickerOpen ? null : msg.id)}
-                        title="React to message"
-                        style={{ background: 'none', border: 'none', color: '#54656F', cursor: 'pointer', padding: '3px 5px', display: 'flex', alignItems: 'center' }}
-                      >
-                        <Smile size={14} />
-                      </button>
-
-                      {/* WhatsApp Delete for Everyone Button */}
-                      {canDelete && (
-                        <button
-                          type="button"
-                          onClick={() => setDeleteCandidate(msg)}
-                          title={isAdminOrTrainer ? 'Delete for everyone (Moderator)' : 'Delete for everyone (Within 2 hours)'}
-                          style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '3px 5px', display: 'flex', alignItems: 'center' }}
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                  {/* Avatar for Incoming Messages (Student / Trainer / Admin Profile Pic) */}
+                  {!isMe && (
+                    <div
+                      onClick={() => {
+                        if (isAdminOrTrainer && isStudent) openStudentPreview(msg.senderId, msg.senderName);
+                      }}
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: '50%',
+                        background: isAdmin ? '#EDE9FE' : (isTrainer ? '#D1FAE5' : '#E0E7FF'),
+                        color: isAdmin ? '#6D28D9' : (isTrainer ? '#047857' : '#3730A3'),
+                        fontSize: 14,
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        marginTop: 2,
+                        cursor: (isAdminOrTrainer && isStudent) ? 'pointer' : 'default',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                        overflow: 'hidden'
+                      }}
+                      title={isAdminOrTrainer && isStudent ? "Click to view student profile" : msg.senderName}
+                    >
+                      {msg.senderAvatar ? (
+                        <img src={msg.senderAvatar} alt={msg.senderName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        (msg.senderName || 'U').charAt(0).toUpperCase()
                       )}
                     </div>
                   )}
 
-                  {/* WhatsApp Quick Reaction Strip Popup */}
-                  {isPickerOpen && !msg.isDeleted && (
+                  {/* Message Column: Author + Bubble + Bottom Likes/Actions */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', maxWidth: '100%' }}>
+                    {/* Header: Sender Name & Role & Timestamp */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontSize: 11.5 }}>
+                      <span
+                        onClick={() => {
+                          if (isAdminOrTrainer && isStudent) openStudentPreview(msg.senderId, msg.senderName);
+                        }}
+                        style={{
+                          fontWeight: 750,
+                          color: isMe ? '#059669' : (isAdmin ? '#7C3AED' : (isTrainer ? '#059669' : '#1E293B')),
+                          cursor: (isAdminOrTrainer && isStudent) ? 'pointer' : 'default',
+                          textDecoration: (isAdminOrTrainer && isStudent) ? 'underline' : 'none'
+                        }}
+                      >
+                        {isMe ? 'You' : msg.senderName}
+                      </span>
+
+                      {isAdmin && (
+                        <span style={{ fontSize: 9.5, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#EDE9FE', color: '#6D28D9' }}>
+                          🛡️ ADMIN
+                        </span>
+                      )}
+                      {isTrainer && (
+                        <span style={{ fontSize: 9.5, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#D1FAE5', color: '#047857' }}>
+                          🎓 TRAINER
+                        </span>
+                      )}
+                      {isStudent && (
+                        <span style={{ fontSize: 9.5, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#E0E7FF', color: '#3730A3' }}>
+                          🎒 STUDENT
+                        </span>
+                      )}
+
+                      <span style={{ color: '#8696A0', fontSize: 10.5 }}>{timeDisplay}</span>
+                    </div>
+
+                    {/* WhatsApp Message Bubble Container */}
                     <div style={{
-                      position: 'absolute',
-                      top: -36,
-                      [isMe ? 'right' : 'left']: 0,
-                      background: '#FFFFFF',
-                      borderRadius: 20,
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-                      border: '1px solid #E9EDEF',
+                      position: 'relative',
+                      background: msg.isDeleted ? '#F0F2F5' : (isMe ? '#D9FDD3' : '#FFFFFF'),
+                      color: '#111B21',
+                      borderRadius: isMe ? '12px 2px 12px 12px' : '2px 12px 12px 12px',
+                      padding: '8px 12px',
+                      boxShadow: '0 1px 2px rgba(11,20,26,0.12)',
+                      wordBreak: 'break-word',
+                      fontSize: 13.5,
+                      lineHeight: 1.45,
+                      border: msg.isDeleted ? '1px dashed #CBD5E1' : 'none',
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      padding: '4px 8px',
-                      zIndex: 20
+                      flexDirection: 'column'
                     }}>
-                      {QUICK_REACTIONS.map(emoji => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => handleToggleReaction(msg.id, emoji)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            fontSize: 18,
-                            cursor: 'pointer',
-                            padding: '2px 4px',
-                            transition: 'transform 0.1s ease'
-                          }}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
+                      {/* Deleted Tombstone */}
+                      {msg.isDeleted ? (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontStyle: 'italic', fontSize: 12.5, color: '#8696A0', padding: '2px 0' }}>
+                          <Ban size={14} color="#8696A0" /> This message was deleted
+                        </div>
+                      ) : (
+                        <>
+                          {/* Sticker */}
+                          {msg.sticker && (
+                            <div style={{ fontSize: 44, margin: '2px 0 4px', lineHeight: 1 }}>
+                              {msg.sticker}
+                            </div>
+                          )}
+
+                          {/* Media Attachment */}
+                          {msg.mediaUrl && (
+                            <div style={{ margin: '4px 0 6px' }}>
+                              {msg.mediaType === 'image' && (
+                                <img
+                                  src={msg.mediaUrl}
+                                  alt={msg.fileName || 'Attachment'}
+                                  onClick={() => setSelectedMediaModal(msg.mediaUrl)}
+                                  style={{ maxWidth: 280, maxHeight: 240, borderRadius: 8, cursor: 'pointer', objectFit: 'cover', display: 'block' }}
+                                />
+                              )}
+                              {msg.mediaType === 'pdf' && (
+                                <a
+                                  href={msg.mediaUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    background: isMe ? 'rgba(0,0,0,0.05)' : '#F0F2F5',
+                                    color: '#111B21',
+                                    padding: '8px 12px',
+                                    borderRadius: 6,
+                                    textDecoration: 'none',
+                                    fontWeight: 600,
+                                    fontSize: 12.5
+                                  }}
+                                >
+                                  <FileText size={18} color="#EF4444" />
+                                  <span style={{ maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {msg.fileName || 'Document.pdf'}
+                                  </span>
+                                  <Download size={14} color="#54656F" />
+                                </a>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Text & Inline Meta (Checkticks) */}
+                          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                            <span style={{ flex: 1, whiteSpace: 'pre-wrap' }}>{msg.text}</span>
+                            {isMe && (
+                              <span style={{ alignSelf: 'flex-end', marginLeft: 'auto', display: 'inline-flex', alignItems: 'center' }} title={msg.isAllRead ? "Seen by all batch members" : "Delivered"}>
+                                <CheckCheck size={14} color={msg.isAllRead ? "#53BDEB" : "#8696A0"} />
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Bottom Action Row: Direct Like / Emoji Buttons & Delete */}
+                    {!msg.isDeleted && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        marginTop: 4,
+                        padding: '0 2px'
+                      }}>
+                        {/* 4 Quick Emoji Reactions / Likes */}
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          {['👍', '❤️', '🔥', '👏'].map(emoji => {
+                            const uids = msg.reactions?.[emoji] || [];
+                            const count = uids.length;
+                            const hasReacted = uids.includes(String(currentUserId));
+                            return (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() => handleToggleReaction(msg.id, emoji)}
+                                style={{
+                                  background: hasReacted ? '#DCF8C6' : '#FFFFFF',
+                                  border: hasReacted ? '1px solid #00A884' : '1px solid #D1D7DB',
+                                  borderRadius: 14,
+                                  padding: '2px 7px',
+                                  fontSize: 12,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 3,
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                title={`React with ${emoji}`}
+                              >
+                                <span>{emoji}</span>
+                                {count > 0 && (
+                                  <strong style={{ fontSize: 10, color: hasReacted ? '#075E54' : '#54656F' }}>
+                                    {count}
+                                  </strong>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* WhatsApp Delete for Everyone Button */}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteCandidate(msg)}
+                            title={isAdminOrTrainer ? 'Delete for everyone (Moderator)' : 'Delete for everyone (Within 2 hours)'}
+                            style={{
+                              background: '#FFFFFF',
+                              border: '1px solid #D1D7DB',
+                              color: '#EF4444',
+                              borderRadius: 14,
+                              padding: '3px 7px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                            }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Avatar for Outgoing Messages (Current User) */}
+                  {isMe && (
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: '50%',
+                        background: '#DCF8C6',
+                        color: '#075E54',
+                        fontSize: 14,
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        marginTop: 2,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                        overflow: 'hidden'
+                      }}
+                      title="You"
+                    >
+                      {currentUser.profile_pic || currentUser.profilePhotoUrl ? (
+                        <img src={currentUser.profile_pic || currentUser.profilePhotoUrl} alt="You" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        (currentUser.fullName || currentUser.name || 'Y').charAt(0).toUpperCase()
+                      )}
                     </div>
                   )}
                 </div>
