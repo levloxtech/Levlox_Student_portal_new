@@ -5,7 +5,8 @@ import {
   BookOpen, Search, Shield, Flag, X, Check,
   Sparkles, ExternalLink, Video, CheckCircle2, Globe, Folder,
   LayoutGrid, MoreHorizontal, Award, Star, Trophy, Users,
-  CheckCircle, PlayCircle, Eye, Share2, BookmarkCheck, ChevronRight
+  CheckCircle, PlayCircle, Eye, Share2, BookmarkCheck, ChevronRight,
+  GraduationCap, Flame, PlaySquare
 } from 'lucide-react';
 import { getRecordedClasses, getPlaylists, getCourses, classifyFirestoreError } from '../services/firebaseService';
 import { useAuth } from '../context/AuthContext';
@@ -23,7 +24,7 @@ import {
   saveRecentlyViewedVideo
 } from '../utils/videoUtils';
 
-/* ── Error Boundary ───────────────────────────────── */
+/* ── Error Boundary ─────────────────────────────────────────────────────────── */
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -55,86 +56,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// Fallback high quality courses matching reference screenshot
-const DEFAULT_COURSES = [
-  {
-    id: "course_py_101",
-    title: "Python Basic - Advanced Python",
-    name: "Python Basic - Advanced Python",
-    category: "Full Stack Development",
-    trainer_name: "Ravi Kumar",
-    trainer_title: "Senior Python Architect",
-    trainer_avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80",
-    lessons_count: 6,
-    completed_lessons: 3,
-    duration: "1h 55m",
-    progress: 50,
-    status: "In Progress",
-    tech_badge: "Python",
-    video_duration: "45:32",
-    thumbnail: "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=800&auto=format&fit=crop&q=80",
-    description: "Master modern Python from foundational syntax and data structures to object-oriented programming, decorators, generators, and async programming.",
-    last_accessed: "2 days ago",
-  },
-  {
-    id: "course_react_201",
-    title: "React JS Fundamentals",
-    name: "React JS Fundamentals",
-    category: "Web Development",
-    trainer_name: "Sneha Patel",
-    trainer_title: "Lead Frontend Engineer",
-    trainer_avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80",
-    lessons_count: 8,
-    completed_lessons: 3,
-    duration: "2h 20m",
-    progress: 33,
-    status: "In Progress",
-    tech_badge: "React",
-    video_duration: "38:15",
-    thumbnail: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&auto=format&fit=crop&q=80",
-    description: "Component lifecycle, modern hooks, context providers, state management, and building lightning-fast reactive web apps.",
-    last_accessed: "Yesterday",
-  },
-  {
-    id: "course_node_301",
-    title: "Node.js & Express",
-    name: "Node.js & Express",
-    category: "Backend Development",
-    trainer_name: "Arun Prakash",
-    trainer_title: "Principal Backend Architect",
-    trainer_avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80",
-    lessons_count: 10,
-    completed_lessons: 10,
-    duration: "3h 45m",
-    progress: 100,
-    status: "Completed",
-    tech_badge: "NodeJS",
-    video_duration: "52:10",
-    thumbnail: "https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=800&auto=format&fit=crop&q=80",
-    description: "Building scalable, high-throughput microservices, REST APIs, middleware auth pipelines, and PostgreSQL integrations.",
-    last_accessed: "5 days ago",
-  },
-  {
-    id: "course_uiux_401",
-    title: "UI/UX Design Principles",
-    name: "UI/UX Design Principles",
-    category: "Design & Development",
-    trainer_name: "Priya Nair",
-    trainer_title: "Product Design Lead",
-    trainer_avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80",
-    lessons_count: 8,
-    completed_lessons: 0,
-    duration: "2h 15m",
-    progress: 0,
-    status: "Not Started",
-    tech_badge: "UI/UX",
-    video_duration: "28:40",
-    thumbnail: "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=800&auto=format&fit=crop&q=80",
-    description: "Principles of human-computer interaction, atomic design systems, accessibility guidelines, typography, and interactive prototyping.",
-    last_accessed: "Never",
-  }
-];
-
 const RecordedClassesPage = ({
   initialCourseId = null,
   initialLessonId = null,
@@ -144,6 +65,8 @@ const RecordedClassesPage = ({
 }) => {
   const { userProfile, currentUser } = useAuth();
   const studentId = userProfile?.id || userProfile?.uid || currentUser?.uid || 'student';
+  const studentBatchId = userProfile?.batch_id || userProfile?.batchId || currentUser?.batch_id || currentUser?.batchId || '';
+  const studentBatchName = userProfile?.batch_name || userProfile?.batch || currentUser?.batch_name || currentUser?.batch || '';
   const watermarkText = `${userProfile?.name || currentUser?.displayName || 'Student'} • ${userProfile?.rollNumber || userProfile?.studentId || 'LVX'}`;
 
   // Data states
@@ -154,39 +77,22 @@ const RecordedClassesPage = ({
 
   // Active category filter tab: 'all' | 'in-progress' | 'completed' | 'not-started'
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Drilldown states:
-  // selectedCourse: viewing the lessons/syllabus of that course
   const [selectedCourse, setSelectedCourse] = useState(null);
-  // activePlayingLesson: currently watching in SecureVideoPlayer
   const [activePlayingLesson, setActivePlayingLesson] = useState(null);
-
-  const handlePlayLesson = (lesson, course = null) => {
-    if (!lesson) return;
-    const targetCourse = course || selectedCourse || currentlyLearningCourse;
-    saveRecentlyViewedVideo(studentId, {
-      ...lesson,
-      courseId: targetCourse?.id,
-      courseTitle: targetCourse?.title || targetCourse?.name || 'Python Course',
-      category: targetCourse?.category || 'Full Stack Development',
-    });
-    setActivePlayingLesson(lesson);
-  };
-
-  // courseDetailsModal: viewing course syllabus details modal
   const [courseDetailsModal, setCourseDetailsModal] = useState(null);
-  // moreMenuCourseId: active dropdown menu
   const [moreMenuCourseId, setMoreMenuCourseId] = useState(null);
 
   // Watch progress map
   const [watchProgressMap, setWatchProgressMap] = useState(() => getAllWatchProgress(studentId));
 
-  // Sync progress
   const refreshWatchProgress = () => {
     setWatchProgressMap(getAllWatchProgress(studentId));
   };
 
-  // Fetch all courses, recordings & playlists
+  // Fetch all real courses, recordings & playlists from localDb/backend
   const loadData = async () => {
     setLoading(true);
     try {
@@ -196,18 +102,12 @@ const RecordedClassesPage = ({
         getPlaylists().catch(() => [])
       ]);
 
-      // If fetched courses is empty, fallback to DEFAULT_COURSES
-      if (Array.isArray(fetchedCourses) && fetchedCourses.length > 0) {
-        setCoursesList(fetchedCourses);
-      } else {
-        setCoursesList(DEFAULT_COURSES);
-      }
-
-      setRecordingsList(fetchedRecs || []);
-      setPlaylistsList(fetchedPlaylists || []);
+      setCoursesList(Array.isArray(fetchedCourses) ? fetchedCourses : []);
+      setRecordingsList(Array.isArray(fetchedRecs) ? fetchedRecs : []);
+      setPlaylistsList(Array.isArray(fetchedPlaylists) ? fetchedPlaylists : []);
     } catch (err) {
       console.error('Error fetching courses:', err);
-      setCoursesList(DEFAULT_COURSES);
+      setCoursesList([]);
     } finally {
       setLoading(false);
     }
@@ -217,1135 +117,291 @@ const RecordedClassesPage = ({
     loadData();
   }, []);
 
-  // Combined list of Courses + Playlists so all uploaded playlists are visible
-  const allPlaylistsAndCourses = useMemo(() => {
-    const courses = (coursesList && coursesList.length > 0) ? coursesList : DEFAULT_COURSES;
-    const knownKeys = new Set(courses.map(c => (c.title || c.name || c.id || '').toLowerCase().trim()));
+  const handlePlayLesson = (lesson, course = null) => {
+    if (!lesson) return;
+    const targetCourse = course || selectedCourse;
+    saveRecentlyViewedVideo(studentId, {
+      ...lesson,
+      courseId: targetCourse?.id,
+      courseTitle: targetCourse?.title || targetCourse?.name || 'Class Lecture',
+      category: targetCourse?.category || 'Curriculum',
+    });
+    setActivePlayingLesson(lesson);
+  };
 
-    // Custom playlists created by Admin/Trainer
-    const customPlaylistsMapped = (playlistsList || [])
-      .filter(pl => pl && pl.name && !knownKeys.has((pl.name || '').toLowerCase().trim()))
-      .map(pl => {
-        const plId = String(pl.id || pl.uid);
-        const relatedVideos = recordingsList.filter(r => 
-          String(r.playlist_id) === plId || 
-          String(r.batch_id) === plId || 
-          (r.playlist_name && r.playlist_name.toLowerCase().trim() === pl.name.toLowerCase().trim())
-        );
+  // 100% Dynamic Playlists & Courses mapped with Real Progress & Batch Filtering
+  const dynamicCourses = useMemo(() => {
+    const list = [];
+    const normalizedBatchId = String(studentBatchId || '').trim().toLowerCase();
+    const normalizedBatchName = String(studentBatchName || '').trim().toLowerCase();
 
-        return {
-          id: plId,
-          courseId: plId,
-          title: pl.name,
-          name: pl.name,
-          category: pl.course_name || pl.category || 'Curated Playlist',
-          description: pl.description || 'Curated technical lecture series.',
-          thumbnail: pl.thumbnail || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&auto=format&fit=crop&q=80',
-          trainer_name: pl.trainer_name || 'Faculty Trainer',
-          progress: 0,
-          status: 'In Progress',
-          lessons_count: Math.max(relatedVideos.length, 1),
-          duration: `${relatedVideos.length * 45 || 90}m`,
-          is_playlist: true
-        };
+    // 1. Process custom Playlists
+    (playlistsList || []).forEach((pl) => {
+      if (!pl || !pl.name) return;
+      const plId = String(pl.id || pl.uid);
+      const plBatchId = String(pl.batch_id || pl.batchId || '').trim().toLowerCase();
+      const plBatchName = String(pl.batch_name || pl.batchName || '').trim().toLowerCase();
+      const isBatchRestricted = pl.access_type === 'batch' || (plBatchId && plBatchId !== 'all' && pl.visibility !== 'everyone');
+
+      // Visibility check: If batch-restricted, student MUST belong to that batch
+      if (isBatchRestricted) {
+        const matchesBatch = (normalizedBatchId && plBatchId === normalizedBatchId) ||
+                             (normalizedBatchName && plBatchName === normalizedBatchName) ||
+                             (normalizedBatchName && plBatchId === normalizedBatchName);
+        if (!matchesBatch) return; // Hide from this student!
+      }
+
+      // Find all lessons for this playlist
+      const relatedVideos = (recordingsList || []).filter((r) => {
+        const rPlId = String(r.playlist_id || r.playlistId || '');
+        const rBatchId = String(r.batch_id || r.batchId || '');
+        const rPlName = (r.playlist_name || r.playlistName || '').toLowerCase().trim();
+        return rPlId === plId || (rBatchId === plId) || (rPlName && rPlName === pl.name.toLowerCase().trim());
       });
 
-    return [...courses, ...customPlaylistsMapped];
-  }, [coursesList, playlistsList, recordingsList]);
+      // Calculate real dynamic progress for this playlist
+      let completedLessonsCount = 0;
+      let totalWatchedSeconds = 0;
+      relatedVideos.forEach((v) => {
+        const vId = v.id || v.uid;
+        const prog = watchProgressMap[vId];
+        if (prog?.completed || (prog?.progress && prog.progress >= 90)) {
+          completedLessonsCount++;
+        }
+        if (prog?.currentTime) {
+          totalWatchedSeconds += prog.currentTime;
+        }
+      });
 
-  // Filtered courses based on category tabs
-  const filteredCourses = useMemo(() => {
-    const list = allPlaylistsAndCourses;
-    if (categoryFilter === 'all') return list;
-    if (categoryFilter === 'in-progress') return list.filter(c => c.status === 'In Progress' || (c.progress > 0 && c.progress < 100));
-    if (categoryFilter === 'completed') return list.filter(c => c.status === 'Completed' || c.progress === 100);
-    if (categoryFilter === 'not-started') return list.filter(c => c.status === 'Not Started' || c.progress === 0);
-    return list;
-  }, [allPlaylistsAndCourses, categoryFilter]);
+      const totalLessons = relatedVideos.length;
+      const progressPercent = totalLessons > 0 ? Math.round((completedLessonsCount / totalLessons) * 100) : 0;
+      const status = progressPercent === 100 ? 'Completed' : (progressPercent > 0 ? 'In Progress' : 'Not Started');
 
-  // Lessons associated with the selected course or playlist
-  const courseLessons = useMemo(() => {
-    if (!selectedCourse) return [];
-    const courseTitleNorm = (selectedCourse.title || selectedCourse.name || '').toLowerCase().trim();
-    const courseId = String(selectedCourse.id || selectedCourse.courseId || selectedCourse.uid || '');
-
-    const matched = recordingsList.filter(r => {
-      // 1. Direct ID match
-      if (r.playlist_id && String(r.playlist_id) === courseId) return true;
-      if (r.course_id && String(r.course_id) === courseId) return true;
-      if (r.batch_id && String(r.batch_id) === courseId) return true;
-
-      // 2. Name matches
-      const rCourse = (r.course_title || r.course_name || '').toLowerCase().trim();
-      const rPlaylist = (r.playlist_name || '').toLowerCase().trim();
-      const rBatch = (r.batch_name || r.batchName || '').toLowerCase().trim();
-
-      if (rPlaylist && (rPlaylist === courseTitleNorm || courseTitleNorm.includes(rPlaylist) || rPlaylist.includes(courseTitleNorm))) return true;
-      if (rCourse && (rCourse === courseTitleNorm || courseTitleNorm.includes(rCourse) || rCourse.includes(courseTitleNorm))) return true;
-      if (rBatch && (rBatch === courseTitleNorm || courseTitleNorm.includes(rBatch) || rBatch.includes(courseTitleNorm))) return true;
-
-      return false;
+      list.push({
+        id: plId,
+        courseId: plId,
+        title: pl.name,
+        name: pl.name,
+        category: pl.course_name || pl.category || 'Curated Series',
+        description: pl.description || 'Comprehensive cohort curriculum and lecture recordings.',
+        thumbnail: pl.thumbnail || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&auto=format&fit=crop&q=80',
+        trainer_name: pl.trainer_name || 'Faculty Trainer',
+        trainer_avatar: pl.trainer_avatar || null,
+        lessons: relatedVideos,
+        lessons_count: totalLessons,
+        completed_lessons: completedLessonsCount,
+        progress: progressPercent,
+        status: status,
+        duration: pl.duration || (totalLessons > 0 ? `${totalLessons * 45} mins` : 'Flexible'),
+        is_playlist: true,
+        batch_name: pl.batch_name || (isBatchRestricted ? 'Cohort Exclusive' : 'Open Access'),
+        updatedAt: pl.updatedAt || pl.createdAt || null
+      });
     });
 
-    if (matched.length > 0) {
-      matched.sort((a, b) => (Number(a.sort_order || 99) - Number(b.sort_order || 99)));
-      return matched;
-    }
+    // 2. Process Courses from coursesList (if distinct from playlists)
+    (coursesList || []).forEach((c) => {
+      if (!c || (!c.title && !c.name)) return;
+      const cId = String(c.id || c.uid);
+      const cTitle = c.title || c.name;
+      // Skip if already represented by playlist with same name
+      if (list.some(item => item.title.toLowerCase().trim() === cTitle.toLowerCase().trim())) return;
 
-    // Fallback demo lessons if no video uploaded yet
-    const count = selectedCourse.lessons_count || 4;
-    return Array.from({ length: count }, (_, idx) => ({
-      id: `${selectedCourse.id}_lesson_${idx + 1}`,
-      title: idx === 0 ? "Environment Architecture & Fundamentals" :
-             idx === 1 ? "Core Data Structures & Control Workflows" :
-             idx === 2 ? "Object-Oriented Design & Encapsulation" :
-             `Applied Engineering Capstone - Session ${idx + 1}`,
-      module: `Module ${Math.floor(idx / 2) + 1}`,
-      duration: idx === 0 ? "18m 10s" : idx === 1 ? "22m 15s" : idx === 2 ? "25m 40s" : "35m 20s",
-      video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      sort_order: idx + 1,
-      course_title: selectedCourse.title || selectedCourse.name,
-      description: `In-depth hands-on technical breakdown of key topics, interactive architectures, and industry implementation standards.`
-    }));
-  }, [selectedCourse, recordingsList]);
+      const cBatchId = String(c.batch_id || c.batchId || '').trim().toLowerCase();
+      const isBatchRestricted = c.access_type === 'batch' || (cBatchId && cBatchId !== 'all' && c.visibility !== 'everyone');
+      if (isBatchRestricted) {
+        const matchesBatch = (normalizedBatchId && cBatchId === normalizedBatchId);
+        if (!matchesBatch) return;
+      }
 
-  // Currently Learning primary course (Python Basic - Advanced Python)
+      const relatedVideos = (recordingsList || []).filter((r) => {
+        const rCourseId = String(r.course_id || r.courseId || '');
+        const rCourseTitle = (r.course_title || r.course_name || '').toLowerCase().trim();
+        return rCourseId === cId || (rCourseTitle && rCourseTitle === cTitle.toLowerCase().trim());
+      });
+
+      let completedLessonsCount = 0;
+      relatedVideos.forEach((v) => {
+        const vId = v.id || v.uid;
+        const prog = watchProgressMap[vId];
+        if (prog?.completed || (prog?.progress && prog.progress >= 90)) completedLessonsCount++;
+      });
+
+      const totalLessons = relatedVideos.length;
+      const progressPercent = totalLessons > 0 ? Math.round((completedLessonsCount / totalLessons) * 100) : 0;
+      const status = progressPercent === 100 ? 'Completed' : (progressPercent > 0 ? 'In Progress' : 'Not Started');
+
+      list.push({
+        id: cId,
+        courseId: cId,
+        title: cTitle,
+        name: cTitle,
+        category: c.category || 'Specialization',
+        description: c.description || 'Industry-standard technical modules and recorded sessions.',
+        thumbnail: c.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80',
+        trainer_name: c.trainer_name || 'Levlox Instructor',
+        trainer_avatar: null,
+        lessons: relatedVideos,
+        lessons_count: totalLessons,
+        completed_lessons: completedLessonsCount,
+        progress: progressPercent,
+        status: status,
+        duration: c.duration || (totalLessons > 0 ? `${totalLessons * 45} mins` : 'Flexible'),
+        is_playlist: false,
+        batch_name: c.batch_name || 'Open Access',
+        updatedAt: c.updatedAt || c.createdAt || null
+      });
+    });
+
+    return list;
+  }, [playlistsList, coursesList, recordingsList, watchProgressMap, studentBatchId, studentBatchName]);
+
+  // Dynamic Currently Learning Course:
+  // Pick the course the student is actively progressing in, or the one with lessons, or null
   const currentlyLearningCourse = useMemo(() => {
-    return coursesList.find(c => c.id === 'course_py_101') || DEFAULT_COURSES[0];
-  }, [coursesList]);
+    if (dynamicCourses.length === 0) return null;
+    // Prefer one with progress > 0 and < 100
+    const inProgress = dynamicCourses.find(c => c.progress > 0 && c.progress < 100);
+    if (inProgress) return inProgress;
+    // Else prefer one with lessons
+    const hasLessons = dynamicCourses.find(c => c.lessons_count > 0);
+    if (hasLessons) return hasLessons;
+    // Fallback to first course in list
+    return dynamicCourses[0];
+  }, [dynamicCourses]);
 
-  // Overall Statistics Calculation
+  // Overall Dynamic Statistics
   const progressStats = useMemo(() => {
-    const list = coursesList.length > 0 ? coursesList : DEFAULT_COURSES;
-    const total = list.length || 6;
-    const completed = list.filter(c => c.status === 'Completed' || c.progress === 100).length;
-    const inProgress = list.filter(c => c.status === 'In Progress' || (c.progress > 0 && c.progress < 100)).length;
-    const notStarted = Math.max(0, total - completed - inProgress);
+    if (dynamicCourses.length === 0) {
+      return { percent: 0, completed: 0, inProgress: 0, notStarted: 0, totalCourses: 0, totalLessons: 0, completedLessons: 0, totalHours: '0h 0m' };
+    }
+    const totalCourses = dynamicCourses.length;
+    const completed = dynamicCourses.filter(c => c.status === 'Completed').length;
+    const inProgress = dynamicCourses.filter(c => c.status === 'In Progress').length;
+    const notStarted = dynamicCourses.filter(c => c.status === 'Not Started').length;
+
+    let totalLessonsAll = 0;
+    let totalCompletedLessonsAll = 0;
+    let totalSecondsWatched = 0;
+
+    dynamicCourses.forEach(c => {
+      totalLessonsAll += (c.lessons_count || 0);
+      totalCompletedLessonsAll += (c.completed_lessons || 0);
+      (c.lessons || []).forEach(l => {
+        const prog = watchProgressMap[l.id || l.uid];
+        if (prog?.currentTime) totalSecondsWatched += prog.currentTime;
+      });
+    });
+
+    const percent = totalLessonsAll > 0 ? Math.round((totalCompletedLessonsAll / totalLessonsAll) * 100) : 0;
+    const hours = Math.floor(totalSecondsWatched / 3600);
+    const mins = Math.floor((totalSecondsWatched % 3600) / 60);
 
     return {
-      percent: 68,
+      percent,
       completed,
       inProgress,
       notStarted,
-      streakDays: 5,
-      totalHours: '18h 42m'
+      totalCourses,
+      totalLessons: totalLessonsAll,
+      completedLessons: totalCompletedLessonsAll,
+      totalHours: hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
     };
-  }, [coursesList]);
+  }, [dynamicCourses, watchProgressMap]);
+
+  // Filtered Courses based on Category Tabs and Search
+  const filteredCourses = useMemo(() => {
+    return dynamicCourses.filter(c => {
+      if (categoryFilter === 'in-progress' && c.status !== 'In Progress') return false;
+      if (categoryFilter === 'completed' && c.status !== 'Completed') return false;
+      if (categoryFilter === 'not-started' && c.status !== 'Not Started') return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchTitle = (c.title || '').toLowerCase().includes(q);
+        const matchCat = (c.category || '').toLowerCase().includes(q);
+        const matchTrainer = (c.trainer_name || '').toLowerCase().includes(q);
+        if (!matchTitle && !matchCat && !matchTrainer) return false;
+      }
+      return true;
+    });
+  }, [dynamicCourses, categoryFilter, searchQuery]);
+
+  // Active Course Lessons for Drilldown
+  const activeCourseLessons = useMemo(() => {
+    if (!selectedCourse) return [];
+    return (selectedCourse.lessons || []).map((v, idx) => ({
+      ...v,
+      id: v.id || v.uid || `lesson_${idx + 1}`,
+      title: v.title || v.topic || `Lecture ${idx + 1}`,
+      sort_order: v.sort_order || idx + 1,
+      duration: v.duration || '45m',
+      video_url: v.video_url || v.videoUrl || v.url,
+      thumbnail: v.thumbnail || selectedCourse.thumbnail,
+      notes_url: v.notes_url || v.notesUrl || null,
+      study_materials: v.study_materials || v.studyMaterials || []
+    }));
+  }, [selectedCourse]);
 
   return (
     <div className="levlox-courses-page" style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
 
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {/* 1. TOP LEARNING JOURNEY BANNER (CLONED EXACTLY FROM REFERENCE)  */}
-      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* ─── 1. TOP LEARNING BANNER (UDEMY-INSPIRED EXPERIENCE) ─── */}
       <div style={{
-        background: 'linear-gradient(135deg, #EEF5FF 0%, #F5F3FF 50%, #EFF6FF 100%)',
-        borderRadius: 22,
-        border: '1px solid #E2E8F0',
-        padding: '24px 32px',
+        background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #1E293B 100%)',
+        borderRadius: 20,
+        padding: '24px 30px',
+        color: '#FFFFFF',
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: '0 4px 20px -2px rgba(99, 102, 241, 0.06)',
+        boxShadow: '0 8px 24px rgba(30, 27, 75, 0.15)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: 24
+        gap: 20
       }}>
-        {/* Left Column: Heading & Subtitle */}
-        <div style={{ flex: '1 1 340px', minWidth: 280, zIndex: 2 }}>
-          {/* Tag Badge */}
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            background: '#FFFFFF',
-            padding: '5px 14px',
-            borderRadius: 999,
-            border: '1px solid #E2E8F0',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-            marginBottom: 12
-          }}>
-            <BookOpen size={14} color="#2563EB" />
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#2563EB', letterSpacing: '-0.1px' }}>
-              Your Learning Journey
-            </span>
+        <div style={{ zIndex: 2, maxWidth: 580 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255, 255, 255, 0.12)', backdropFilter: 'blur(8px)', padding: '4px 12px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, marginBottom: 12 }}>
+            <Sparkles size={13} color="#FBBF24" />
+            <span>Welcome to Your Learning Campus</span>
           </div>
-
-          {/* Heading */}
-          <h1 style={{
-            fontSize: 'clamp(24px, 3vw, 32px)',
-            fontWeight: 850,
-            margin: '0 0 10px',
-            color: '#0F172A',
-            letterSpacing: '-0.6px',
-            lineHeight: 1.2
-          }}>
-            Explore Your Courses <br />
-            <span style={{
-              background: 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              display: 'inline-block'
-            }}>
-              and Keep Growing
-            </span>
+          <h1 style={{ fontSize: 24, fontWeight: 850, margin: '0 0 8px', letterSpacing: '-0.4px', lineHeight: 1.25 }}>
+            Accelerate Your Technical Career
           </h1>
-
-          <p style={{
-            fontSize: 13.5,
-            color: '#64748B',
-            lineHeight: 1.55,
-            margin: 0,
-            maxWidth: 420,
-            fontWeight: 500
-          }}>
-            Access your course materials, watch live sessions, complete assignments and track your progress.
+          <p style={{ fontSize: 13.5, color: '#C7D2FE', margin: 0, lineHeight: 1.5 }}>
+            Explore on-demand lectures, practical code walkthroughs, and recorded sessions assigned to your batch.
           </p>
         </div>
 
-        {/* Right: 3D Illustration */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          zIndex: 1,
-          paddingRight: 10
-        }}>
-          <img 
-            src={workspace3D} 
-            alt="Levlox 3D Learning Space"
-            style={{
-              maxHeight: 185,
-              width: 'auto',
-              objectFit: 'contain',
-              filter: 'drop-shadow(0 14px 24px rgba(37, 99, 235, 0.15))',
-              userSelect: 'none',
-              pointerEvents: 'none'
-            }} 
-          />
+        {/* Right side quick count */}
+        <div style={{ zIndex: 2, display: 'flex', gap: 14 }}>
+          <div style={{ background: 'rgba(255, 255, 255, 0.08)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: 14, padding: '12px 18px', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 850, color: '#A5B4FC' }}>{progressStats.totalCourses}</div>
+            <div style={{ fontSize: 11, color: '#E0E7FF', fontWeight: 600 }}>Active Courses</div>
+          </div>
+          <div style={{ background: 'rgba(255, 255, 255, 0.08)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: 14, padding: '12px 18px', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 850, color: '#34D399' }}>{progressStats.completed}</div>
+            <div style={{ fontSize: 11, color: '#E0E7FF', fontWeight: 600 }}>Completed</div>
+          </div>
         </div>
       </div>
 
+      {/* ─── 2. MIDDLE ROW: DYNAMIC CURRENTLY LEARNING & REAL COURSE PROGRESS ─── */}
+      {/* ONLY RENDER WHEN REAL COURSES EXIST FOR THE STUDENT */}
+      {dynamicCourses.length > 0 && currentlyLearningCourse && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1.15fr)', gap: 20, alignItems: 'stretch' }}>
 
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {/* 2. MIDDLE ROW: CURRENTLY LEARNING & YOUR COURSE PROGRESS       */}
-      {/* ══════════════════════════════════════════════════════════════ */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.65fr) minmax(0, 1.15fr)', gap: 24, alignItems: 'stretch' }}>
-
-        {/* ── CARD 1: CURRENTLY LEARNING ── */}
-        <div style={{
-          background: '#FFFFFF',
-          borderRadius: 20,
-          border: '1px solid #E2E8F0',
-          padding: '22px 24px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          gap: 16
-        }}>
-          {/* Header Pill */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              background: '#EFF6FF',
-              padding: '4px 12px',
-              borderRadius: 999,
-              color: '#2563EB',
-              fontSize: 11.5,
-              fontWeight: 750
-            }}>
-              <Play size={11} fill="#2563EB" />
-              <span>Currently Learning</span>
-            </div>
-          </div>
-
-          {/* Body: Thumbnail + Details */}
-          <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Left: Video Card Preview */}
-            <div 
-              onClick={() => {
-                setSelectedCourse(currentlyLearningCourse);
-                if (courseLessons.length > 0) handlePlayLesson(courseLessons[0], currentlyLearningCourse);
-              }}
-              style={{
-                width: 210,
-                height: 125,
-                borderRadius: 14,
-                overflow: 'hidden',
-                position: 'relative',
-                background: '#0F172A',
-                cursor: 'pointer',
-                flexShrink: 0,
-                boxShadow: '0 6px 16px rgba(0,0,0,0.12)'
-              }}
-              className="clickable-card-hover"
-            >
-              <img 
-                src="https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=600&auto=format&fit=crop&q=80" 
-                alt="Python Course"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }}
-              />
-              {/* Python Center Icon Badge */}
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <div style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: 12,
-                  background: 'rgba(15, 23, 42, 0.75)',
-                  backdropFilter: 'blur(8px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-                }}>
-                  <span style={{ fontSize: 26 }}>🐍</span>
-                </div>
-              </div>
-
-              {/* Tag Bottom Left: Python */}
-              <div style={{
-                position: 'absolute',
-                bottom: 8,
-                left: 8,
-                background: 'rgba(0,0,0,0.65)',
-                backdropFilter: 'blur(6px)',
-                color: '#FFFFFF',
-                fontSize: 10.5,
-                fontWeight: 750,
-                padding: '3px 8px',
-                borderRadius: 6,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4
-              }}>
-                <Play size={9} fill="#FFFFFF" />
-                <span>Python</span>
-              </div>
-
-              {/* Tag Bottom Right: Duration */}
-              <div style={{
-                position: 'absolute',
-                bottom: 8,
-                right: 8,
-                background: 'rgba(0,0,0,0.75)',
-                color: '#FFFFFF',
-                fontSize: 10,
-                fontWeight: 700,
-                padding: '2px 6px',
-                borderRadius: 5
-              }}>
-                45:32
-              </div>
-            </div>
-
-            {/* Right: Info & Actions */}
-            <div style={{ flex: 1, minWidth: 200, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div>
-                <h3 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 2px', color: '#0F172A', letterSpacing: '-0.3px' }}>
-                  {currentlyLearningCourse.title}
-                </h3>
-                <span style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>
-                  {currentlyLearningCourse.category}
-                </span>
-              </div>
-
-              {/* Lessons Completed & Progress Bar */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>
-                    3 of 6 lessons completed
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: '#0F172A' }}>
-                    50%
-                  </span>
-                </div>
-                <div style={{ width: '100%', height: 7, background: '#EEF2F6', borderRadius: 999, overflow: 'hidden' }}>
-                  <div style={{ width: '50%', height: '100%', background: '#2563EB', borderRadius: 999 }} />
-                </div>
-              </div>
-
-              {/* Action Buttons Row */}
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
-                <button
-                  onClick={() => {
-                    setSelectedCourse(currentlyLearningCourse);
-                    if (courseLessons.length > 0) handlePlayLesson(courseLessons[0], currentlyLearningCourse);
-                  }}
-                  style={{
-                    padding: '8px 18px',
-                    background: '#2563EB',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: 9,
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)'
-                  }}
-                >
-                  <span>Continue Learning</span>
-                  <ArrowRight size={13} />
-                </button>
-
-                <button
-                  onClick={() => setCourseDetailsModal(currentlyLearningCourse)}
-                  style={{
-                    padding: '8px 16px',
-                    background: '#FFFFFF',
-                    color: '#2563EB',
-                    border: '1.5px solid #CBD5E1',
-                    borderRadius: 9,
-                    fontSize: 12.5,
-                    fontWeight: 650,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6
-                  }}
-                >
-                  <FileText size={13} color="#2563EB" />
-                  <span>View Course Details</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer Meta Row */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 18,
-            paddingTop: 12,
-            borderTop: '1px solid #F1F5F9',
-            fontSize: 12,
-            color: '#64748B',
-            fontWeight: 500,
-            flexWrap: 'wrap'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <BookOpen size={13} color="#64748B" />
-              <span>6 Lessons</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Clock size={13} color="#64748B" />
-              <span>1h 55m</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Calendar size={13} color="#64748B" />
-              <span>Last accessed: 2 days ago</span>
-            </div>
-          </div>
-        </div>
-
-
-        {/* ── CARD 2: YOUR COURSE PROGRESS ── */}
-        <div style={{
-          background: '#FFFFFF',
-          borderRadius: 20,
-          border: '1px solid #E2E8F0',
-          padding: '22px 24px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          gap: 16
-        }}>
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <FileText size={16} color="#2563EB" />
-            <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0, color: '#0F172A', letterSpacing: '-0.2px' }}>
-              Your Course Progress
-            </h3>
-          </div>
-
-          {/* Donut Chart + Breakdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24, justifyContent: 'space-around', flexWrap: 'wrap' }}>
-            {/* Circular Donut Ring */}
-            <div style={{ position: 'relative', width: 110, height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="110" height="110" viewBox="0 0 110 110" style={{ transform: 'rotate(-90deg)' }}>
-                {/* Background Track */}
-                <circle
-                  cx="55"
-                  cy="55"
-                  r="45"
-                  stroke="#EEF2F6"
-                  strokeWidth="10"
-                  fill="transparent"
-                />
-                {/* Blue Progress Arc (68%) */}
-                <circle
-                  cx="55"
-                  cy="55"
-                  r="45"
-                  stroke="#2563EB"
-                  strokeWidth="10"
-                  strokeDasharray="282.7"
-                  strokeDashoffset={282.7 * (1 - 0.68)}
-                  strokeLinecap="round"
-                  fill="transparent"
-                />
-              </svg>
-              {/* Center Text */}
-              <div style={{ position: 'absolute', textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 850, color: '#0F172A', lineHeight: 1 }}>
-                  68%
-                </div>
-                <div style={{ fontSize: 10, color: '#64748B', fontWeight: 600, marginTop: 3 }}>
-                  Overall Progress
-                </div>
-              </div>
-            </div>
-
-            {/* Breakdown List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 150 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569', fontWeight: 600 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#2563EB' }} />
-                  <span>Courses Completed</span>
-                </div>
-                <span style={{ fontWeight: 800, color: '#0F172A' }}>3 / 6</span>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569', fontWeight: 600 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#F59E0B' }} />
-                  <span>In Progress</span>
-                </div>
-                <span style={{ fontWeight: 800, color: '#0F172A' }}>2 / 6</span>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569', fontWeight: 600 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3B82F6' }} />
-                  <span>Not Started</span>
-                </div>
-                <span style={{ fontWeight: 800, color: '#0F172A' }}>1 / 6</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Split Stats: Streak & Hours */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 16,
-            paddingTop: 12,
-            borderTop: '1px solid #F1F5F9'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{
-                width: 34,
-                height: 34,
-                borderRadius: 9,
-                background: '#FFFBEB',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 16
-              }}>
-                ⭐
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Current Streak</div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>5 Days</div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderLeft: '1px solid #F1F5F9', paddingLeft: 16 }}>
-              <div style={{
-                width: 34,
-                height: 34,
-                borderRadius: 9,
-                background: '#FEF3C7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 16
-              }}>
-                🏆
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Total Learning Hours</div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>18h 42m</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {/* 3. BOTTOM SECTION: ALL COURSES GRID WITH CATEGORY TABS         */}
-      {/* ══════════════════════════════════════════════════════════════ */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-
-        {/* Section Header & Tabs */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <LayoutGrid size={18} color="#2563EB" />
-            <h2 style={{ fontSize: 18, fontWeight: 850, margin: 0, color: '#0F172A', letterSpacing: '-0.3px' }}>
-              All Courses
-            </h2>
-          </div>
-
-          {/* Filter Pills */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            background: '#F1F5F9',
-            padding: 4,
-            borderRadius: 999
-          }}>
-            {[
-              { id: 'all', label: 'All' },
-              { id: 'in-progress', label: 'In Progress' },
-              { id: 'completed', label: 'Completed' },
-              { id: 'not-started', label: 'Not Started' },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setCategoryFilter(tab.id)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: 999,
-                  border: 'none',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  background: categoryFilter === tab.id ? '#2563EB' : 'transparent',
-                  color: categoryFilter === tab.id ? '#FFFFFF' : '#64748B',
-                  boxShadow: categoryFilter === tab.id ? '0 2px 6px rgba(37, 99, 235, 0.25)' : 'none',
-                  transition: 'all 0.15s'
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 4 Course Cards Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: 20
-        }}>
-          {filteredCourses.map((course) => {
-            const isCompleted = course.status === 'Completed' || course.progress === 100;
-            const isInProgress = course.status === 'In Progress' || (course.progress > 0 && course.progress < 100);
-            const isNotStarted = !isCompleted && !isInProgress;
-
-            return (
-              <div
-                key={course.id}
-                style={{
-                  background: '#FFFFFF',
-                  borderRadius: 18,
-                  border: '1px solid #E2E8F0',
-                  overflow: 'hidden',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s',
-                  position: 'relative'
-                }}
-                className="clickable-card-hover"
-              >
-                {/* Course Header Thumbnail */}
-                <div style={{ height: 120, position: 'relative', overflow: 'hidden', background: '#0F172A' }}>
-                  <img
-                    src={course.thumbnail}
-                    alt={course.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'linear-gradient(180deg, rgba(15,23,42,0.1) 0%, rgba(15,23,42,0.6) 100%)'
-                  }} />
-
-                  {/* Top Right Status Badge */}
-                  <div style={{ position: 'absolute', top: 10, right: 10 }}>
-                    {isInProgress && (
-                      <span style={{
-                        background: '#FFFFFF',
-                        color: '#2563EB',
-                        fontSize: 10.5,
-                        fontWeight: 750,
-                        padding: '3px 8px',
-                        borderRadius: 999,
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4
-                      }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2563EB' }} />
-                        In Progress
-                      </span>
-                    )}
-                    {isCompleted && (
-                      <span style={{
-                        background: '#FFFFFF',
-                        color: '#059669',
-                        fontSize: 10.5,
-                        fontWeight: 750,
-                        padding: '3px 8px',
-                        borderRadius: 999,
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4
-                      }}>
-                        <CheckCircle size={11} color="#059669" />
-                        Completed
-                      </span>
-                    )}
-                    {isNotStarted && (
-                      <span style={{
-                        background: '#FFFFFF',
-                        color: '#64748B',
-                        fontSize: 10.5,
-                        fontWeight: 750,
-                        padding: '3px 8px',
-                        borderRadius: 999,
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                      }}>
-                        Not Started
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Course Card Body */}
-                <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-                  <div>
-                    <h3 style={{
-                      fontSize: 15,
-                      fontWeight: 800,
-                      margin: '0 0 3px',
-                      color: '#0F172A',
-                      lineHeight: 1.3,
-                      letterSpacing: '-0.2px'
-                    }}>
-                      {course.title}
-                    </h3>
-                    <span style={{ fontSize: 11.5, color: '#64748B', fontWeight: 500 }}>
-                      {course.category}
-                    </span>
-                  </div>
-
-                  {/* Trainer Avatar & Name */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <img
-                      src={course.trainer_avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"}
-                      alt={course.trainer_name}
-                      style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }}
-                    />
-                    <span style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}>
-                      {course.trainer_name}
-                    </span>
-                  </div>
-
-                  {/* Progress Bar & Percentage */}
-                  <div>
-                    <div style={{ width: '100%', height: 6, background: '#EEF2F6', borderRadius: 999, overflow: 'hidden' }}>
-                      <div style={{
-                        width: `${course.progress}%`,
-                        height: '100%',
-                        background: isCompleted ? '#2563EB' : '#2563EB',
-                        borderRadius: 999
-                      }} />
-                    </div>
-                    <div style={{ textAlign: 'right', fontSize: 11, fontWeight: 750, color: '#475569', marginTop: 4 }}>
-                      {course.progress}%
-                    </div>
-                  </div>
-
-                  {/* Meta: Lessons count & Duration */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: '#64748B', fontWeight: 500 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <BookOpen size={12} />
-                      <span>{course.lessons_count} Lessons</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Clock size={12} />
-                      <span>{course.duration}</span>
-                    </div>
-                  </div>
-
-                  {/* Bottom Row: Action Button + More [...] */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
-                    {isInProgress && (
-                      <button
-                        onClick={() => {
-                          setSelectedCourse(course);
-                          if (courseLessons.length > 0) handlePlayLesson(courseLessons[0], course);
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: '9px 12px',
-                          background: '#2563EB',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: 8,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 6,
-                          boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)'
-                        }}
-                      >
-                        <span>Continue Learning</span>
-                        <ArrowRight size={12} />
-                      </button>
-                    )}
-
-                    {isCompleted && (
-                      <button
-                        onClick={() => {
-                          setSelectedCourse(course);
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: '8px 12px',
-                          background: '#FFFFFF',
-                          color: '#2563EB',
-                          border: '1.5px solid #CBD5E1',
-                          borderRadius: 8,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 6
-                        }}
-                      >
-                        <span>View Course</span>
-                      </button>
-                    )}
-
-                    {isNotStarted && (
-                      <button
-                        onClick={() => {
-                          setSelectedCourse(course);
-                          if (courseLessons.length > 0) handlePlayLesson(courseLessons[0], course);
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: '9px 12px',
-                          background: '#EEF2FF',
-                          color: '#4F46E5',
-                          border: 'none',
-                          borderRadius: 8,
-                          fontSize: 12,
-                          fontWeight: 750,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 6
-                        }}
-                      >
-                        <span>Start Course</span>
-                      </button>
-                    )}
-
-                    {/* More [...] Button */}
-                    <div style={{ position: 'relative' }}>
-                      <button
-                        onClick={() => setMoreMenuCourseId(moreMenuCourseId === course.id ? null : course.id)}
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
-                          border: '1px solid #E2E8F0',
-                          background: '#FFFFFF',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          color: '#64748B'
-                        }}
-                      >
-                        <MoreHorizontal size={14} />
-                      </button>
-
-                      {moreMenuCourseId === course.id && (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: '100%',
-                          right: 0,
-                          marginBottom: 6,
-                          background: '#FFFFFF',
-                          border: '1px solid #E2E8F0',
-                          borderRadius: 10,
-                          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-                          width: 170,
-                          zIndex: 20,
-                          overflow: 'hidden'
-                        }}>
-                          <button
-                            onClick={() => {
-                              setCourseDetailsModal(course);
-                              setMoreMenuCourseId(null);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '9px 12px',
-                              textAlign: 'left',
-                              background: 'none',
-                              border: 'none',
-                              fontSize: 12,
-                              color: '#1E293B',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 8,
-                              cursor: 'pointer'
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                          >
-                            <FileText size={13} color="#2563EB" />
-                            <span>View Syllabus</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedCourse(course);
-                              setMoreMenuCourseId(null);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '9px 12px',
-                              textAlign: 'left',
-                              background: 'none',
-                              border: 'none',
-                              fontSize: 12,
-                              color: '#1E293B',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 8,
-                              cursor: 'pointer',
-                              borderTop: '1px solid #F1F5F9'
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                          >
-                            <PlayCircle size={13} color="#10B981" />
-                            <span>Browse Lessons</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {/* 4. COURSE CURRICULUM & LESSONS VIEW (WHEN COURSE IS SELECTED) */}
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {selectedCourse && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 20
-        }}>
+          {/* ── CARD 1: DYNAMIC CURRENTLY LEARNING ── */}
           <div style={{
             background: '#FFFFFF',
-            borderRadius: 24,
-            width: '100%',
-            maxWidth: 820,
-            maxHeight: '90vh',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            border: '1px solid #E2E8F0'
-          }}>
-            {/* Modal Header */}
-            <div style={{
-              padding: '20px 26px',
-              borderBottom: '1px solid #E2E8F0',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              background: '#F8FAFC'
-            }}>
-              <div>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#2563EB', fontSize: 11.5, fontWeight: 750, textTransform: 'uppercase' }}>
-                  <BookOpen size={13} />
-                  <span>{selectedCourse.category}</span>
-                </div>
-                <h2 style={{ fontSize: 20, fontWeight: 800, margin: '2px 0 0', color: '#0F172A' }}>
-                  {selectedCourse.title}
-                </h2>
-              </div>
-
-              <button
-                onClick={() => setSelectedCourse(null)}
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  border: '1px solid #E2E8F0',
-                  background: '#FFFFFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#64748B'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Content: Lessons List */}
-            <div style={{ padding: '24px 26px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#1E293B' }}>
-                  Course Syllabus ({courseLessons.length} Lessons Available)
-                </span>
-                <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>
-                  Trainer: {selectedCourse.trainer_name}
-                </span>
-              </div>
-
-              {courseLessons.map((lesson, idx) => {
-                const isLessonCompleted = idx < (selectedCourse.completed_lessons || 0);
-
-                return (
-                  <div
-                    key={lesson.id}
-                    onClick={() => handlePlayLesson(lesson, selectedCourse)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '14px 18px',
-                      borderRadius: 14,
-                      border: '1px solid #E2E8F0',
-                      background: '#FFFFFF',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2563EB'; e.currentTarget.style.background = '#F8FAFC'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.background = '#FFFFFF'; }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <div style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 10,
-                        background: isLessonCompleted ? '#ECFDF5' : '#EFF6FF',
-                        color: isLessonCompleted ? '#059669' : '#2563EB',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 800,
-                        fontSize: 13
-                      }}>
-                        {isLessonCompleted ? <Check size={16} strokeWidth={3} /> : <Play size={14} fill="#2563EB" />}
-                      </div>
-
-                      <div>
-                        <div style={{ fontSize: 13.5, fontWeight: 750, color: '#0F172A' }}>
-                          Lesson {idx + 1}: {lesson.title}
-                        </div>
-                        <div style={{ fontSize: 11.5, color: '#64748B', display: 'flex', gap: 10, marginTop: 2 }}>
-                          <span>{lesson.module}</span>
-                          <span>•</span>
-                          <span>{lesson.duration}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      style={{
-                        padding: '6px 14px',
-                        background: '#2563EB',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        borderRadius: 8,
-                        fontSize: 11.5,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 5
-                      }}
-                    >
-                      <Play size={11} fill="#FFFFFF" />
-                      <span>Watch</span>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {/* 5. COURSE SYLLABUS DETAILS MODAL                               */}
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {courseDetailsModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 20
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: 24,
-            width: '100%',
-            maxWidth: 620,
-            padding: '28px 30px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            borderRadius: 18,
             border: '1px solid #E2E8F0',
+            padding: '22px 24px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
             display: 'flex',
             flexDirection: 'column',
-            gap: 18
+            justifyContent: 'space-between',
+            gap: 16
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{
@@ -1353,185 +409,770 @@ const RecordedClassesPage = ({
                 alignItems: 'center',
                 gap: 6,
                 background: '#EFF6FF',
-                color: '#2563EB',
                 padding: '4px 12px',
                 borderRadius: 999,
+                color: '#2563EB',
                 fontSize: 11.5,
                 fontWeight: 750
               }}>
-                <Sparkles size={12} />
-                <span>Course Overview</span>
+                <Play size={11} fill="#2563EB" />
+                <span>Currently Learning</span>
               </div>
-              <button
-                onClick={() => setCourseDetailsModal(null)}
+              <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>
+                {currentlyLearningCourse.batch_name}
+              </span>
+            </div>
+
+            {/* Content: Thumbnail + Info */}
+            <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div 
+                onClick={() => {
+                  setSelectedCourse(currentlyLearningCourse);
+                  if (currentlyLearningCourse.lessons?.length > 0) {
+                    handlePlayLesson(currentlyLearningCourse.lessons[0], currentlyLearningCourse);
+                  }
+                }}
                 style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  border: '1px solid #E2E8F0',
-                  background: '#FFFFFF',
+                  width: 200,
+                  height: 120,
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  position: 'relative',
+                  background: '#0F172A',
                   cursor: 'pointer',
-                  color: '#64748B',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  flexShrink: 0,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                 }}
               >
-                <X size={16} />
+                <img 
+                  src={currentlyLearningCourse.thumbnail} 
+                  alt={currentlyLearningCourse.title}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+                    <Play size={20} fill="#2563EB" style={{ marginLeft: 2 }} />
+                  </div>
+                </div>
+                <div style={{ position: 'absolute', bottom: 6, right: 8, background: 'rgba(0,0,0,0.75)', color: '#FFFFFF', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>
+                  {currentlyLearningCourse.duration}
+                </div>
+              </div>
+
+              <div style={{ flex: 1, minWidth: 200, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 2px', color: '#0F172A', letterSpacing: '-0.3px' }}>
+                    {currentlyLearningCourse.title}
+                  </h3>
+                  <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>
+                    {currentlyLearningCourse.category} • Instructor: {currentlyLearningCourse.trainer_name}
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>
+                      {currentlyLearningCourse.completed_lessons} of {currentlyLearningCourse.lessons_count} lessons completed
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: '#2563EB' }}>
+                      {currentlyLearningCourse.progress}%
+                    </span>
+                  </div>
+                  <div style={{ width: '100%', height: 7, background: '#EEF2F6', borderRadius: 999, overflow: 'hidden' }}>
+                    <div style={{ width: `${currentlyLearningCourse.progress}%`, height: '100%', background: '#2563EB', borderRadius: 999, transition: 'width 0.3s ease' }} />
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
+                  <button
+                    onClick={() => {
+                      setSelectedCourse(currentlyLearningCourse);
+                      if (currentlyLearningCourse.lessons?.length > 0) {
+                        handlePlayLesson(currentlyLearningCourse.lessons[0], currentlyLearningCourse);
+                      }
+                    }}
+                    style={{
+                      padding: '8px 18px',
+                      background: '#2563EB',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: 8,
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)'
+                    }}
+                  >
+                    <span>Continue Learning</span>
+                    <ArrowRight size={13} />
+                  </button>
+
+                  <button
+                    onClick={() => setCourseDetailsModal(currentlyLearningCourse)}
+                    style={{
+                      padding: '8px 16px',
+                      background: '#FFFFFF',
+                      color: '#2563EB',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: 8,
+                      fontSize: 12.5,
+                      fontWeight: 650,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6
+                    }}
+                  >
+                    <FileText size={13} />
+                    <span>View Curriculum</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Meta */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, paddingTop: 12, borderTop: '1px solid #F1F5F9', fontSize: 12, color: '#64748B', fontWeight: 500 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <BookOpen size={13} />
+                <span>{currentlyLearningCourse.lessons_count} Lectures</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Clock size={13} />
+                <span>{currentlyLearningCourse.duration}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── CARD 2: DYNAMIC REAL COURSE PROGRESS ── */}
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: 18,
+            border: '1px solid #E2E8F0',
+            padding: '22px 24px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: 16
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FileText size={16} color="#2563EB" />
+              <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0, color: '#0F172A' }}>
+                Your Course Progress
+              </h3>
+            </div>
+
+            {/* Donut Progress Ring + Real Breakdown */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, justifyContent: 'space-around', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', width: 104, height: 104, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="104" height="104" viewBox="0 0 104 104" style={{ transform: 'rotate(-90deg)' }}>
+                  <circle cx="52" cy="52" r="42" stroke="#EEF2F6" strokeWidth="9" fill="transparent" />
+                  <circle
+                    cx="52"
+                    cy="52"
+                    r="42"
+                    stroke="#2563EB"
+                    strokeWidth="9"
+                    strokeDasharray="263.89"
+                    strokeDashoffset={263.89 * (1 - (progressStats.percent / 100))}
+                    strokeLinecap="round"
+                    fill="transparent"
+                  />
+                </svg>
+                <div style={{ position: 'absolute', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 850, color: '#0F172A', lineHeight: 1 }}>
+                    {progressStats.percent}%
+                  </div>
+                  <div style={{ fontSize: 9.5, color: '#64748B', fontWeight: 600, marginTop: 2 }}>
+                    Overall
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Counts */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 140 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569', fontWeight: 600 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981' }} />
+                    <span>Completed</span>
+                  </div>
+                  <span style={{ fontWeight: 800, color: '#0F172A' }}>{progressStats.completed} / {progressStats.totalCourses}</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569', fontWeight: 600 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#F59E0B' }} />
+                    <span>In Progress</span>
+                  </div>
+                  <span style={{ fontWeight: 800, color: '#0F172A' }}>{progressStats.inProgress} / {progressStats.totalCourses}</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569', fontWeight: 600 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94A3B8' }} />
+                    <span>Not Started</span>
+                  </div>
+                  <span style={{ fontWeight: 800, color: '#0F172A' }}>{progressStats.notStarted} / {progressStats.totalCourses}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Real Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, paddingTop: 12, borderTop: '1px solid #F1F5F9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4F46E5' }}>
+                  <BookOpen size={16} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 10.5, color: '#64748B', fontWeight: 600 }}>Total Lectures</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A' }}>{progressStats.totalLessons}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderLeft: '1px solid #F1F5F9', paddingLeft: 14 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D97706' }}>
+                  <Clock size={16} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 10.5, color: '#64748B', fontWeight: 600 }}>Time Watched</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A' }}>{progressStats.totalHours}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ─── 3. BOTTOM SECTION: ALL COURSES CATALOG (UDEMY TEMPLATE STYLE) ─── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+        {/* Catalog Header & Filter Tabs */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <LayoutGrid size={20} color="#2563EB" />
+            <h2 style={{ fontSize: 19, fontWeight: 850, margin: 0, color: '#0F172A', letterSpacing: '-0.3px' }}>
+              All Courses & Playlists
+            </h2>
+            <span style={{ fontSize: 11.5, background: '#E0E7FF', color: '#4338CA', padding: '2px 8px', borderRadius: 999, fontWeight: 700 }}>
+              {filteredCourses.length} {filteredCourses.length === 1 ? 'Course' : 'Courses'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {/* Search Input */}
+            <div style={{ position: 'relative', width: 220 }}>
+              <input
+                type="text"
+                placeholder="Search courses..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{ width: '100%', padding: '7px 12px 7px 32px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 12.5, outline: 'none', background: '#FFFFFF', boxSizing: 'border-box' }}
+              />
+              <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+              {searchQuery && (
+                <X size={14} color="#94A3B8" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer' }} onClick={() => setSearchQuery('')} />
+              )}
+            </div>
+
+            {/* Filter Tabs */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F1F5F9', padding: 3, borderRadius: 999 }}>
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'in-progress', label: 'In Progress' },
+                { id: 'completed', label: 'Completed' },
+                { id: 'not-started', label: 'Not Started' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setCategoryFilter(tab.id)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 999,
+                    border: 'none',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: categoryFilter === tab.id ? '#2563EB' : 'transparent',
+                    color: categoryFilter === tab.id ? '#FFFFFF' : '#64748B',
+                    boxShadow: categoryFilter === tab.id ? '0 2px 6px rgba(37, 99, 235, 0.25)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* If loading */}
+        {loading ? (
+          <div style={{ background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0', padding: '60px 20px', textAlign: 'center', color: '#64748B' }}>
+            <div className="animate-spin" style={{ width: 28, height: 28, border: '3px solid #2563EB', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto 12px' }} />
+            <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600 }}>Loading your cohort courses...</p>
+          </div>
+        ) : filteredCourses.length === 0 ? (
+          /* ── UDEMY EMPTY STATE: NO COURSES FOUND ── */
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: 20,
+            border: '1.5px dashed #CBD5E1',
+            padding: '60px 24px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 12
+          }}>
+            <div style={{ width: 64, height: 64, borderRadius: 20, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB', marginBottom: 4 }}>
+              <BookOpen size={32} />
+            </div>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0F172A' }}>
+              {searchQuery ? 'No matching courses found' : 'No Courses or Playlists Available Yet'}
+            </h3>
+            <p style={{ margin: 0, fontSize: 13.5, color: '#64748B', maxWidth: 440, lineHeight: 1.5 }}>
+              {searchQuery ? 'Try clearing your search query or choosing another filter.' : 'Your instructors haven\'t published any course playlists for your cohort yet. Once added, you will see your curriculum and video lectures here.'}
+            </p>
+          </div>
+        ) : (
+          /* ── UDEMY TEMPLATE COURSE CARDS GRID ── */
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: 22
+          }}>
+            {filteredCourses.map((course) => {
+              const isCompleted = course.status === 'Completed';
+              const isInProgress = course.status === 'In Progress';
+
+              return (
+                <div
+                  key={course.id}
+                  onClick={() => {
+                    setSelectedCourse(course);
+                    if (course.lessons?.length > 0) handlePlayLesson(course.lessons[0], course);
+                  }}
+                  style={{
+                    background: '#FFFFFF',
+                    borderRadius: 16,
+                    border: '1px solid #E2E8F0',
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    position: 'relative'
+                  }}
+                  className="clickable-card-hover"
+                >
+                  {/* 16:9 Thumbnail with Overlay */}
+                  <div style={{ height: 140, position: 'relative', overflow: 'hidden', background: '#0F172A' }}>
+                    <img
+                      src={course.thumbnail}
+                      alt={course.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.65) 100%)'
+                    }} />
+
+                    {/* Top Right Status Badge */}
+                    <div style={{ position: 'absolute', top: 10, right: 10 }}>
+                      {isCompleted ? (
+                        <span style={{ background: '#10B981', color: '#FFFFFF', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <CheckCircle2 size={11} /> Completed
+                        </span>
+                      ) : isInProgress ? (
+                        <span style={{ background: '#2563EB', color: '#FFFFFF', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <Play size={10} fill="#FFFFFF" /> In Progress
+                        </span>
+                      ) : (
+                        <span style={{ background: 'rgba(255,255,255,0.9)', color: '#475569', fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 999 }}>
+                          Not Started
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Duration badge bottom right */}
+                    <div style={{ position: 'absolute', bottom: 8, right: 10, background: 'rgba(0,0,0,0.75)', color: '#FFFFFF', fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 4 }}>
+                      {course.duration}
+                    </div>
+
+                    {/* Category pill bottom left */}
+                    <div style={{ position: 'absolute', bottom: 8, left: 10, background: 'rgba(255,255,255,0.92)', color: '#1E293B', fontSize: 10.5, fontWeight: 750, padding: '2px 8px', borderRadius: 4 }}>
+                      {course.category}
+                    </div>
+                  </div>
+
+                  {/* Card Content (Udemy Layout) */}
+                  <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between', gap: 12 }}>
+                    <div>
+                      <h4 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 6px', color: '#0F172A', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {course.title}
+                      </h4>
+                      <p style={{ margin: 0, fontSize: 12, color: '#64748B', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.45 }}>
+                        {course.description}
+                      </p>
+                    </div>
+
+                    <div>
+                      {/* Instructor info */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#475569', fontWeight: 600, marginBottom: 8 }}>
+                        <Users size={13} color="#64748B" />
+                        <span>{course.trainer_name}</span>
+                        <span style={{ color: '#CBD5E1' }}>•</span>
+                        <span style={{ color: '#2563EB', fontWeight: 700 }}>{course.lessons_count} Lectures</span>
+                      </div>
+
+                      {/* Progress bar if started */}
+                      {course.progress > 0 && (
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: '#64748B', marginBottom: 4 }}>
+                            <span>Progress</span>
+                            <span style={{ color: isCompleted ? '#10B981' : '#2563EB' }}>{course.progress}%</span>
+                          </div>
+                          <div style={{ width: '100%', height: 5, background: '#F1F5F9', borderRadius: 999, overflow: 'hidden' }}>
+                            <div style={{ width: `${course.progress}%`, height: '100%', background: isCompleted ? '#10B981' : '#2563EB', borderRadius: 999 }} />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Action Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCourse(course);
+                          if (course.lessons?.length > 0) handlePlayLesson(course.lessons[0], course);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '9px 12px',
+                          borderRadius: 8,
+                          border: 'none',
+                          background: isCompleted ? '#ECFDF5' : (isInProgress ? '#EFF6FF' : '#F8FAFC'),
+                          color: isCompleted ? '#059669' : (isInProgress ? '#2563EB' : '#1E293B'),
+                          fontWeight: 750,
+                          fontSize: 12.5,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          border: isCompleted ? '1px solid #A7F3D0' : (isInProgress ? '1px solid #BFDBFE' : '1px solid #E2E8F0')
+                        }}
+                      >
+                        <Play size={12} fill={isCompleted ? '#059669' : (isInProgress ? '#2563EB' : '#1E293B')} />
+                        {isCompleted ? 'Review Lectures' : (isInProgress ? 'Continue Learning' : 'Start Course')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ─── 4. UDEMY DRILLDOWN: ACTIVE LESSON PLAYER & CURRICULUM VIEW ─── */}
+      {selectedCourse && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: 20
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: 1100,
+            maxHeight: '92vh',
+            background: '#FFFFFF',
+            borderRadius: 20,
+            boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{ padding: '16px 24px', background: '#0F172A', color: '#FFFFFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontSize: 11, color: '#A5B4FC', fontWeight: 700, textTransform: 'uppercase' }}>
+                  {selectedCourse.category}
+                </span>
+                <h3 style={{ margin: '2px 0 0', fontSize: 18, fontWeight: 800 }}>
+                  {selectedCourse.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedCourse(null);
+                  setActivePlayingLesson(null);
+                  refreshWatchProgress();
+                }}
+                style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#FFFFFF', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={18} />
               </button>
             </div>
 
-            <div>
-              <h2 style={{ fontSize: 22, fontWeight: 850, margin: '0 0 6px', color: '#0F172A' }}>
-                {courseDetailsModal.title}
-              </h2>
-              <p style={{ fontSize: 13.5, color: '#64748B', lineHeight: 1.55, margin: 0 }}>
-                {courseDetailsModal.description}
-              </p>
-            </div>
+            {/* Main Interactive Grid: Video Player + Curriculum Syllabus */}
+            <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(0, 1.2fr)', overflow: 'hidden' }}>
+              
+              {/* Left Column: Secure Video Player */}
+              <div style={{ background: '#000000', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+                {activePlayingLesson ? (
+                  <div style={{ width: '100%', position: 'relative' }}>
+                    <SecureVideoPlayer
+                      videoUrl={activePlayingLesson.video_url || activePlayingLesson.videoUrl || activePlayingLesson.url}
+                      watermarkText={watermarkText}
+                      videoId={activePlayingLesson.id}
+                      studentId={studentId}
+                      lessonTitle={activePlayingLesson.title}
+                      onProgressUpdate={(p) => {
+                        saveWatchProgress(studentId, activePlayingLesson.id, p);
+                        refreshWatchProgress();
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ height: 360, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', gap: 10 }}>
+                    <PlayCircle size={48} color="#6366F1" />
+                    <p style={{ margin: 0, fontSize: 14 }}>Select a lecture on the right to start watching.</p>
+                  </div>
+                )}
 
-            {/* Trainer Profile Card */}
-            <div style={{
-              background: '#F8FAFC',
-              borderRadius: 14,
-              padding: '14px 18px',
-              border: '1px solid #E2E8F0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 14
-            }}>
-              <img
-                src={courseDetailsModal.trainer_avatar}
-                alt={courseDetailsModal.trainer_name}
-                style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }}
-              />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A' }}>
-                  {courseDetailsModal.trainer_name}
-                </div>
-                <div style={{ fontSize: 12, color: '#64748B' }}>
-                  {courseDetailsModal.trainer_title}
-                </div>
-              </div>
-            </div>
+                {/* Lesson Description & Resources Row */}
+                {activePlayingLesson && (
+                  <div style={{ padding: '18px 20px', background: '#0F172A', color: '#FFFFFF', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                    <h4 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 750 }}>
+                      {activePlayingLesson.title}
+                    </h4>
+                    <p style={{ margin: '0 0 12px', fontSize: 12.5, color: '#94A3B8', lineHeight: 1.5 }}>
+                      {activePlayingLesson.description || 'Hands-on lecture breakdown and practical implementations.'}
+                    </p>
 
-            {/* Metrics */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: 12, borderRadius: 12, textAlign: 'center' }}>
-                <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Total Lessons</div>
-                <div style={{ fontSize: 16, fontWeight: 850, color: '#0F172A', marginTop: 2 }}>{courseDetailsModal.lessons_count}</div>
+                    {/* Resources */}
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {activePlayingLesson.notes_url && (
+                        <a
+                          href={activePlayingLesson.notes_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            background: 'rgba(255,255,255,0.1)',
+                            color: '#FFFFFF',
+                            padding: '6px 12px',
+                            borderRadius: 6,
+                            textDecoration: 'none',
+                            fontSize: 12,
+                            fontWeight: 600
+                          }}
+                        >
+                          <FileText size={14} /> Download Lecture Notes
+                        </a>
+                      )}
+                      {(activePlayingLesson.study_materials || []).map((m, mIdx) => (
+                        <a
+                          key={mIdx}
+                          href={m.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            background: '#2563EB',
+                            color: '#FFFFFF',
+                            padding: '6px 12px',
+                            borderRadius: 6,
+                            textDecoration: 'none',
+                            fontSize: 12,
+                            fontWeight: 600
+                          }}
+                        >
+                          <Download size={14} /> {m.name || `Material ${mIdx + 1}`}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: 12, borderRadius: 12, textAlign: 'center' }}>
-                <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Total Duration</div>
-                <div style={{ fontSize: 16, fontWeight: 850, color: '#0F172A', marginTop: 2 }}>{courseDetailsModal.duration}</div>
+
+              {/* Right Column: Udemy Syllabus List */}
+              <div style={{ background: '#F8FAFC', borderLeft: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <div style={{ padding: '14px 18px', background: '#FFFFFF', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#1E293B' }}>
+                    Course Curriculum
+                  </h4>
+                  <span style={{ fontSize: 11.5, color: '#64748B', fontWeight: 600 }}>
+                    {activeCourseLessons.length} Lectures
+                  </span>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {activeCourseLessons.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px 10px', color: '#94A3B8', fontSize: 13 }}>
+                      No video lectures uploaded to this playlist yet.
+                    </div>
+                  ) : (
+                    activeCourseLessons.map((lesson, idx) => {
+                      const isCurrent = activePlayingLesson?.id === lesson.id;
+                      const prog = watchProgressMap[lesson.id];
+                      const isDone = prog?.completed || (prog?.progress && prog.progress >= 90);
+
+                      return (
+                        <div
+                          key={lesson.id}
+                          onClick={() => handlePlayLesson(lesson, selectedCourse)}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: 10,
+                            background: isCurrent ? '#EEF2FF' : '#FFFFFF',
+                            border: isCurrent ? '1.5px solid #6366F1' : '1px solid #E2E8F0',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            background: isDone ? '#10B981' : (isCurrent ? '#6366F1' : '#F1F5F9'),
+                            color: isDone || isCurrent ? '#FFFFFF' : '#64748B',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            flexShrink: 0
+                          }}>
+                            {isDone ? <Check size={14} /> : (idx + 1)}
+                          </div>
+
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: isCurrent ? 800 : 650, color: isCurrent ? '#4338CA' : '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {lesson.title}
+                            </div>
+                            <span style={{ fontSize: 11, color: '#64748B' }}>
+                              ⏱ {lesson.duration}
+                            </span>
+                          </div>
+
+                          {isCurrent && (
+                            <span style={{ fontSize: 11, background: '#6366F1', color: '#FFFFFF', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
+                              Playing
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: 12, borderRadius: 12, textAlign: 'center' }}>
-                <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Status</div>
-                <div style={{ fontSize: 14, fontWeight: 850, color: '#2563EB', marginTop: 3 }}>{courseDetailsModal.status}</div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 5. COURSE OVERVIEW / DETAILS MODAL ─── */}
+      {courseDetailsModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: 20
+        }}>
+          <div style={{ width: '100%', maxWidth: 520, background: '#FFFFFF', borderRadius: 20, padding: 24, position: 'relative' }}>
+            <button
+              onClick={() => setCourseDetailsModal(null)}
+              style={{ position: 'absolute', right: 16, top: 16, background: '#F1F5F9', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <X size={16} />
+            </button>
+
+            <h3 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 850, color: '#0F172A' }}>
+              {courseDetailsModal.title}
+            </h3>
+            <span style={{ fontSize: 12, color: '#2563EB', fontWeight: 700, display: 'block', marginBottom: 12 }}>
+              {courseDetailsModal.category} • {courseDetailsModal.batch_name}
+            </span>
+
+            <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.5, marginBottom: 18 }}>
+              {courseDetailsModal.description}
+            </p>
+
+            <div style={{ background: '#F8FAFC', borderRadius: 12, padding: 14, border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12.5, marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748B', fontWeight: 600 }}>Instructor:</span>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>{courseDetailsModal.trainer_name}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748B', fontWeight: 600 }}>Total Lectures:</span>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>{courseDetailsModal.lessons_count} Lectures</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748B', fontWeight: 600 }}>Duration:</span>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>{courseDetailsModal.duration}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748B', fontWeight: 600 }}>Your Progress:</span>
+                <span style={{ fontWeight: 800, color: courseDetailsModal.progress === 100 ? '#10B981' : '#2563EB' }}>
+                  {courseDetailsModal.progress}% ({courseDetailsModal.completed_lessons} / {courseDetailsModal.lessons_count} completed)
+                </span>
               </div>
             </div>
 
             <button
               onClick={() => {
-                setSelectedCourse(courseDetailsModal);
+                const target = courseDetailsModal;
                 setCourseDetailsModal(null);
+                setSelectedCourse(target);
+                if (target.lessons?.length > 0) handlePlayLesson(target.lessons[0], target);
               }}
               style={{
                 width: '100%',
-                padding: '12px 20px',
+                padding: '11px',
+                borderRadius: 10,
+                border: 'none',
                 background: '#2563EB',
                 color: '#FFFFFF',
-                border: 'none',
-                borderRadius: 12,
-                fontSize: 14,
                 fontWeight: 750,
+                fontSize: 13.5,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 8,
-                marginTop: 6
+                gap: 6
               }}
             >
-              <span>Explore Curriculum & Start Learning</span>
-              <ArrowRight size={15} />
+              <Play size={14} fill="#FFFFFF" /> Open Course Lessons
             </button>
-          </div>
-        </div>
-      )}
-
-
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {/* 6. DRM VIDEO PLAYER MODAL                                      */}
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {activePlayingLesson && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.92)',
-          zIndex: 99999,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 20
-        }}>
-          {/* Top Bar */}
-          <div style={{
-            width: '100%',
-            maxWidth: 1040,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 14,
-            color: '#FFFFFF'
-          }}>
-            <div>
-              <span style={{ fontSize: 11, color: '#93C5FD', fontWeight: 700, textTransform: 'uppercase' }}>
-                {activePlayingLesson.module || 'Lecture Session'}
-              </span>
-              <h3 style={{ fontSize: 18, fontWeight: 800, margin: '2px 0 0', color: '#FFFFFF' }}>
-                {activePlayingLesson.title}
-              </h3>
-            </div>
-
-            <button
-              onClick={() => setActivePlayingLesson(null)}
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.15)',
-                border: 'none',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer'
-              }}
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          {/* Video Container */}
-          <div style={{
-            width: '100%',
-            maxWidth: 1040,
-            height: '70vh',
-            borderRadius: 16,
-            overflow: 'hidden',
-            background: '#000000',
-            boxShadow: '0 25px 60px rgba(0,0,0,0.8)'
-          }}>
-            <SecureVideoPlayer
-              videoUrl={activePlayingLesson.video_url}
-              title={activePlayingLesson.title}
-              watermarkText={watermarkText}
-              lessonId={activePlayingLesson.id}
-              studentId={studentId}
-              autoPlay={true}
-            />
           </div>
         </div>
       )}

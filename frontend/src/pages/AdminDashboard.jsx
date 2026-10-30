@@ -2699,18 +2699,6 @@ const AdminDashboard = () => {
     e.preventDefault();
     if (!validateBatchForm()) return;
     try {
-      if (isCustomBatchCourse && customBatchCourseName.trim()) {
-        const cTitle = customBatchCourseName.trim();
-        await addCourse({
-          title: cTitle,
-          name: cTitle,
-          description: `${cTitle} Course`,
-          category: 'Technical',
-          status: 'Active',
-          createdAt: new Date().toISOString()
-        }).catch(err => console.warn('[Admin] Auto-create batch course error:', err));
-        queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
-      }
       const code = await generateNextId('batch');
       const created = await addBatch({ ...batchPayload(), code });
       if (created?.id) {
