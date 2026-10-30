@@ -121,7 +121,7 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
     if (!selectedBatchId) return;
     if (!silent) setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/messages/batch/${selectedBatchId}`);
+      const res = await fetch(`${API_BASE}/api/messages/batch/${selectedBatchId}?userId=${encodeURIComponent(currentUserId || '')}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setMessages(Array.isArray(data) ? data : []);
@@ -768,7 +768,11 @@ export default function BatchChatPage({ user: propUser, userProfile: propProfile
                           <span style={{ flex: 1, whiteSpace: 'pre-wrap' }}>{msg.text}</span>
                           <span style={{ fontSize: 10.5, color: '#667781', alignSelf: 'flex-end', display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 'auto', paddingTop: 2 }}>
                             {timeDisplay}
-                            {isMe && <CheckCheck size={14} color="#53BDEB" />}
+                            {isMe && (
+                              <span title={msg.isAllRead ? "Seen by all batch members" : "Delivered"}>
+                                <CheckCheck size={14} color={msg.isAllRead ? "#53BDEB" : "#8696A0"} />
+                              </span>
+                            )}
                           </span>
                         </div>
                       </>

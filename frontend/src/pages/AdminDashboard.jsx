@@ -4068,17 +4068,16 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleFileUpload = async (file) => {
-    // Upload to Firebase Storage
+  const handleFileUpload = async (file, folder = 'study-materials') => {
     try {
-      const { uploadFile } = await import('../services/firebaseService');
-      const ext = file.name.split('.').pop();
-      const path = `uploads/${Date.now()}_${file.name}`;
-      const url = await uploadFile(path, file, { contentType: file.type });
-      return { url };
+      const res = await uploadUniversalFile(file, folder);
+      if (res && res.url) {
+        return { url: res.url, name: res.originalName || file.name, type: res.fileType || 'pdf' };
+      }
+      return null;
     } catch (e) {
       console.error(e);
-      showModal('Upload Error', 'Failed to upload file to storage.', 'error');
+      showModal('Upload Error', e.message || 'Failed to upload file to storage.', 'error');
       return null;
     }
   };
@@ -4089,7 +4088,6 @@ const AdminDashboard = () => {
     const isDrive = Boolean(getGoogleDriveFileId(recVideoUrl));
     const isYouTube = Boolean(getYouTubeVideoId(recVideoUrl));
     const finalSourceType = isDrive ? 'drive' : (isYouTube ? 'youtube' : videoSourceType);
-    const finalThumbnail = recThumbnailUrl || getResolvedThumbnail(recVideoUrl, recThumbnailUrl);
     let targetPlaylistId = selectedBatchId;
     let targetPlaylistName = '';
     let targetBatchId = '';
@@ -4114,13 +4112,26 @@ const AdminDashboard = () => {
       finalCourseTitle = recCourseTitle || foundBatch?.course_name || 'General Course';
     }
 
+    // Include any pending material input in the form
+    let finalMaterials = [...recStudyMaterials];
+    if (newMaterialUrl && newMaterialUrl.trim()) {
+      const fileExt = newMaterialUrl.split('.').pop()?.split('?')[0]?.toLowerCase() || 'pdf';
+      finalMaterials.push({
+        name: (newMaterialName && newMaterialName.trim()) || 'Lecture Study Material',
+        url: newMaterialUrl.trim(),
+        type: fileExt
+      });
+      setNewMaterialName('');
+      setNewMaterialUrl('');
+    }
+
     const payload = {
       title: recTitle,
       module: recModule,
       video_url: recVideoUrl,
-      thumbnail: finalThumbnail,
+      thumbnail: '',
       description: recLessonDescription,
-      notes_url: recNotesUrl,
+      notes_url: recNotesUrl ? recNotesUrl.trim() : '',
       assignment: recAssignment,
       visibility: recVisibility,
       course_title: finalCourseTitle,
@@ -4133,7 +4144,7 @@ const AdminDashboard = () => {
       sort_order: recSortOrder ? parseInt(recSortOrder) : 999,
       duration: recDuration || '1h 30m',
       video_source_type: finalSourceType,
-      study_materials: recStudyMaterials,
+      study_materials: finalMaterials,
     };
     try {
       const recId = editingRecordedClass?.id || editingRecordedClass?.uid || editingRecordedClass?._id;
@@ -10282,20 +10293,6 @@ const AdminDashboard = () => {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label" htmlFor="recThumbnailUrl">Thumbnail Image URL</label>
-                    <input 
-                      id="recThumbnailUrl" 
-                      type="url" 
-                      className="form-input" 
-                      value={recThumbnailUrl} 
-                      onChange={(e) => setRecThumbnailUrl(e.target.value)} 
-                      placeholder="Custom thumbnail URL (optional, auto-generated if blank)" 
-                    />
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-                      Leave empty to auto-use Google Drive / YouTube video thumbnail
-                    </span>
-                  </div>
-                  <div className="form-group">
                     <label className="form-label" htmlFor="recDuration">Duration</label>
                     <input id="recDuration" type="text" className="form-input" value={recDuration} onChange={(e) => setRecDuration(e.target.value)} placeholder="e.g. 1h 15m" />
                   </div>
@@ -10305,17 +10302,42 @@ const AdminDashboard = () => {
                     <textarea id="recLessonDescription" className="form-input" style={{ height: 60, resize: 'none' }} value={recLessonDescription} onChange={(e) => setRecLessonDescription(e.target.value)} placeholder="Brief overview of what students will learn..." />
                   </div>
 
+                  {/* Direct Lecture Notes / Document Link */}
+                  <div className="form-group grid-col-span-2">
+                    <label className="form-label" htmlFor="recNotesUrl">Lecture Notes / Document Link (PDF, Drive, Notion, GitHub)</label>
+                    <input 
+                      id="recNotesUrl" 
+                      type="url" 
+                      className="form-input" 
+                      value={recNotesUrl} 
+                      onChange={(e) => setRecNotesUrl(e.target.value)} 
+                      placeholder="https://drive.google.com/... or https://..." 
+                    />
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                      Direct notes link displayed prominently in the student video player for one-click opening.
+                    </span>
+                  </div>
+
                   {/* Multiple Study Materials Manager */}
                   <div className="form-group grid-col-span-2" style={{ background: 'var(--bg-secondary)', padding: 14, borderRadius: 12, border: '1px solid var(--border-color)' }}>
-                    <label className="form-label" style={{ fontWeight: 800 }}>Study Materials Manager</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label className="form-label" style={{ fontWeight: 800, margin: 0 }}>Study Materials & Downloadable Attachments</label>
+                      <span style={{ fontSize: 11, color: '#64748B' }}>Students will see & download these in their player</span>
+                    </div>
+
                     {/* Current Materials List */}
                     {recStudyMaterials.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, marginTop: 6 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, marginTop: 8 }}>
                         {recStudyMaterials.map((mat, index) => (
-                          <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-light)' }}>
-                            <span style={{ fontSize: 12, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
-                              📄 {mat.name} ({mat.type?.toUpperCase()})
-                            </span>
+                          <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-light)', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', maxWidth: '85%' }}>
+                              <span style={{ background: '#EFF6FF', color: '#2563EB', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 800, textTransform: 'uppercase' }}>
+                                {mat.type || 'FILE'}
+                              </span>
+                              <span style={{ fontSize: 12.5, color: '#1E293B', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {mat.name}
+                              </span>
+                            </div>
                             <button 
                               type="button" 
                               style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
@@ -10332,34 +10354,57 @@ const AdminDashboard = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8, borderTop: '1px solid var(--border-light)', paddingTop: 10 }}>
                       <input 
                         type="text" 
-                        placeholder="Material Name (e.g. Slide Lecture 1)" 
+                        placeholder="Material Title (e.g. Slide Deck Lecture 1, Source Code ZIP)" 
                         className="form-input" 
                         style={{ height: 36, fontSize: 12.5 }}
                         value={newMaterialName} 
                         onChange={(e) => setNewMaterialName(e.target.value)} 
                       />
-                      <div style={{ display: 'flex', gap: 12 }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 12, cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', gap: 16 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 12.5, cursor: 'pointer' }}>
                           <input type="radio" name="newMaterialSourceType" value="link" checked={newMaterialSourceType === 'link'} onChange={() => setNewMaterialSourceType('link')} />
-                          Drive Link
+                          <span>External Web / Drive Link</span>
                         </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 12, cursor: 'pointer' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 12.5, cursor: 'pointer' }}>
                           <input type="radio" name="newMaterialSourceType" value="upload" checked={newMaterialSourceType === 'upload'} onChange={() => setNewMaterialSourceType('upload')} />
-                          Upload File
+                          <span>Upload Local File</span>
                         </label>
                       </div>
 
                       {newMaterialSourceType === 'link' ? (
-                        <input 
-                          type="url" 
-                          placeholder="https://drive.google.com/..." 
-                          className="form-input" 
-                          style={{ height: 36, fontSize: 12.5 }}
-                          value={newMaterialUrl} 
-                          onChange={(e) => setNewMaterialUrl(e.target.value)} 
-                        />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input 
+                            type="url" 
+                            placeholder="https://drive.google.com/... or resource link" 
+                            className="form-input" 
+                            style={{ height: 36, fontSize: 12.5, flex: 1 }}
+                            value={newMaterialUrl} 
+                            onChange={(e) => setNewMaterialUrl(e.target.value)} 
+                          />
+                          <button 
+                            type="button" 
+                            className="btn btn-primary" 
+                            style={{ padding: '0 14px', fontSize: 12, height: 36, flexShrink: 0 }}
+                            onClick={() => {
+                              if (!newMaterialUrl.trim()) {
+                                showModal("Warning", "Please provide a link for the study material.", "warning");
+                                return;
+                              }
+                              const fileExt = newMaterialUrl.split('.').pop()?.split('?')[0]?.toLowerCase() || 'link';
+                              setRecStudyMaterials(prev => [...prev, {
+                                name: (newMaterialName && newMaterialName.trim()) || 'Study Resource',
+                                url: newMaterialUrl.trim(),
+                                type: fileExt
+                              }]);
+                              setNewMaterialName('');
+                              setNewMaterialUrl('');
+                            }}
+                          >
+                            + Attach Link
+                          </button>
+                        </div>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           <input 
                             type="file" 
                             accept=".pdf,.docx,.ppt,.pptx,.zip,.rar,image/*" 
@@ -10372,35 +10417,21 @@ const AdminDashboard = () => {
                               const res = await handleFileUpload(file);
                               setUploadingMaterial(false);
                               if (res && res.url) {
-                                setNewMaterialUrl(res.url);
+                                const matName = (newMaterialName && newMaterialName.trim()) || res.name || file.name;
+                                setRecStudyMaterials(prev => [...prev, {
+                                  name: matName,
+                                  url: res.url,
+                                  type: res.type || 'pdf'
+                                }]);
+                                setNewMaterialName('');
+                                setNewMaterialUrl('');
+                                showModal("Attached", `"${matName}" successfully attached!`, "success");
                               }
                             }} 
                           />
-                          {uploadingMaterial && <span style={{ fontSize: 11, color: 'var(--primary-color)' }}>Uploading file...</span>}
+                          {uploadingMaterial && <span style={{ fontSize: 11, color: 'var(--primary-color)', fontWeight: 600 }}>Uploading file to server...</span>}
                         </div>
                       )}
-
-                      <button 
-                        type="button" 
-                        className="btn btn-outline" 
-                        style={{ alignSelf: 'flex-start', padding: '5px 12px', fontSize: 12, height: 30 }}
-                        onClick={() => {
-                          if (!newMaterialName.trim() || !newMaterialUrl.trim()) {
-                            showModal("Warning", "Please provide a name and a link/file for the study material.", "warning");
-                            return;
-                          }
-                          const fileExt = newMaterialUrl.split('.').pop()?.split('?')[0]?.toLowerCase() || 'pdf';
-                          setRecStudyMaterials(prev => [...prev, {
-                            name: newMaterialName.trim(),
-                            url: newMaterialUrl.trim(),
-                            type: fileExt
-                          }]);
-                          setNewMaterialName('');
-                          setNewMaterialUrl('');
-                        }}
-                      >
-                        + Add Material
-                      </button>
                     </div>
                   </div>
 

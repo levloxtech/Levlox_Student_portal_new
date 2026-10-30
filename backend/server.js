@@ -2288,15 +2288,67 @@ app.post('/api/notifications/live-class', requireAuth, requireAdminOrTrainer, as
 // BATCH CHAT & MESSAGING ROUTES
 // ════════════════════════════════════════════════════════════════════════════
 
-// Get all messages for a specific batch
+// Get all messages for a specific batch (with real-time read receipts & blue tick check)
 app.get('/api/messages/batch/:batchId', (req, res) => {
   try {
     const { batchId } = req.params;
+    const { userId } = req.query;
     const all = localDb.loadCollection('messages');
+    const allStudents = localDb.loadCollection('students');
+    const allBatches = localDb.loadCollection('batches');
+    const allTrainers = localDb.loadCollection('trainers');
+
+    const batch = allBatches.find(b => String(b.id) === String(batchId) || String(b.uid) === String(batchId) || b.name === batchId);
+
+    // Identify all enrolled members of this batch
+    const batchMembers = new Set();
+    allStudents.filter(s =>
+      String(s.batch_id || s.batchId || '') === String(batchId) ||
+      (batch && (s.batch_name === batch.name || s.batch === batch.name))
+    ).forEach(s => batchMembers.add(String(s.id || s.uid)));
+
+    if (batch && (batch.trainer_uid || batch.trainerId)) {
+      batchMembers.add(String(batch.trainer_uid || batch.trainerId));
+    }
+    allTrainers.filter(t => (t.assigned_batch_ids || []).map(String).includes(String(batchId)))
+      .forEach(t => batchMembers.add(String(t.id || t.uid)));
+
     const filtered = all.filter(m =>
       String(m.batchId) === String(batchId) ||
       String(m.batch_id) === String(batchId)
     );
+
+    let hasUpdates = false;
+    const cleanUserId = userId ? String(userId) : null;
+
+    filtered.forEach(m => {
+      if (!Array.isArray(m.readBy)) {
+        m.readBy = m.senderId ? [String(m.senderId)] : [];
+        hasUpdates = true;
+      }
+      // Record reader's receipt if they are a different user
+      if (cleanUserId && String(m.senderId) !== cleanUserId && !m.readBy.map(String).includes(cleanUserId)) {
+        m.readBy.push(cleanUserId);
+        hasUpdates = true;
+      }
+
+      // Check if ALL recipients have seen the message
+      const senderStr = String(m.senderId || '');
+      const recipients = Array.from(batchMembers).filter(id => id && id !== senderStr);
+
+      if (recipients.length > 0) {
+        const readByStrs = m.readBy.map(String);
+        m.isAllRead = recipients.every(rId => readByStrs.includes(rId));
+      } else {
+        // If no cohort recipients listed yet, true if any other user has read it
+        m.isAllRead = m.readBy.filter(r => r !== senderStr).length > 0;
+      }
+    });
+
+    if (hasUpdates) {
+      localDb.saveCollection('messages', all);
+    }
+
     // Sort chronologically
     filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     res.json(filtered);
@@ -2346,6 +2398,8 @@ app.post('/api/messages/batch/:batchId', (req, res) => {
       fileName: fileName || null,
       fileSize: fileSize || null,
       sticker: sticker || null,
+      readBy: senderId ? [String(senderId)] : [],
+      isAllRead: false,
       reactions: {},
       replyTo: replyTo || null,
       createdAt: new Date().toISOString()

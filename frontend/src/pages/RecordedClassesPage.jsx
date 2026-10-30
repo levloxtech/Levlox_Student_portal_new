@@ -82,6 +82,7 @@ const RecordedClassesPage = ({
   // Drilldown states:
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [activePlayingLesson, setActivePlayingLesson] = useState(null);
+  const [playerTab, setPlayerTab] = useState('curriculum'); // 'curriculum' | 'materials'
   const [courseDetailsModal, setCourseDetailsModal] = useState(null);
   const [moreMenuCourseId, setMoreMenuCourseId] = useState(null);
 
@@ -120,13 +121,23 @@ const RecordedClassesPage = ({
   const handlePlayLesson = (lesson, course = null) => {
     if (!lesson) return;
     const targetCourse = course || selectedCourse;
-    saveRecentlyViewedVideo(studentId, {
+    const rawMaterials = lesson.study_materials || lesson.studyMaterials || [];
+    const normalized = {
       ...lesson,
+      id: lesson.id || lesson.uid,
+      title: lesson.title || lesson.topic || 'Video Lecture',
+      video_url: lesson.video_url || lesson.videoUrl || lesson.url,
+      description: lesson.description || '',
+      notes_url: lesson.notes_url || lesson.notesUrl || '',
+      assignment: lesson.assignment || '',
+      duration: lesson.duration || '45m',
+      study_materials: Array.isArray(rawMaterials) ? rawMaterials : [],
       courseId: targetCourse?.id,
       courseTitle: targetCourse?.title || targetCourse?.name || 'Class Lecture',
       category: targetCourse?.category || 'Curriculum',
-    });
-    setActivePlayingLesson(lesson);
+    };
+    saveRecentlyViewedVideo(studentId, normalized);
+    setActivePlayingLesson(normalized);
   };
 
   // 100% Dynamic Playlists & Courses mapped with Real Progress & Batch Filtering
@@ -340,6 +351,50 @@ const RecordedClassesPage = ({
       notes_url: v.notes_url || v.notesUrl || null,
       study_materials: v.study_materials || v.studyMaterials || []
     }));
+  }, [selectedCourse]);
+
+  // Aggregate All Downloadable Course Materials across all lectures
+  const allCourseMaterials = useMemo(() => {
+    if (!selectedCourse) return [];
+    const list = [];
+    (selectedCourse.lessons || []).forEach((l, lIdx) => {
+      const lTitle = l.title || l.topic || `Lecture ${lIdx + 1}`;
+      if (l.notes_url || l.notesUrl) {
+        list.push({
+          id: `notes_${l.id || l.uid || lIdx}`,
+          name: `${lTitle} - Lecture Notes / Documentation`,
+          url: l.notes_url || l.notesUrl,
+          type: 'doc',
+          lessonId: l.id || l.uid,
+          lessonTitle: lTitle
+        });
+      }
+      const mats = l.study_materials || l.studyMaterials || [];
+      if (Array.isArray(mats)) {
+        mats.forEach((m, mIdx) => {
+          list.push({
+            id: `mat_${l.id || l.uid || lIdx}_${mIdx}`,
+            name: m.name || `${lTitle} Resource ${mIdx + 1}`,
+            url: m.url,
+            type: m.type || 'file',
+            lessonId: l.id || l.uid,
+            lessonTitle: lTitle
+          });
+        });
+      }
+      if (l.assignment) {
+        list.push({
+          id: `assign_${l.id || l.uid || lIdx}`,
+          name: `${lTitle} - Assignment Task Specification`,
+          url: String(l.assignment).startsWith('http') ? l.assignment : null,
+          text: l.assignment,
+          type: 'task',
+          lessonId: l.id || l.uid,
+          lessonTitle: lTitle
+        });
+      }
+    });
+    return list;
   }, [selectedCourse]);
 
   return (
@@ -950,59 +1005,106 @@ const RecordedClassesPage = ({
         )}
       </div>
 
-      {/* ─── 4. UDEMY DRILLDOWN: ACTIVE LESSON PLAYER & CURRICULUM VIEW ─── */}
+      {/* ─── 4. UDEMY/COURSERA LEARNING THEATRE & STUDY MATERIALS PLAYER ─── */}
       {selectedCourse && (
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(4px)',
+          background: 'rgba(11, 15, 25, 0.88)',
+          backdropFilter: 'blur(8px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 9999,
-          padding: 20
+          padding: '16px'
         }}>
           <div style={{
             width: '100%',
-            maxWidth: 1100,
-            maxHeight: '92vh',
-            background: '#FFFFFF',
+            maxWidth: 1220,
+            height: '92vh',
+            maxHeight: 900,
+            background: '#0F172A',
             borderRadius: 20,
-            boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
+            boxShadow: '0 25px 70px rgba(0,0,0,0.5)',
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
           }}>
-            {/* Header */}
-            <div style={{ padding: '16px 24px', background: '#0F172A', color: '#FFFFFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span style={{ fontSize: 11, color: '#A5B4FC', fontWeight: 700, textTransform: 'uppercase' }}>
-                  {selectedCourse.category}
+            {/* Top Bar Header */}
+            <div style={{
+              padding: '14px 24px',
+              background: 'linear-gradient(90deg, #0B132B 0%, #1E1B4B 100%)',
+              color: '#FFFFFF',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  background: 'rgba(99, 102, 241, 0.25)',
+                  border: '1px solid rgba(165, 180, 252, 0.4)',
+                  color: '#C7D2FE',
+                  padding: '3px 10px',
+                  borderRadius: 999,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.4px'
+                }}>
+                  {selectedCourse.category || 'Curriculum'}
                 </span>
-                <h3 style={{ margin: '2px 0 0', fontSize: 18, fontWeight: 800 }}>
-                  {selectedCourse.title}
-                </h3>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 17, fontWeight: 850, letterSpacing: '-0.3px', color: '#FFFFFF' }}>
+                    {selectedCourse.title}
+                  </h3>
+                  {activePlayingLesson && (
+                    <span style={{ fontSize: 12, color: '#94A3B8' }}>
+                      Now Playing: <strong style={{ color: '#E2E8F0' }}>{activePlayingLesson.title}</strong>
+                    </span>
+                  )}
+                </div>
               </div>
-              <button
-                onClick={() => {
-                  setSelectedCourse(null);
-                  setActivePlayingLesson(null);
-                  refreshWatchProgress();
-                }}
-                style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#FFFFFF', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-              >
-                <X size={18} />
-              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCourse(null);
+                    setActivePlayingLesson(null);
+                    refreshWatchProgress();
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.12)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#FFFFFF',
+                    borderRadius: '50%',
+                    width: 36,
+                    height: 36,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="Close Player"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
-            {/* Main Interactive Grid: Video Player + Curriculum Syllabus */}
-            <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(0, 1.2fr)', overflow: 'hidden' }}>
+            {/* Main Interactive Dual-Pane Grid */}
+            <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1.85fr) minmax(340px, 1.15fr)', overflow: 'hidden' }}>
               
-              {/* Left Column: Secure Video Player */}
-              <div style={{ background: '#000000', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-                {activePlayingLesson ? (
-                  <div style={{ width: '100%', position: 'relative' }}>
+              {/* Left Column: Video Player + Lecture Details & Direct Material Bar */}
+              <div style={{ background: '#090D16', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+                
+                {/* 16:9 Video Canvas */}
+                <div style={{ width: '100%', background: '#000000', position: 'relative' }}>
+                  {activePlayingLesson ? (
                     <SecureVideoPlayer
                       videoUrl={activePlayingLesson.video_url || activePlayingLesson.videoUrl || activePlayingLesson.url}
                       watermarkText={watermarkText}
@@ -1014,26 +1116,46 @@ const RecordedClassesPage = ({
                         refreshWatchProgress();
                       }}
                     />
-                  </div>
-                ) : (
-                  <div style={{ height: 360, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', gap: 10 }}>
-                    <PlayCircle size={48} color="#6366F1" />
-                    <p style={{ margin: 0, fontSize: 14 }}>Select a lecture on the right to start watching.</p>
-                  </div>
-                )}
+                  ) : (
+                    <div style={{ height: 380, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', gap: 12 }}>
+                      <PlayCircle size={52} color="#6366F1" />
+                      <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Select a lecture from the curriculum on the right to start watching.</p>
+                    </div>
+                  )}
+                </div>
 
-                {/* Lesson Description & Resources Row */}
+                {/* Below Player Information & Quick Materials Action Bar */}
                 {activePlayingLesson && (
-                  <div style={{ padding: '18px 20px', background: '#0F172A', color: '#FFFFFF', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                    <h4 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 750 }}>
-                      {activePlayingLesson.title}
-                    </h4>
-                    <p style={{ margin: '0 0 12px', fontSize: 12.5, color: '#94A3B8', lineHeight: 1.5 }}>
-                      {activePlayingLesson.description || 'Hands-on lecture breakdown and practical implementations.'}
-                    </p>
+                  <div style={{ padding: '20px 24px', background: '#0F172A', color: '#FFFFFF', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    
+                    {/* Title + Meta Row */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
+                      <div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block', marginBottom: 2 }}>
+                          {activePlayingLesson.module || 'Lecture Lesson'}
+                        </span>
+                        <h2 style={{ margin: 0, fontSize: 19, fontWeight: 850, color: '#FFFFFF', letterSpacing: '-0.3px' }}>
+                          {activePlayingLesson.title}
+                        </h2>
+                      </div>
 
-                    {/* Resources */}
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#CBD5E1', fontSize: 11.5, fontWeight: 700, padding: '4px 10px', borderRadius: 999 }}>
+                          ⏱ {activePlayingLesson.duration || 'Flexible'}
+                        </span>
+                        <span style={{ background: 'rgba(16, 185, 129, 0.18)', color: '#6EE7B7', fontSize: 11.5, fontWeight: 750, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                          ✓ HD DRM Secure
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Prominent Quick-Action Study Materials & Notes Buttons */}
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', background: 'rgba(255, 255, 255, 0.04)', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      <span style={{ fontSize: 12, fontWeight: 750, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <BookOpen size={14} color="#818CF8" /> Materials & Docs:
+                      </span>
+
+                      {/* Direct Notes Link */}
                       {activePlayingLesson.notes_url && (
                         <a
                           href={activePlayingLesson.notes_url}
@@ -1043,18 +1165,21 @@ const RecordedClassesPage = ({
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 6,
-                            background: 'rgba(255,255,255,0.1)',
+                            background: '#059669',
                             color: '#FFFFFF',
-                            padding: '6px 12px',
-                            borderRadius: 6,
+                            padding: '6px 14px',
+                            borderRadius: 8,
+                            fontSize: 12.5,
+                            fontWeight: 750,
                             textDecoration: 'none',
-                            fontSize: 12,
-                            fontWeight: 600
+                            boxShadow: '0 2px 6px rgba(5, 150, 105, 0.3)'
                           }}
                         >
-                          <FileText size={14} /> Download Lecture Notes
+                          <FileText size={14} /> Open Lecture Notes ↗
                         </a>
                       )}
+
+                      {/* Active Lesson Materials Pills */}
                       {(activePlayingLesson.study_materials || []).map((m, mIdx) => (
                         <a
                           key={mIdx}
@@ -1067,94 +1192,286 @@ const RecordedClassesPage = ({
                             gap: 6,
                             background: '#2563EB',
                             color: '#FFFFFF',
-                            padding: '6px 12px',
-                            borderRadius: 6,
+                            padding: '6px 14px',
+                            borderRadius: 8,
+                            fontSize: 12.5,
+                            fontWeight: 750,
                             textDecoration: 'none',
-                            fontSize: 12,
-                            fontWeight: 600
+                            boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)'
                           }}
                         >
-                          <Download size={14} /> {m.name || `Material ${mIdx + 1}`}
+                          <Download size={14} /> {m.name || `Attachment ${mIdx + 1}`}
                         </a>
                       ))}
+
+                      {/* Switch to sidebar Materials tab */}
+                      <button
+                        type="button"
+                        onClick={() => setPlayerTab('materials')}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          background: 'rgba(255, 255, 255, 0.12)',
+                          color: '#E2E8F0',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          padding: '6px 14px',
+                          borderRadius: 8,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Folder size={14} color="#A5B4FC" />
+                        <span>All Resources ({allCourseMaterials.length})</span>
+                      </button>
+                    </div>
+
+                    {/* Assignment / Practice Work Box if present */}
+                    {activePlayingLesson.assignment && (
+                      <div style={{ background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%)', border: '1px solid #4338CA', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: '#A5B4FC', fontSize: 12, fontWeight: 800 }}>
+                          <Award size={15} color="#FBBF24" />
+                          <span>PRACTICE ASSIGNMENT & LAB TASK</span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: 13, color: '#E2E8F0', lineHeight: 1.5 }}>
+                          {activePlayingLesson.assignment}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Lesson Description */}
+                    <div>
+                      <h4 style={{ margin: '0 0 6px', fontSize: 13.5, fontWeight: 750, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        Lecture Overview
+                      </h4>
+                      <p style={{ margin: 0, fontSize: 13.5, color: '#CBD5E1', lineHeight: 1.6 }}>
+                        {activePlayingLesson.description || 'Hands-on practical walkthrough and code implementations for this module.'}
+                      </p>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Right Column: Udemy Syllabus List */}
+              {/* Right Column: Interactive Dual Tabs (Curriculum Syllabus & Study Materials) */}
               <div style={{ background: '#F8FAFC', borderLeft: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <div style={{ padding: '14px 18px', background: '#FFFFFF', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#1E293B' }}>
-                    Course Curriculum
-                  </h4>
-                  <span style={{ fontSize: 11.5, color: '#64748B', fontWeight: 600 }}>
-                    {activeCourseLessons.length} Lectures
-                  </span>
+                
+                {/* Segmented Tab Bar */}
+                <div style={{ padding: '12px 14px', background: '#FFFFFF', borderBottom: '1px solid #E2E8F0', display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => setPlayerTab('curriculum')}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: playerTab === 'curriculum' ? '#EEF2FF' : '#F1F5F9',
+                      color: playerTab === 'curriculum' ? '#4F46E5' : '#64748B',
+                      fontWeight: playerTab === 'curriculum' ? 800 : 650,
+                      fontSize: 12.5,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <BookOpen size={14} />
+                    <span>Lectures ({activeCourseLessons.length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPlayerTab('materials')}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: playerTab === 'materials' ? '#EFF6FF' : '#F1F5F9',
+                      color: playerTab === 'materials' ? '#2563EB' : '#64748B',
+                      fontWeight: playerTab === 'materials' ? 800 : 650,
+                      fontSize: 12.5,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Folder size={14} />
+                    <span>Materials ({allCourseMaterials.length})</span>
+                  </button>
                 </div>
 
-                <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {activeCourseLessons.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '40px 10px', color: '#94A3B8', fontSize: 13 }}>
-                      No video lectures uploaded to this playlist yet.
-                    </div>
-                  ) : (
-                    activeCourseLessons.map((lesson, idx) => {
-                      const isCurrent = activePlayingLesson?.id === lesson.id;
-                      const prog = watchProgressMap[lesson.id];
-                      const isDone = prog?.completed || (prog?.progress && prog.progress >= 90);
+                {/* Content Pane */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {playerTab === 'curriculum' ? (
+                    /* ─── CURRICULUM TAB ─── */
+                    activeCourseLessons.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '40px 10px', color: '#94A3B8', fontSize: 13 }}>
+                        No video lectures uploaded to this playlist yet.
+                      </div>
+                    ) : (
+                      activeCourseLessons.map((lesson, idx) => {
+                        const isCurrent = activePlayingLesson?.id === lesson.id;
+                        const prog = watchProgressMap[lesson.id];
+                        const isDone = prog?.completed || (prog?.progress && prog.progress >= 90);
+                        const hasMaterials = Boolean(lesson.notes_url || (lesson.study_materials?.length > 0));
 
-                      return (
-                        <div
-                          key={lesson.id}
-                          onClick={() => handlePlayLesson(lesson, selectedCourse)}
-                          style={{
-                            padding: '10px 12px',
-                            borderRadius: 10,
-                            background: isCurrent ? '#EEF2FF' : '#FFFFFF',
-                            border: isCurrent ? '1.5px solid #6366F1' : '1px solid #E2E8F0',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 12,
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          <div style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: '50%',
-                            background: isDone ? '#10B981' : (isCurrent ? '#6366F1' : '#F1F5F9'),
-                            color: isDone || isCurrent ? '#FFFFFF' : '#64748B',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 12,
-                            fontWeight: 700,
-                            flexShrink: 0
-                          }}>
-                            {isDone ? <Check size={14} /> : (idx + 1)}
-                          </div>
-
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: isCurrent ? 800 : 650, color: isCurrent ? '#4338CA' : '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {lesson.title}
+                        return (
+                          <div
+                            key={lesson.id}
+                            onClick={() => handlePlayLesson(lesson, selectedCourse)}
+                            style={{
+                              padding: '12px 14px',
+                              borderRadius: 12,
+                              background: isCurrent ? '#EEF2FF' : '#FFFFFF',
+                              border: isCurrent ? '1.5px solid #6366F1' : '1px solid #E2E8F0',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              transition: 'all 0.15s ease',
+                              boxShadow: isCurrent ? '0 4px 12px rgba(99, 102, 241, 0.15)' : '0 1px 2px rgba(0,0,0,0.02)'
+                            }}
+                          >
+                            <div style={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: '50%',
+                              background: isDone ? '#10B981' : (isCurrent ? '#6366F1' : '#F1F5F9'),
+                              color: isDone || isCurrent ? '#FFFFFF' : '#64748B',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 12.5,
+                              fontWeight: 800,
+                              flexShrink: 0
+                            }}>
+                              {isDone ? <Check size={14} /> : (idx + 1)}
                             </div>
-                            <span style={{ fontSize: 11, color: '#64748B' }}>
-                              ⏱ {lesson.duration}
-                            </span>
-                          </div>
 
-                          {isCurrent && (
-                            <span style={{ fontSize: 11, background: '#6366F1', color: '#FFFFFF', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
-                              Playing
-                            </span>
-                          )}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: isCurrent ? 800 : 650, color: isCurrent ? '#4338CA' : '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {lesson.title}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                <span style={{ fontSize: 11, color: '#64748B' }}>
+                                  ⏱ {lesson.duration}
+                                </span>
+                                {hasMaterials && (
+                                  <span style={{ fontSize: 10, background: '#EFF6FF', color: '#2563EB', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                                    📎 Materials
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {isCurrent && (
+                              <span style={{ fontSize: 11, background: '#6366F1', color: '#FFFFFF', padding: '3px 8px', borderRadius: 999, fontWeight: 750 }}>
+                                Playing
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })
+                    )
+                  ) : (
+                    /* ─── STUDY MATERIALS TAB ─── */
+                    allCourseMaterials.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '50px 14px', color: '#64748B' }}>
+                        <Folder size={38} color="#94A3B8" style={{ margin: '0 auto 10px' }} />
+                        <h4 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#1E293B' }}>
+                          No Materials Attached Yet
+                        </h4>
+                        <p style={{ margin: 0, fontSize: 12, color: '#94A3B8', maxWidth: 240, margin: '0 auto' }}>
+                          Your instructor has not uploaded any downloadable files or notes for this course yet.
+                        </p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px', padding: '4px 2px' }}>
+                          Course Resources & Documentation ({allCourseMaterials.length})
                         </div>
-                      );
-                    })
+                        {allCourseMaterials.map((mat) => {
+                          const isCurrentLessonMat = activePlayingLesson && mat.lessonId === activePlayingLesson.id;
+
+                          return (
+                            <div
+                              key={mat.id}
+                              style={{
+                                background: '#FFFFFF',
+                                border: isCurrentLessonMat ? '1.5px solid #2563EB' : '1px solid #E2E8F0',
+                                borderRadius: 12,
+                                padding: '12px 14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 10,
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                                <div style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 8,
+                                  background: mat.type === 'doc' ? '#ECFDF5' : (mat.type === 'task' ? '#FEF3C7' : '#EFF6FF'),
+                                  color: mat.type === 'doc' ? '#059669' : (mat.type === 'task' ? '#D97706' : '#2563EB'),
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  {mat.type === 'doc' ? <FileText size={16} /> : (mat.type === 'task' ? <Award size={16} /> : <Download size={16} />)}
+                                </div>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ fontSize: 12.5, fontWeight: 750, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {mat.name}
+                                  </div>
+                                  <span style={{ fontSize: 11, color: '#64748B' }}>
+                                    From: {mat.lessonTitle}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {mat.url ? (
+                                <a
+                                  href={mat.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
+                                    padding: '5px 12px',
+                                    borderRadius: 6,
+                                    background: '#2563EB',
+                                    color: '#FFFFFF',
+                                    fontSize: 11.5,
+                                    fontWeight: 750,
+                                    textDecoration: 'none',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  <span>Download</span>
+                                  <ExternalLink size={11} />
+                                </a>
+                              ) : (
+                                <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Task Spec</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )
                   )}
                 </div>
+
               </div>
 
             </div>

@@ -1201,9 +1201,9 @@ const TrainerDashboard = () => {
       title: recTitle.trim(),
       module: recModule.trim() || 'General Lesson',
       video_url: recVideoUrl.trim(),
-      thumbnail: finalThumbnail,
+      thumbnail: '',
       description: recLessonDescription.trim(),
-      notes_url: recNotesUrl.trim(),
+      notes_url: recNotesUrl ? recNotesUrl.trim() : '',
       assignment: recAssignment.trim(),
       visibility: recVisibility,
       course_title: finalCourseTitle,
@@ -4550,20 +4550,6 @@ const TrainerDashboard = () => {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label" htmlFor="recThumbnailUrl">Thumbnail Image URL</label>
-                    <input 
-                      id="recThumbnailUrl" 
-                      type="url" 
-                      className="form-input" 
-                      value={recThumbnailUrl} 
-                      onChange={(e) => setRecThumbnailUrl(e.target.value)} 
-                      placeholder="Custom thumbnail URL (optional, auto-generated if blank)" 
-                    />
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-                      Leave empty to auto-use Google Drive / YouTube video thumbnail
-                    </span>
-                  </div>
-                  <div className="form-group">
                     <label className="form-label" htmlFor="recDuration">Duration</label>
                     <input id="recDuration" type="text" className="form-input" value={recDuration} onChange={(e) => setRecDuration(e.target.value)} placeholder="e.g. 1h 15m" />
                   </div>
@@ -4573,16 +4559,41 @@ const TrainerDashboard = () => {
                     <textarea id="recLessonDescription" className="form-input" style={{ height: 60, resize: 'none' }} value={recLessonDescription} onChange={(e) => setRecLessonDescription(e.target.value)} placeholder="Brief overview of what students will learn..." />
                   </div>
 
+                  {/* Direct Lecture Notes / Document Link */}
+                  <div className="form-group grid-col-span-2">
+                    <label className="form-label" htmlFor="recNotesUrl">Lecture Notes / Document Link (PDF, Drive, Notion, GitHub)</label>
+                    <input 
+                      id="recNotesUrl" 
+                      type="url" 
+                      className="form-input" 
+                      value={recNotesUrl} 
+                      onChange={(e) => setRecNotesUrl(e.target.value)} 
+                      placeholder="https://drive.google.com/... or https://..." 
+                    />
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                      Direct notes link displayed prominently in the student video player for one-click opening.
+                    </span>
+                  </div>
+
                   {/* Multiple Study Materials Manager */}
                   <div className="form-group grid-col-span-2" style={{ background: 'var(--bg-secondary)', padding: 14, borderRadius: 12, border: '1px solid var(--border-color)' }}>
-                    <label className="form-label" style={{ fontWeight: 800 }}>Study Materials Manager</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label className="form-label" style={{ fontWeight: 800, margin: 0 }}>Study Materials & Downloadable Attachments</label>
+                      <span style={{ fontSize: 11, color: '#64748B' }}>Students will see & download these in their player</span>
+                    </div>
+
                     {recStudyMaterials.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, marginTop: 6 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, marginTop: 8 }}>
                         {recStudyMaterials.map((mat, index) => (
-                          <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-light)' }}>
-                            <span style={{ fontSize: 12, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
-                              📄 {mat.name} ({mat.type?.toUpperCase()})
-                            </span>
+                          <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-light)', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', maxWidth: '85%' }}>
+                              <span style={{ background: '#EFF6FF', color: '#2563EB', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 800, textTransform: 'uppercase' }}>
+                                {mat.type || 'FILE'}
+                              </span>
+                              <span style={{ fontSize: 12.5, color: '#1E293B', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {mat.name}
+                              </span>
+                            </div>
                             <button 
                               type="button" 
                               style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
@@ -4595,10 +4606,10 @@ const TrainerDashboard = () => {
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8 }}>
                       <input 
                         type="file" 
-                        id="recMaterialFile" 
+                        id="recMaterialFileTrainer" 
                         style={{ display: 'none' }} 
                         onChange={async (e) => {
                           const file = e.target.files[0];
@@ -4627,9 +4638,9 @@ const TrainerDashboard = () => {
                         type="button" 
                         className="btn btn-outline" 
                         style={{ fontSize: 12, padding: '6px 14px', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                        onClick={() => document.getElementById('recMaterialFile').click()}
+                        onClick={() => document.getElementById('recMaterialFileTrainer').click()}
                       >
-                        <UploadCloud size={14} /> Attach PDF / Resource File
+                        <UploadCloud size={14} /> Attach File (PDF / Slides / ZIP)
                       </button>
                       <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>PDF, slides, source code archives, datasets</span>
                     </div>
