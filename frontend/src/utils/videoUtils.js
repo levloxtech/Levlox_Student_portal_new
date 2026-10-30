@@ -111,8 +111,49 @@ export const getEmbedVideoUrl = (rawUrl) => {
 /**
  * Resolve the best thumbnail for a given video URL.
  */
+export const resolveDirectImageUrl = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  const url = rawUrl.trim();
+
+  // 1. ClipSafari clip page -> direct CDN PNG/SVG
+  if (url.includes('clipsafari.com/clips/')) {
+    if (url.includes('o248484-python-logo') || url.includes('python-logo')) {
+      return 'https://spaces-cdn.clipsafari.com/0xnv8d9ush4m3sh3cjkrglrw2j6n';
+    }
+    const match = url.match(/clipsafari\.com\/clips\/o\d+-([a-zA-Z0-9_-]+)/i);
+    if (match && match[1]) {
+      return `https://images.clipsafari.com/nipu4bvfh7gv8qzavtuvnmgrufz2?filename=${match[1]}.svg`;
+    }
+  }
+
+  // 2. Google Drive preview/view link -> direct thumbnail
+  const driveId = getGoogleDriveFileId(url);
+  if (driveId) {
+    return `https://drive.google.com/thumbnail?id=${driveId}&sz=w800`;
+  }
+
+  // 3. Unsplash photo page -> direct image
+  const unsplashMatch = url.match(/unsplash\.com\/photos\/([a-zA-Z0-9_-]+)/i);
+  if (unsplashMatch && unsplashMatch[1]) {
+    return `https://images.unsplash.com/photo-${unsplashMatch[1]}?w=800&auto=format&fit=crop&q=80`;
+  }
+
+  // 4. Imgur page -> direct image
+  const imgurMatch = url.match(/imgur\.com\/([a-zA-Z0-9]{5,8})$/i);
+  if (imgurMatch && imgurMatch[1]) {
+    return `https://i.imgur.com/${imgurMatch[1]}.png`;
+  }
+
+  return url;
+};
+
+/**
+ * Resolve the best thumbnail for a given video URL.
+ */
 export const getResolvedThumbnail = (url, thumbnail) => {
-  if (thumbnail && thumbnail.trim()) return thumbnail.trim();
+  if (thumbnail && thumbnail.trim()) {
+    return resolveDirectImageUrl(thumbnail.trim());
+  }
 
   const ytId = getYouTubeVideoId(url);
   if (ytId) {

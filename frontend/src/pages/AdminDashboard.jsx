@@ -109,7 +109,7 @@ import {
   formatLocalDate
 } from '../utils/batchUtils';
 import SecureVideoPlayer from '../components/SecureVideoPlayer';
-import { getGoogleDriveFileId, getYouTubeVideoId, getResolvedThumbnail, parseDurationToSeconds, formatSecondsToDisplay } from '../utils/videoUtils';
+import { getGoogleDriveFileId, getYouTubeVideoId, getResolvedThumbnail, resolveDirectImageUrl, parseDurationToSeconds, formatSecondsToDisplay } from '../utils/videoUtils';
 
 const PLAYLIST_CARD_THEMES = [
   {
@@ -6554,8 +6554,14 @@ const AdminDashboard = () => {
                           }}>
                             {/* Main Visual Image - Vibrant & Unobscured */}
                             <img
-                              src={customThumb}
-                              alt={playlist.name}
+                              src={customThumb || workspace3D}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                              crossOrigin="anonymous"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = workspace3D;
+                              }}
                               style={{
                                 width: '100%',
                                 height: '100%',
@@ -6680,12 +6686,22 @@ const AdminDashboard = () => {
                                   flexShrink: 0,
                                   overflow: 'hidden',
                                 }}>
-                                  <img
-                                    src={customThumb}
-                                    alt=""
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                    onError={(e) => { e.target.style.display = 'none'; }}
-                                  />
+                                  {customThumb ? (
+                                    <img
+                                      src={customThumb}
+                                      alt=""
+                                      referrerPolicy="no-referrer"
+                                      crossOrigin="anonymous"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'flex';
+                                      }}
+                                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    />
+                                  ) : null}
+                                  <div style={{ display: customThumb ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                                    <BookOpen size={18} color="#6366F1" />
+                                  </div>
                                 </div>
                                 <h5 style={{
                                   fontSize: '16px',
@@ -10042,8 +10058,21 @@ const AdminDashboard = () => {
                       type="url"
                       className="form-input"
                       value={playlistFormThumbnail}
-                      onChange={(e) => setPlaylistFormThumbnail(e.target.value)}
-                      placeholder="https://images.unsplash.com/... or image link"
+                      onChange={async (e) => {
+                        const val = e.target.value;
+                        const direct = resolveDirectImageUrl(val);
+                        setPlaylistFormThumbnail(direct);
+                        if (val.startsWith('http') && !/\.(png|jpe?g|svg|webp|gif)($|\?)/i.test(val)) {
+                          try {
+                            const r = await fetch(`/api/resolve-image?url=${encodeURIComponent(val)}`);
+                            if (r.ok) {
+                              const d = await r.json();
+                              if (d.directUrl && d.directUrl !== val) setPlaylistFormThumbnail(d.directUrl);
+                            }
+                          } catch (_) {}
+                        }
+                      }}
+                      placeholder="Paste image link, webpage (e.g. clipsafari), or direct URL"
                     />
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -10081,7 +10110,7 @@ const AdminDashboard = () => {
                       overflow: 'hidden',
                       position: 'relative',
                       height: 110,
-                      background: `linear-gradient(180deg, rgba(15, 23, 42, 0.25) 0%, rgba(15, 23, 42, 0.88) 100%), url(${playlistFormThumbnail}) center / cover no-repeat`,
+                      background: `linear-gradient(180deg, rgba(15, 23, 42, 0.25) 0%, rgba(15, 23, 42, 0.88) 100%), url(${resolveDirectImageUrl(playlistFormThumbnail)}) center / cover no-repeat`,
                       border: '1px solid rgba(226, 232, 240, 0.8)',
                       boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
                       display: 'flex',

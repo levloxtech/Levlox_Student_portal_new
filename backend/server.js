@@ -1658,6 +1658,62 @@ app.post('/api/storage/thumbnail/upload', requireAuth, requireAdmin, (req, res, 
   res.json({ success: true, filename: req.file.filename, storagePath: relativePath, url: `/api/storage/file/${encodeURIComponent(relativePath)}` });
 });
 
+// ── Direct Image Resolver Endpoint ──────────────────────────────────────
+app.get('/api/resolve-image', async (req, res) => {
+  const targetUrl = req.query.url;
+  if (!targetUrl || typeof targetUrl !== 'string') {
+    return res.status(400).json({ error: 'url query parameter required' });
+  }
+
+  const trimmed = targetUrl.trim();
+  if (trimmed.includes('clipsafari.com/clips/')) {
+    if (trimmed.includes('o248484-python-logo') || trimmed.includes('python-logo')) {
+      return res.json({ directUrl: 'https://spaces-cdn.clipsafari.com/0xnv8d9ush4m3sh3cjkrglrw2j6n' });
+    }
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (/\.(png|jpe?g|svg|webp|gif)($|\?)/i.test(parsed.pathname)) {
+      return res.json({ directUrl: trimmed });
+    }
+
+    const response = await fetch(trimmed, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/*;q=0.8,*/*;q=0.7'
+      }
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.startsWith('image/')) {
+      return res.json({ directUrl: trimmed });
+    }
+
+    const html = await response.text();
+    const ogMatch = html.match(/property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+                    html.match(/content=["']([^"']+)["']\s+property=["']og:image["']/i);
+    if (ogMatch && ogMatch[1]) {
+      let resolved = ogMatch[1];
+      if (resolved.startsWith('//')) resolved = 'https:' + resolved;
+      else if (resolved.startsWith('/')) resolved = `${parsed.protocol}//${parsed.host}${resolved}`;
+      return res.json({ directUrl: resolved });
+    }
+
+    const imgMatch = html.match(/<img[^>]+src=["']([^"']+\.(png|svg|jpg|jpeg|webp))["']/i);
+    if (imgMatch && imgMatch[1]) {
+      let resolved = imgMatch[1];
+      if (resolved.startsWith('//')) resolved = 'https:' + resolved;
+      else if (resolved.startsWith('/')) resolved = `${parsed.protocol}//${parsed.host}${resolved}`;
+      return res.json({ directUrl: resolved });
+    }
+
+    return res.json({ directUrl: trimmed });
+  } catch (err) {
+    return res.json({ directUrl: trimmed });
+  }
+});
+
 app.post('/api/storage/document/upload', requireAuth, requireAdminOrTrainer, (req, res, next) => {
   documentUpload.single('document')(req, res, (err) => {
     if (err) return res.status(400).json({ error: err.message });

@@ -4364,7 +4364,7 @@ const TrainerDashboard = () => {
                       overflow: 'hidden',
                       position: 'relative',
                       height: 110,
-                      background: `linear-gradient(180deg, rgba(15, 23, 42, 0.25) 0%, rgba(15, 23, 42, 0.88) 100%), url(${playlistFormThumbnail}) center / cover no-repeat`,
+                      background: `linear-gradient(180deg, rgba(15, 23, 42, 0.25) 0%, rgba(15, 23, 42, 0.88) 100%), url(${resolveDirectImageUrl(playlistFormThumbnail)}) center / cover no-repeat`,
                       border: '1px solid rgba(226, 232, 240, 0.8)',
                       boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
                       display: 'flex',
