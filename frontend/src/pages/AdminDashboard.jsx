@@ -5402,6 +5402,10 @@ const AdminDashboard = () => {
             <div className="mobile-student-cards">
               {students.map((student) => {
                 const initials = student.name ? student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ST';
+                const isPendingVerification = student.status === 'Pending Email Verification' || student.status === 'pending_verification';
+                const isExpired = Boolean(student.accessExpiresAt && new Date(student.accessExpiresAt).getTime() < Date.now());
+                const isDeactivated = student.status === 'deactivated' || student.status === 'disabled' || student.status === 'inactive' || student.isDeactivated === true || isExpired;
+                const isActive = !isPendingVerification && !isDeactivated && (student.status === 'active' || student.status === 'Active');
                 return (
                   <div key={student.id} className="student-mobile-card" onClick={() => handleViewStudentDetails(student.id)}>
                     <div className="student-card-header">
