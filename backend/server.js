@@ -446,8 +446,32 @@ app.post('/api/auth/login', (req, res) => {
     }
   }
 
-  if (user.status === 'disabled' || user.status === 'inactive') {
-    return res.status(403).json({ error: 'Your account has been deactivated. Please contact support.' });
+  // Check if student profile is deactivated or validity period has expired
+  const studentRec = matchedStudent || (user.role === 'student' ? (localDb.getDocument('students', user.id) || localDb.getDocument('students', user.uid)) : null);
+  if (studentRec) {
+    const isExplicitlyDeactivated = ['disabled', 'inactive', 'deactivated'].includes(String(studentRec.status || '').toLowerCase()) || studentRec.isDeactivated === true;
+    const expiresAt = studentRec.accessExpiresAt || studentRec.validUntil || studentRec.portalExpiresAt;
+    const isExpired = Boolean(expiresAt && new Date(expiresAt).getTime() < Date.now());
+
+    if (isExplicitlyDeactivated || isExpired) {
+      if (isExpired && studentRec.status !== 'deactivated') {
+        studentRec.status = 'deactivated';
+        studentRec.isDeactivated = true;
+        localDb.updateDocument('students', studentRec.id || studentRec.uid, {
+          status: 'deactivated',
+          isDeactivated: true,
+        });
+      }
+      return res.status(403).json({
+        error: 'Your account is deactivated. Please contact admin at sales@levlox.in to reactivate your portal access.'
+      });
+    }
+  }
+
+  if (user.status === 'disabled' || user.status === 'inactive' || user.status === 'deactivated' || user.isDeactivated === true) {
+    return res.status(403).json({
+      error: 'Your account is deactivated. Please contact admin at sales@levlox.in to reactivate your portal access.'
+    });
   }
 
   const token = localDb.createSession(user);
@@ -487,6 +511,16 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
     profile = localDb.getDocument('trainers', user.id) || user;
   } else {
     profile = localDb.getDocument('students', user.id) || user;
+    if (profile) {
+      const isExplicitlyDeactivated = ['disabled', 'inactive', 'deactivated'].includes(String(profile.status || '').toLowerCase()) || profile.isDeactivated === true;
+      const expiresAt = profile.accessExpiresAt || profile.validUntil || profile.portalExpiresAt;
+      const isExpired = Boolean(expiresAt && new Date(expiresAt).getTime() < Date.now());
+      if (isExplicitlyDeactivated || isExpired) {
+        return res.status(403).json({
+          error: 'Your account is deactivated. Please contact admin at sales@levlox.in to reactivate your portal access.'
+        });
+      }
+    }
   }
   res.json({ user, profile });
 });

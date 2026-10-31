@@ -199,9 +199,12 @@ const Login = () => {
         }
         role = 'trainer';
       } else if (studentDoc) {
-        if (studentDoc.status === 'disabled' || studentDoc.status === 'inactive') {
+        const isDeactivated = ['disabled', 'inactive', 'deactivated'].includes(String(studentDoc.status || '').toLowerCase()) || studentDoc.isDeactivated === true;
+        const expiresAt = studentDoc.accessExpiresAt || studentDoc.validUntil || studentDoc.portalExpiresAt;
+        const isExpired = Boolean(expiresAt && new Date(expiresAt).getTime() < Date.now());
+        if (isDeactivated || isExpired) {
           await signOut(auth);
-          throw new Error('Your account has been disabled. Please contact your administrator.');
+          throw new Error('Your account is deactivated. Please contact admin at sales@levlox.in to reactivate your portal access.');
         }
         role = 'student';
       } else {
@@ -337,9 +340,10 @@ const Login = () => {
       console.error('[Login] Authentication failed:', err.message);
 
       const isRateLimit = (err.message || '').toLowerCase().includes('too many') || (err.message || '').toLowerCase().includes('rate');
+      const isDeactivated = (err.message || '').toLowerCase().includes('deactivated') || (err.message || '').toLowerCase().includes('disabled');
 
       let locked = false;
-      if (!isRateLimit) {
+      if (!isRateLimit && !isDeactivated) {
         locked = recordFailedAttempt();
       }
 
@@ -349,6 +353,12 @@ const Login = () => {
           `Account temporarily locked for ${LOCKOUT_SECONDS} seconds. Please wait.`,
           'error'
         );
+        return;
+      }
+
+      if (isDeactivated) {
+        showToast('Account Deactivated', err.message, 'error');
+        setIdentifierError(err.message);
         return;
       }
 

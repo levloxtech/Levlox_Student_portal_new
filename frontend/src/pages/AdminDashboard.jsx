@@ -708,6 +708,7 @@ const AdminDashboard = () => {
   const [createBatchId, setCreateBatchId] = useState('');
   const [createTotalFee, setCreateTotalFee] = useState(20000);
   const [createPaidAmount, setCreatePaidAmount] = useState(0);
+  const [createActiveDays, setCreateActiveDays] = useState(90);
   const [createTempPassword, setCreateTempPassword] = useState('');
   const [createDob, setCreateDob] = useState('');
   const [createGender, setCreateGender] = useState('');
@@ -1989,6 +1990,7 @@ const AdminDashboard = () => {
   const [editAddress, setEditAddress] = useState('');
   const [editCompany, setEditCompany] = useState('');
   const [editAccountStatus, setEditAccountStatus] = useState('active');
+  const [editActiveDays, setEditActiveDays] = useState(90);
   const [editFeesStatus, setEditFeesStatus] = useState('Pending Payment');
   const [editTotal, setEditTotal] = useState(1500);
   const [editPaid, setEditPaid] = useState(0);
@@ -3166,10 +3168,21 @@ const AdminDashboard = () => {
   const toggleStatus = async (studentId) => {
     try {
       const studentObj = students.find(s => s.id === studentId);
-      const newStatus = studentObj?.status === 'active' ? 'disabled' : 'active';
-      await updateStudent(studentId, { status: newStatus });
+      const isCurrentlyActive = (studentObj?.status || '').toLowerCase() === 'active';
+      const newStatus = isCurrentlyActive ? 'deactivated' : 'active';
+      const days = Number(studentObj?.accessDays || studentObj?.validityDays) || 90;
+      const patch = { 
+        status: newStatus,
+        isDeactivated: isCurrentlyActive,
+      };
+      if (!isCurrentlyActive) {
+        patch.accessExpiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+        patch.validUntil = patch.accessExpiresAt;
+      }
+      await updateStudent(studentId, patch);
       fetchStudents();
       fetchStats();
+      showToast('Status Updated', `Student account has been ${newStatus === 'active' ? 'activated' : 'deactivated'}.`, 'success');
     } catch (error) {
       console.error(error);
       showModal('Error', classifyFirestoreError(error).message, 'error');
@@ -3368,6 +3381,8 @@ const AdminDashboard = () => {
       const selectedBatch = batches.find(b => b.id === createBatchId);
       const vToken = generateVerificationToken();
       const vExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+      const activeDaysNum = Math.max(1, Number(createActiveDays) || 90);
+      const accessExpiresAt = new Date(Date.now() + activeDaysNum * 24 * 60 * 60 * 1000).toISOString();
 
       const studentPayload = {
         name: createName,
@@ -3391,6 +3406,11 @@ const AdminDashboard = () => {
         role: 'student',
         mustChangePassword: true,
         createdBy: uid,
+        accessDays: activeDaysNum,
+        validityDays: activeDaysNum,
+        accessExpiresAt,
+        validUntil: accessExpiresAt,
+        isDeactivated: false,
         dob: createDob || '',
         gender: createGender || '',
         city: createCity || '',
@@ -3431,7 +3451,7 @@ const AdminDashboard = () => {
       setCreateTempPassword('');
       setCreateDob(''); setCreateGender(''); setCreateCity('');
       setCreateLocation(''); setCreateGuardianName(''); setCreateGuardianPhone('');
-      setCreateTotalFee(20000); setCreatePaidAmount(0);
+      setCreateTotalFee(20000); setCreatePaidAmount(0); setCreateActiveDays(90);
       setShowCreateModal(false);
       fetchStudents(); fetchStats();
     } catch (e) {
@@ -3502,6 +3522,7 @@ const AdminDashboard = () => {
     setEditAddress(student.permanent_address || '');
     setEditCompany(student.company || '');
     setEditAccountStatus(student.status || 'active');
+    setEditActiveDays(student.accessDays || student.validityDays || 90);
     setEditFeesStatus(student.feesStatus || 'Pending Payment');
   };
 
@@ -3532,6 +3553,14 @@ const AdminDashboard = () => {
       if (!finalCourse) finalCourse = 'Fullstack Engineering';
 
       const selectedBatch = batches.find(b => b.id === editBatchId);
+      const activeDaysNum = Math.max(1, Number(editActiveDays) || 90);
+      const isActivating = editAccountStatus === 'active';
+      const isCurrentlyActive = (editingStudent?.status || '').toLowerCase() === 'active';
+      let newExpiresAt = editingStudent?.accessExpiresAt;
+      if (isActivating && (!isCurrentlyActive || !newExpiresAt || new Date(newExpiresAt).getTime() < Date.now())) {
+        newExpiresAt = new Date(Date.now() + activeDaysNum * 24 * 60 * 60 * 1000).toISOString();
+      }
+
       const payload = {
         name: editName,
         email: editEmail,
@@ -3546,6 +3575,11 @@ const AdminDashboard = () => {
         permanent_address: editAddress,
         company: editCompany,
         status: editAccountStatus,
+        isDeactivated: editAccountStatus !== 'active',
+        accessDays: activeDaysNum,
+        validityDays: activeDaysNum,
+        accessExpiresAt: newExpiresAt,
+        validUntil: newExpiresAt,
         feesStatus: editFeesStatus,
       };
       const oldBatchId = editingStudent?.batch_id;
@@ -5257,7 +5291,9 @@ const AdminDashboard = () => {
                   {students.map((student) => {
                     const initials = student.name ? student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ST';
                     const isPendingVerification = student.status === 'Pending Email Verification' || student.status === 'pending_verification';
-                    const isActive = student.status === 'active' || student.status === 'Active';
+                    const isExpired = Boolean(student.accessExpiresAt && new Date(student.accessExpiresAt).getTime() < Date.now());
+                    const isDeactivated = student.status === 'deactivated' || student.status === 'disabled' || student.status === 'inactive' || student.isDeactivated === true || isExpired;
+                    const isActive = !isPendingVerification && !isDeactivated && (student.status === 'active' || student.status === 'Active');
 
                     return (
                       <tr key={student.id} style={{ cursor: 'pointer' }} onClick={() => handleViewStudentDetails(student.id)}>
@@ -5297,19 +5333,20 @@ const AdminDashboard = () => {
                           <span
                             className="badge-status-fixed"
                             onClick={(e) => { e.stopPropagation(); toggleStatus(student.id); }}
+                            title="Click to toggle account activation"
                             style={{
                               cursor: 'pointer',
                               padding: '4px 10px',
                               borderRadius: 12,
                               fontSize: 11.5,
                               fontWeight: 700,
-                              background: isPendingVerification ? '#FEF3C7' : (isActive ? '#D1FAE5' : '#F3F4F6'),
-                              color: isPendingVerification ? '#D97706' : (isActive ? '#059669' : '#4B5563'),
+                              background: isPendingVerification ? '#FEF3C7' : (isActive ? '#D1FAE5' : (isExpired ? '#FEE2E2' : '#F3F4F6')),
+                              color: isPendingVerification ? '#D97706' : (isActive ? '#059669' : (isExpired ? '#DC2626' : '#4B5563')),
                               border: '1px solid currentColor',
                               whiteSpace: 'nowrap'
                             }}
                           >
-                            {isPendingVerification ? 'Pending Email Verification' : (isActive ? 'Active' : 'Inactive')}
+                            {isPendingVerification ? 'Pending Email Verification' : (isActive ? `Active (${student.accessDays || student.validityDays || 90}d)` : (isExpired ? 'Deactivated (Expired)' : 'Deactivated'))}
                           </span>
                         </td>
                         <td className="col-delivery">
@@ -5405,8 +5442,8 @@ const AdminDashboard = () => {
                       </div>
                       <div>
                         <span className="student-card-label">Status</span>
-                        <span className={`badge-status-fixed ${student.status === 'active' || student.status === 'Active' ? 'paid' : 'unpaid'}`} onClick={(e) => { e.stopPropagation(); toggleStatus(student.id); }} style={{ cursor: 'pointer', display: 'inline-flex' }}>
-                          {student.status === 'active' || student.status === 'Active' ? 'Active' : 'Inactive'}
+                        <span className={`badge-status-fixed ${isActive ? 'paid' : 'unpaid'}`} onClick={(e) => { e.stopPropagation(); toggleStatus(student.id); }} style={{ cursor: 'pointer', display: 'inline-flex' }}>
+                          {isPendingVerification ? 'Pending' : (isActive ? 'Active' : (isExpired ? 'Expired' : 'Deactivated'))}
                         </span>
                       </div>
                     </div>
@@ -6376,6 +6413,47 @@ const AdminDashboard = () => {
 
         {/* Recorded Classes View */}
         {activeTab === 'recorded-classes' && (
+          previewRecordedClass ? (
+            (() => {
+              const targetId = String(selectedPlaylistBatch?.id || previewRecordedClass.playlist_id || previewRecordedClass.batch_id || 'preview_playlist');
+              const isCustom = selectedPlaylistBatch?.isCustom;
+              const currentLessons = (selectedPlaylistBatch)
+                ? (recordedClasses || []).filter(r => isCustom ? (String(r.playlist_id) === targetId || String(r.batch_id) === targetId) : (String(r.batch_id || r.batchId) === targetId || String(r.playlist_id) === targetId))
+                : (recordedClasses || []).filter(r => String(r.playlist_id || r.batch_id) === targetId);
+
+              // Sort lessons in sequential ascending order (1, 2, 3...)
+              const sortedLessons = [...(currentLessons.length > 0 ? currentLessons : [previewRecordedClass])].sort((a, b) => {
+                const orderA = a.sort_order ?? a.order ?? 999;
+                const orderB = b.sort_order ?? b.order ?? 999;
+                if (orderA !== orderB) return Number(orderA) - Number(orderB);
+                return (a.title || '').localeCompare(b.title || '');
+              });
+
+              const playerPlaylist = {
+                id: targetId,
+                name: selectedPlaylistBatch?.name || previewRecordedClass.course_title || 'Course Recordings',
+                title: selectedPlaylistBatch?.name || previewRecordedClass.title,
+                course_name: previewRecordedClass.course_title || selectedPlaylistBatch?.course_name,
+                description: selectedPlaylistBatch?.description || previewRecordedClass.description || '',
+                lessons: sortedLessons,
+                study_materials: selectedPlaylistBatch?.study_materials || previewRecordedClass?.study_materials || []
+              };
+
+              return (
+                <div style={{ width: '100%', minHeight: '80vh' }}>
+                  <AcademiaCourseViewer
+                    playlist={playerPlaylist}
+                    onBack={() => setPreviewRecordedClass(null)}
+                    onClose={() => setPreviewRecordedClass(null)}
+                    initialLessonId={previewRecordedClass.id}
+                    userRole="admin"
+                    userProfile={userProfile}
+                    currentUser={currentUser}
+                  />
+                </div>
+              );
+            })()
+          ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
             <FilterBar
               searchPlaceholder="Search Recorded Class"
@@ -7107,6 +7185,7 @@ const AdminDashboard = () => {
               </div>
             )}
           </div>
+          )
         )}
         {activeTab === 'announcements' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
@@ -8584,10 +8663,21 @@ const AdminDashboard = () => {
                     </select>
                   </div>
                   <div className="form-group">
+                    <label className="form-label" htmlFor="editActiveDays">Portal Access Validity (Days)</label>
+                    <input
+                      id="editActiveDays"
+                      type="number"
+                      min="1"
+                      className="form-input"
+                      value={editActiveDays}
+                      onChange={(e) => setEditActiveDays(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
                     <label className="form-label" htmlFor="editAccountStatus">Account Status</label>
                     <select id="editAccountStatus" className="form-select" value={editAccountStatus} onChange={(e) => setEditAccountStatus(e.target.value)}>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
+                      <option value="active">Active (Portal Access Enabled)</option>
+                      <option value="deactivated">Deactivated (Access Blocked)</option>
                     </select>
                   </div>
                 </div>
@@ -8955,6 +9045,55 @@ const AdminDashboard = () => {
                       onChange={(e) => setCreatePaidAmount(e.target.value)}
                       placeholder="e.g. 0 or 25000"
                     />
+                  </div>
+                  <div className="form-group grid-col-span-2" style={{ background: '#F8FAFC', padding: '14px 16px', borderRadius: 12, border: '1.5px solid #E2E8F0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <label className="form-label" htmlFor="createActiveDays" style={{ margin: 0, fontWeight: 800, color: '#1E293B' }}>
+                        Portal Active Duration (Days) *
+                      </label>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#6366F1', background: '#EEF2FF', padding: '2px 8px', borderRadius: 999 }}>
+                        Auto-deactivation period
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+                      <input
+                        id="createActiveDays"
+                        type="number"
+                        min="1"
+                        max="3650"
+                        className="form-input"
+                        placeholder="e.g. 90"
+                        value={createActiveDays}
+                        onChange={(e) => setCreateActiveDays(e.target.value)}
+                        required
+                        style={{ flex: 1, height: 42, background: '#FFFFFF' }}
+                      />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Days</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {[30, 60, 90, 180, 365].map(d => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setCreateActiveDays(d)}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '11.5px',
+                            borderRadius: 8,
+                            border: Number(createActiveDays) === d ? '1.5px solid #6366F1' : '1px solid #CBD5E1',
+                            background: Number(createActiveDays) === d ? '#EEF2FF' : '#FFFFFF',
+                            color: Number(createActiveDays) === d ? '#4F46E5' : '#475569',
+                            fontWeight: Number(createActiveDays) === d ? 750 : 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {d} Days
+                        </button>
+                      ))}
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '6px', display: 'block' }}>
+                      Student portal stays active for this number of days, then deactivates automatically. You can reactivate or extend anytime from Admin.
+                    </span>
                   </div>
                   <div className="form-group">
                     <label className="form-label" htmlFor="createDob">Date of Birth</label>
@@ -10748,105 +10887,6 @@ const AdminDashboard = () => {
           </div>
         </div>
       )}
-
-      {/* Academia Modern In-Portal Course Viewer */}
-      {previewRecordedClass && (() => {
-        const previewPlaylistObj = {
-          id: previewRecordedClass.playlist_id || selectedPlaylistBatch?.id || 'preview_playlist',
-          name: selectedPlaylistBatch?.name || previewRecordedClass.course_title || 'Course Recordings',
-          title: selectedPlaylistBatch?.name || previewRecordedClass.title,
-          course_name: previewRecordedClass.course_title || selectedPlaylistBatch?.course_name,
-          batch_name: selectedPlaylistBatch?.name || 'Academic Batch Recordings',
-          lessons: (selectedPlaylistBatch && playlistLessons?.length > 0) ? playlistLessons : [previewRecordedClass],
-          study_materials: selectedPlaylistBatch?.study_materials || previewRecordedClass?.study_materials || []
-        };
-
-        return (
-          <div style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.75)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 9999,
-            overflowY: 'auto',
-            padding: '24px 20px',
-            display: 'flex',
-            justifyContent: 'center',
-          }}>
-            <div style={{
-              background: '#FFFFFF',
-              borderRadius: 24,
-              maxWidth: 1380,
-              width: '100%',
-              boxShadow: '0 25px 60px -15px rgba(0,0,0,0.3)',
-              position: 'relative',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              minHeight: '85vh',
-            }}>
-              {/* Header Bar */}
-              <div style={{
-                padding: '16px 24px',
-                borderBottom: '1px solid #E2E8F0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: '#FFFFFF',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{
-                    fontSize: 11.5,
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    color: '#6366F1',
-                    background: '#EEF2FF',
-                    padding: '4px 10px',
-                    borderRadius: 999,
-                  }}>
-                    Admin Portal Preview
-                  </span>
-                  <span style={{ fontSize: 13, color: '#64748B' }}>
-                    Student DRM & Protected In-Portal Playback
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPreviewRecordedClass(null)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '8px 16px',
-                    borderRadius: 999,
-                    border: '1.5px solid #E2E8F0',
-                    background: '#FFFFFF',
-                    color: '#0F172A',
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <X size={15} />
-                  <span>Close Viewer</span>
-                </button>
-              </div>
-
-              {/* Academia 2-Column Course Viewer Component */}
-              <div style={{ padding: '20px 24px 40px', flex: 1, background: '#F8FAFC' }}>
-                <AcademiaCourseViewer
-                  playlist={previewPlaylistObj}
-                  initialLessonId={previewRecordedClass.id}
-                  onBack={() => setPreviewRecordedClass(null)}
-                  userRole="admin"
-                  userProfile={userProfile}
-                  currentUser={currentUser}
-                />
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ═══ ADMIN UPLOAD CLASS RECORDING MODAL ═════════════════════ */}
       {adminUploadClass && (
