@@ -55,11 +55,17 @@ export const AuthProvider = ({ children }) => {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
-        if (!res.ok) throw new Error('Session expired');
+        if (res.status === 401 || res.status === 403) {
+          throw new Error('Session expired');
+        }
+        if (!res.ok) {
+          console.warn('[AuthContext] Backend returned status on /api/auth/me:', res.status);
+          return null;
+        }
         return res.json();
       })
       .then((data) => {
-        if (data.user) {
+        if (data && data.user) {
           const userObj = { ...data.user, uid: data.user.id || data.user.uid };
           const profileObj = data.profile || userObj;
           setCurrentUser(userObj);
@@ -69,14 +75,18 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem(PROFILE_KEY, JSON.stringify(profileObj));
         }
       })
-      .catch(() => {
-        // Clear invalid session
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-        localStorage.removeItem(PROFILE_KEY);
-        setCurrentUser(null);
-        setUserProfile(null);
-        setUserRole(null);
+      .catch((err) => {
+        if (err.message === 'Session expired') {
+          // Clear invalid session ONLY when explicitly 401/403
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          localStorage.removeItem(PROFILE_KEY);
+          setCurrentUser(null);
+          setUserProfile(null);
+          setUserRole(null);
+        } else {
+          console.warn('[AuthContext] Transient session check warning:', err.message);
+        }
       })
       .finally(() => {
         setAuthLoading(false);
@@ -93,7 +103,7 @@ export const AuthProvider = ({ children }) => {
         const res = await fetch(`${API_BASE}/api/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (res.status === 401 || res.status === 403 || res.status === 404) {
+        if (res.status === 401 || res.status === 403) {
           console.warn('[AuthContext] Session revoked or user deleted by admin. Terminating session.');
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);

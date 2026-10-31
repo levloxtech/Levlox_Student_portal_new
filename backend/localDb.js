@@ -232,7 +232,7 @@ function createSession(user) {
   const token = crypto.randomBytes(32).toString('hex');
   const session = {
     token,
-    userId: user.id,
+    userId: user.id || user.uid,
     email: user.email,
     role: user.role,
     createdAt: Date.now(),

@@ -27,6 +27,8 @@ const localDb = require('./localDb');
 
 // ── 100% Self-Hosted Local Database Engine ────────────────────────────────
 // All operations are persisted directly to storage/data/*.json
+let admin = null;
+let db = null;
 
 
 // ── Storage Configuration ───────────────────────────────────────────────────
@@ -182,7 +184,10 @@ app.use(morgan('combined'));
 // ── Authentication Middleware ───────────────────────────────────────────────
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
-  const idToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split('Bearer ')[1] : null;
+  const queryToken = req.query?.token;
+  const idToken = authHeader && authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7).trim()
+    : (queryToken ? String(queryToken).trim() : null);
 
   // 1. Check self-hosted session first
   if (idToken) {
@@ -194,7 +199,7 @@ async function requireAuth(req, res, next) {
   }
 
   // 2. Fallback to Firebase if configured
-  if (idToken && typeof admin !== 'undefined' && typeof db !== 'undefined' && admin && db) {
+  if (idToken && admin && db) {
     try {
       const decoded = await admin.auth().verifyIdToken(idToken);
       req.user = { uid: decoded.uid, email: decoded.email };
@@ -217,12 +222,6 @@ async function requireAuth(req, res, next) {
   // If a token was provided but failed both local session & Firebase verification
   if (idToken) {
     return res.status(401).json({ error: 'Session expired or user account deleted.', revoked: true });
-  }
-
-  // 3. In self-hosted mode without Firebase Admin, allow requests from authenticated dashboard
-  if (!admin || !db) {
-    req.user = { uid: 'super_admin_001', role: 'admin', email: process.env.MAIL_USER || 'admin@levlox.com' };
-    return next();
   }
 
   return res.status(401).json({ error: 'Missing or invalid authorization header.' });
@@ -503,14 +502,15 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/me', requireAuth, (req, res) => {
-  const user = localDb.getDocument('users', req.user.uid) || req.user;
+  const userId = req.user.id || req.user.uid;
+  const user = localDb.getDocument('users', userId) || req.user;
   let profile = null;
   if (user.role === 'admin') {
-    profile = localDb.getDocument('admins', user.id) || user;
+    profile = localDb.getDocument('admins', userId) || user;
   } else if (user.role === 'trainer') {
-    profile = localDb.getDocument('trainers', user.id) || user;
+    profile = localDb.getDocument('trainers', userId) || user;
   } else {
-    profile = localDb.getDocument('students', user.id) || user;
+    profile = localDb.getDocument('students', userId) || user;
     if (profile) {
       const isExplicitlyDeactivated = ['disabled', 'inactive', 'deactivated'].includes(String(profile.status || '').toLowerCase()) || profile.isDeactivated === true;
       const expiresAt = profile.accessExpiresAt || profile.validUntil || profile.portalExpiresAt;
@@ -2017,20 +2017,42 @@ app.get('/api/storage/stats', requireAuth, requireAdmin, (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 
 app.post('/api/notifications/create', requireAuth, requireAdminOrTrainer, async (req, res) => {
-  if (!db) return res.status(503).json({ error: 'Firestore not configured on server.' });
-
   const { userIds, title, message, type = 'system', data = {}, link = null } = req.body;
   if (!userIds || !Array.isArray(userIds) || userIds.length === 0) return res.status(400).json({ error: 'userIds array is required.' });
   if (!title || !message) return res.status(400).json({ error: 'title and message are required.' });
 
-  try {
-    const batch = db.batch();
-    const createdAt = admin.firestore.FieldValue.serverTimestamp();
-    for (const userId of userIds) {
-      const notifRef = db.collection('notifications').doc();
-      batch.set(notifRef, { userId, title, message, type, data, link, read: false, createdAt, createdBy: req.user.uid });
+  const nowIso = new Date().toISOString();
+
+  if (db && admin) {
+    try {
+      const batch = db.batch();
+      const createdAt = admin.firestore.FieldValue.serverTimestamp();
+      for (const userId of userIds) {
+        const notifRef = db.collection('notifications').doc();
+        batch.set(notifRef, { userId, title, message, type, data, link, read: false, createdAt, createdBy: req.user.uid });
+      }
+      await batch.commit();
+      return res.json({ success: true, count: userIds.length });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
     }
-    await batch.commit();
+  }
+
+  // Self-hosted localDb mode
+  try {
+    for (const userId of userIds) {
+      localDb.addDocument('notifications', {
+        userId,
+        title,
+        message,
+        type,
+        data,
+        link,
+        read: false,
+        createdAt: nowIso,
+        createdBy: req.user?.uid || req.user?.id || 'admin'
+      });
+    }
     res.json({ success: true, count: userIds.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
