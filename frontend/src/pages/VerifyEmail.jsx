@@ -15,9 +15,18 @@ import {
   Mail,
   ShieldCheck,
   ArrowRight,
+  Laptop,
 } from "lucide-react";
 import CustomModal from "../components/Modal";
 import leveloxLogo from "../assets/levelox-icon-transparent.png";
+
+const isMobileDevice = () => {
+  if (typeof window === 'undefined') return false;
+  const ua = navigator.userAgent || navigator.vendor || window.opera || '';
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(ua);
+  const isSmallTouch = window.innerWidth <= 768 && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  return isMobileUA || isSmallTouch;
+};
 
 const VerifyEmail = () => {
   const [searchParams] = useSearchParams();
@@ -230,30 +239,55 @@ const VerifyEmail = () => {
               <h3 style={{ fontSize: 18, fontWeight: 800, color: "#FFFFFF", margin: "0 0 8px" }}>
                 Already Verified & Active
               </h3>
-              <p style={{ fontSize: 13.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, margin: "0 0 24px" }}>
+              <p style={{ fontSize: 13.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, margin: "0 0 16px" }}>
                 Your email address <strong style={{ color: "#A78BFA" }}>{student?.email}</strong> is already verified and your account is fully active.
               </p>
-              <button
-                type="button"
-                onClick={() => navigate("/login")}
-                style={{
-                  width: "100%",
-                  height: 48,
-                  borderRadius: 14,
-                  border: "none",
-                  background: "linear-gradient(135deg, #6C3CF0 0%, #4c22bc 100%)",
-                  color: "white",
-                  fontSize: 14,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                }}
-              >
-                Proceed to Login <ArrowRight size={16} />
-              </button>
+              
+              <div style={{
+                background: "rgba(59, 130, 246, 0.12)",
+                border: "1px solid rgba(59, 130, 246, 0.35)",
+                borderRadius: 14,
+                padding: "14px 16px",
+                margin: "0 0 20px",
+                textAlign: "center",
+                color: "#93C5FD"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 6, color: "#60A5FA", fontWeight: 800, fontSize: 14 }}>
+                  <Laptop size={18} />
+                  <span>Access the Portal Through Laptop</span>
+                </div>
+                <p style={{ fontSize: 12.5, margin: 0, color: "rgba(255,255,255,0.75)", lineHeight: 1.5 }}>
+                  Mobile access to the student portal is restricted. Please access <strong>levloxstudent.com</strong> through your laptop or desktop computer to sign in.
+                </p>
+              </div>
+
+              {!isMobileDevice() ? (
+                <button
+                  type="button"
+                  onClick={() => navigate("/login")}
+                  style={{
+                    width: "100%",
+                    height: 48,
+                    borderRadius: 14,
+                    border: "none",
+                    background: "linear-gradient(135deg, #6C3CF0 0%, #4c22bc 100%)",
+                    color: "white",
+                    fontSize: 14,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                  }}
+                >
+                  Proceed to Login (Laptop) <ArrowRight size={16} />
+                </button>
+              ) : (
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 8 }}>
+                  Please open this link on your laptop to proceed to login.
+                </div>
+              )}
             </div>
           )}
 
@@ -441,34 +475,58 @@ const VerifyEmail = () => {
                 <CheckCircle2 size={36} color="#10B981" />
               </div>
               <h3 style={{ fontSize: 20, fontWeight: 800, color: "#FFFFFF", margin: "0 0 10px" }}>
-                Email Verified & Account Active!
+                Email Verified & Password Set!
               </h3>
-              <p style={{ fontSize: 14, color: "rgba(255,255,255,0.65)", lineHeight: 1.6, margin: "0 0 28px" }}>
-                Congratulations <strong style={{ color: "#A78BFA" }}>{student?.name}</strong>! Your email address has been verified successfully. You can now log in to access your training dashboard and assigned courses.
+              <p style={{ fontSize: 14, color: "rgba(255,255,255,0.65)", lineHeight: 1.6, margin: "0 0 18px" }}>
+                Congratulations <strong style={{ color: "#A78BFA" }}>{student?.name}</strong>! Your account is active.
               </p>
 
-              <button
-                type="button"
-                onClick={() => navigate("/login")}
-                style={{
-                  width: "100%",
-                  height: 52,
-                  borderRadius: 14,
-                  border: "none",
-                  background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                  color: "white",
-                  fontSize: 15,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 10,
-                  boxShadow: "0 8px 24px rgba(16,185,129,0.35)",
-                }}
-              >
-                Go to Training Portal Login <ArrowRight size={18} />
-              </button>
+              <div style={{
+                background: "rgba(59, 130, 246, 0.12)",
+                border: "1px solid rgba(59, 130, 246, 0.35)",
+                borderRadius: 14,
+                padding: "16px",
+                margin: "0 0 24px",
+                textAlign: "center",
+                color: "#93C5FD"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8, color: "#60A5FA", fontWeight: 800, fontSize: 15 }}>
+                  <Laptop size={20} />
+                  <span>Access the Portal Through Laptop</span>
+                </div>
+                <p style={{ fontSize: 13, margin: 0, color: "rgba(255,255,255,0.8)", lineHeight: 1.5 }}>
+                  The Levlox Student Portal is strictly restricted to laptops and desktops. Mobile phone access is not permitted. Please access <strong>levloxstudent.com</strong> through your laptop to sign in.
+                </p>
+              </div>
+
+              {!isMobileDevice() ? (
+                <button
+                  type="button"
+                  onClick={() => navigate("/login")}
+                  style={{
+                    width: "100%",
+                    height: 52,
+                    borderRadius: 14,
+                    border: "none",
+                    background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                    color: "white",
+                    fontSize: 15,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 10,
+                    boxShadow: "0 8px 24px rgba(16,185,129,0.35)",
+                  }}
+                >
+                  Go to Training Portal Login <ArrowRight size={18} />
+                </button>
+              ) : (
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", marginTop: 8 }}>
+                  Please open this portal on your laptop to proceed to login.
+                </div>
+              )}
             </div>
           )}
         </div>

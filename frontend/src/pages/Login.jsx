@@ -12,7 +12,7 @@ import { getStudent, getAdmin, getDocument } from '../services/firebaseService';
 import {
   Eye, EyeOff, Lock, Smartphone, Check, X, Mail, User,
   ShieldCheck, AlertTriangle, Shield, Loader2,
-  GraduationCap, Sparkles
+  GraduationCap, Sparkles, Laptop
 } from 'lucide-react';
 
 
@@ -24,6 +24,14 @@ import { useAuth } from '../context/AuthContext';
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECONDS = 30;
+
+export const isMobileDevice = () => {
+  if (typeof window === 'undefined') return false;
+  const ua = navigator.userAgent || navigator.vendor || window.opera || '';
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(ua);
+  const isSmallTouch = window.innerWidth <= 768 && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  return isMobileUA || isSmallTouch;
+};
 
 const Login = () => {
   /* ─── Form state ─── */
@@ -177,6 +185,10 @@ const Login = () => {
   /* ════ GOOGLE OAUTH SIGN IN ════ */
   const handleGoogleSignIn = async () => {
     if (isLocked) return;
+    if (isMobileDevice()) {
+      showToast('Access Restricted', 'Please access the portal through laptop. Mobile access is not permitted.', 'warning');
+      return;
+    }
     setGoogleLoading(true);
     try {
       const provider = new GoogleAuthProvider();
@@ -317,6 +329,15 @@ const Login = () => {
       valid = false;
     }
     if (!valid) return;
+
+    if (isMobileDevice()) {
+      const isAdminEmail = rawInput.toLowerCase() === 'levloxtech@gmail.com' || rawInput.toLowerCase() === 'admin';
+      if (!isAdminEmail) {
+        setPassError('Access Restricted: Please access the portal through laptop. Mobile access is not permitted.');
+        showToast('Access Restricted', 'Please access the portal through laptop. Mobile phone access is not permitted.', 'warning');
+        return;
+      }
+    }
 
     setLoading(true);
     try {
@@ -471,6 +492,30 @@ const Login = () => {
                 <p style={{ margin: 0, fontSize: 12.5, color: '#FDE68A', fontWeight: 600 }}>
                   {MAX_ATTEMPTS - failedAttempts} attempt{MAX_ATTEMPTS - failedAttempts > 1 ? 's' : ''} remaining before temporary lockout
                 </p>
+              </div>
+            )}
+
+            {/* MOBILE ACCESS RESTRICTION BANNER */}
+            {isMobileDevice() && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                borderRadius: 14,
+                padding: '14px 16px',
+                marginBottom: 20,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 12,
+                color: '#FCA5A5',
+                textAlign: 'left'
+              }}>
+                <Laptop size={22} style={{ flexShrink: 0, marginTop: 2, color: '#F87171' }} />
+                <div>
+                  <strong style={{ color: '#FFFFFF', display: 'block', fontSize: 13.5, marginBottom: 3 }}>Laptop Access Required</strong>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45, display: 'block' }}>
+                    Access the portal through laptop. Mobile phone access is restricted for security and interactive learning.
+                  </span>
+                </div>
               </div>
             )}
 

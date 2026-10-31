@@ -7,9 +7,17 @@ import {
 import { auth } from '../firebase';
 import {
   Eye, EyeOff, Lock, CheckCircle, ShieldCheck, AlertCircle,
-  ArrowLeft, Key, Loader2
+  ArrowLeft, Key, Loader2, Laptop
 } from 'lucide-react';
 import leveloxLogo from '../assets/levelox-icon-transparent.png';
+
+const isMobileDevice = () => {
+  if (typeof window === 'undefined') return false;
+  const ua = navigator.userAgent || navigator.vendor || window.opera || '';
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(ua);
+  const isSmallTouch = window.innerWidth <= 768 && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  return isMobileUA || isSmallTouch;
+};
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
@@ -225,21 +233,43 @@ const ResetPassword = () => {
                 <CheckCircle size={26} color="#10B981" />
               </div>
               <h3 style={{ fontSize: 17, fontWeight: 800, color: '#FFF', margin: '0 0 8px' }}>Password Reset Successfully</h3>
-              <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.6)', margin: '0 0 24px', lineHeight: 1.5 }}>
-                Your password has been reset successfully. You can now sign in to your dashboard with your new password.
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate('/login')}
-                style={{
-                  width: '100%', height: 48, borderRadius: 12, border: 'none',
-                  background: 'linear-gradient(135deg, #6C3CF0 0%, #4c22bc 100%)',
-                  color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                }}
-              >
-                <ShieldCheck size={16} /> Back to Login
-              </button>
+              
+              <div style={{
+                background: 'rgba(59, 130, 246, 0.12)',
+                border: '1px solid rgba(59, 130, 246, 0.35)',
+                borderRadius: 12,
+                padding: '14px 16px',
+                margin: '16px 0 20px',
+                textAlign: 'center',
+                color: '#93C5FD'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 6, color: '#60A5FA', fontWeight: 800, fontSize: 14 }}>
+                  <Laptop size={18} />
+                  <span>Access the Portal Through Laptop</span>
+                </div>
+                <p style={{ fontSize: 12.5, margin: 0, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>
+                  Mobile access to the student portal is restricted. Please access <strong>levloxstudent.com</strong> through your laptop or desktop computer to sign in.
+                </p>
+              </div>
+
+              {!isMobileDevice() ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/login')}
+                  style={{
+                    width: '100%', height: 48, borderRadius: 12, border: 'none',
+                    background: 'linear-gradient(135deg, #6C3CF0 0%, #4c22bc 100%)',
+                    color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  <ShieldCheck size={16} /> Proceed to Login (Laptop)
+                </button>
+              ) : (
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 8 }}>
+                  Please open this link on your laptop to proceed to login.
+                </div>
+              )}
             </div>
           )}
 

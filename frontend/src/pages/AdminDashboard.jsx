@@ -3361,19 +3361,6 @@ const AdminDashboard = () => {
           showModal('Missing Course', 'Please enter a name for the new course.', 'warning');
           return;
         }
-        try {
-          await addCourse({
-            title: finalCourseName,
-            name: finalCourseName,
-            description: `${finalCourseName} Course Module`,
-            category: 'Technical',
-            status: 'Active',
-            createdAt: new Date().toISOString()
-          });
-          queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
-        } catch (cErr) {
-          console.warn('[Admin] Auto-create course failed:', cErr);
-        }
       }
       if (!finalCourseName) finalCourseName = 'Fullstack Engineering';
 
@@ -3535,19 +3522,6 @@ const AdminDashboard = () => {
         if (!finalCourse) {
           showModal('Missing Course', 'Please enter a name for the new course.', 'warning');
           return;
-        }
-        try {
-          await addCourse({
-            title: finalCourse,
-            name: finalCourse,
-            description: `${finalCourse} Course Module`,
-            category: 'Technical',
-            status: 'Active',
-            createdAt: new Date().toISOString()
-          });
-          queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
-        } catch (cErr) {
-          console.warn('[Admin] Auto-create edit course failed:', cErr);
         }
       }
       if (!finalCourse) finalCourse = 'Fullstack Engineering';

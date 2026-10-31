@@ -216,67 +216,8 @@ const RecordedClassesPage = ({
       });
     });
 
-    // 2. Process Courses from coursesList (if distinct from playlists)
-    (coursesList || []).forEach((c) => {
-      if (!c || (!c.title && !c.name)) return;
-      const cId = String(c.id || c.uid);
-      const cTitle = c.title || c.name;
-      // Skip if already represented by playlist with same name
-      if (list.some(item => item.title.toLowerCase().trim() === cTitle.toLowerCase().trim())) return;
-
-      const cBatchId = String(c.batch_id || c.batchId || '').trim().toLowerCase();
-      const isBatchRestricted = c.access_type === 'batch' || (cBatchId && cBatchId !== 'all' && c.visibility !== 'everyone');
-      if (isBatchRestricted) {
-        const matchesBatch = (normalizedBatchId && cBatchId === normalizedBatchId);
-        if (!matchesBatch) return;
-      }
-
-      const relatedVideos = (recordingsList || []).filter((r) => {
-        const rCourseId = String(r.course_id || r.courseId || '');
-        const rCourseTitle = (r.course_title || r.course_name || '').toLowerCase().trim();
-        return rCourseId === cId || (rCourseTitle && rCourseTitle === cTitle.toLowerCase().trim());
-      }).sort((a, b) => {
-        const orderA = a.sort_order ?? a.order ?? 999;
-        const orderB = b.sort_order ?? b.order ?? 999;
-        if (orderA !== orderB) return Number(orderA) - Number(orderB);
-        return (a.title || '').localeCompare(b.title || '');
-      });
-
-      let completedLessonsCount = 0;
-      relatedVideos.forEach((v) => {
-        const vId = v.id || v.uid;
-        const prog = watchProgressMap[vId];
-        if (prog?.completed || (prog?.progress && prog.progress >= 90)) completedLessonsCount++;
-      });
-
-      const totalLessons = relatedVideos.length;
-      const progressPercent = totalLessons > 0 ? Math.round((completedLessonsCount / totalLessons) * 100) : 0;
-      const status = progressPercent === 100 ? 'Completed' : (progressPercent > 0 ? 'In Progress' : 'Not Started');
-
-      list.push({
-        id: cId,
-        courseId: cId,
-        title: cTitle,
-        name: cTitle,
-        category: c.category || 'Specialization',
-        description: c.description || 'Industry-standard technical modules and recorded sessions.',
-        thumbnail: c.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80',
-        trainer_name: c.trainer_name || 'Levlox Instructor',
-        trainer_avatar: null,
-        lessons: relatedVideos,
-        lessons_count: totalLessons,
-        completed_lessons: completedLessonsCount,
-        progress: progressPercent,
-        status: status,
-        duration: c.duration || (totalLessons > 0 ? `${totalLessons * 45} mins` : 'Flexible'),
-        is_playlist: false,
-        batch_name: c.batch_name || 'Open Access',
-        updatedAt: c.updatedAt || c.createdAt || null
-      });
-    });
-
     return list;
-  }, [playlistsList, coursesList, recordingsList, watchProgressMap, studentBatchId, studentBatchName]);
+  }, [playlistsList, recordingsList, watchProgressMap, studentBatchId, studentBatchName]);
 
   // Dynamic Currently Learning Course:
   // Pick the course the student is actively progressing in, or the one with lessons, or null

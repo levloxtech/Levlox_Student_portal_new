@@ -1192,27 +1192,25 @@ const StudentDashboard = () => {
             </div>
           </div>
 
-          <div style={{ fontSize: 12, color: '#64748B', marginBottom: 18, textAlign: 'center' }}>
-            Please login from your desktop computer browser to continue.
+          <div style={{ fontSize: 13, color: '#94A3B8', marginBottom: 20, textAlign: 'center', lineHeight: 1.5 }}>
+            Access the portal through laptop. Mobile access is strictly restricted.
           </div>
 
           <button
-            onClick={() => setBypassDesktopGate(true)}
+            onClick={handleLogout}
             style={{
-              background: 'transparent',
-              border: '1px solid rgba(255, 255, 255, 0.22)',
-              color: '#94A3B8',
-              padding: '10px 20px',
-              borderRadius: 10,
-              fontSize: 12,
-              fontWeight: 650,
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#FCA5A5',
+              padding: '11px 26px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 700,
               cursor: 'pointer',
               transition: 'all 0.18s ease'
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#FFFFFF'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.45)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.22)'; }}
           >
-            Preview in Desktop Mode Anyway (Bypass)
+            Sign Out
           </button>
         </div>
       </div>
