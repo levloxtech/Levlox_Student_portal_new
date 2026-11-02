@@ -362,9 +362,10 @@ const Login = () => {
 
       const isRateLimit = (err.message || '').toLowerCase().includes('too many') || (err.message || '').toLowerCase().includes('rate');
       const isDeactivated = (err.message || '').toLowerCase().includes('deactivated') || (err.message || '').toLowerCase().includes('disabled');
+      const isServerError = (err.message || '').toLowerCase().includes('server') || (err.message || '').toLowerCase().includes('connect') || (err.message || '').toLowerCase().includes('502') || (err.message || '').toLowerCase().includes('gateway');
 
       let locked = false;
-      if (!isRateLimit && !isDeactivated) {
+      if (!isRateLimit && !isDeactivated && !isServerError) {
         locked = recordFailedAttempt();
       }
 
@@ -374,6 +375,11 @@ const Login = () => {
           `Account temporarily locked for ${LOCKOUT_SECONDS} seconds. Please wait.`,
           'error'
         );
+        return;
+      }
+
+      if (isServerError) {
+        showToast('Connection Issue', err.message || 'Server is currently connecting. Please try again in a moment.', 'warning');
         return;
       }
 

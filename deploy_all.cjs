@@ -4,14 +4,11 @@ const fs = require('fs');
 try {
   console.log('1. Git commit and push...');
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(security): restrict phone access to laptop-only and remove auto playlist creation"', { stdio: 'inherit' });
+  execSync('git commit -m "fix(infra): update vercel.json tunnel URL and handle 502 gracefully in login"', { stdio: 'inherit' });
   execSync('git push origin main', { stdio: 'inherit' });
 
   console.log('2. Git pull on remote server...');
   execSync('ssh -p 20027 -o StrictHostKeyChecking=no root@148.113.17.68 "cd /var/www/levlox-portal && git pull origin main"', { stdio: 'inherit' });
-
-  console.log('2b. Clearing auto-created dummy courses from server...');
-  execSync('ssh -p 20027 -o StrictHostKeyChecking=no root@148.113.17.68 "node -e \\"const fs=require(\'fs\'); fs.writeFileSync(\'/var/www/levlox-portal/storage/data/courses.json\', \'[]\', \'utf8\');\\""', { stdio: 'inherit' });
 
   console.log('3. Building frontend locally...');
   execSync('npm run build --prefix frontend', { stdio: 'inherit' });

@@ -2,15 +2,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://clean-olympics-punk-questions.trycloudflare.com/api/:path*"
+      "destination": "https://amsterdam-icq-assembled-rick.trycloudflare.com/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://clean-olympics-punk-questions.trycloudflare.com/health"
+      "destination": "https://amsterdam-icq-assembled-rick.trycloudflare.com/health"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://clean-olympics-punk-questions.trycloudflare.com/uploads/:path*"
+      "destination": "https://amsterdam-icq-assembled-rick.trycloudflare.com/uploads/:path*"
     },
     {
       "source": "/(.*)",

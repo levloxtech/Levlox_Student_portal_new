@@ -152,6 +152,9 @@ export const AuthProvider = ({ children }) => {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
+        if (res.status >= 500) {
+          throw new Error('Server is currently connecting. Please try again in a few moments.');
+        }
         throw new Error(data.error || 'Invalid email or password.');
       }
 
