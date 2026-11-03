@@ -1,11 +1,57 @@
 const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+const http = require('http');
 
-const REPO_DIR = '/var/www/levlox-portal';
+const REPO_DIR = process.env.REPO_DIR || '/var/www/levlox-portal';
 
-function updateVercelJson(newUrl) {
+let currentTunnelUrl = null;
+let lastSyncedUrl = null;
+let tunnelProcess = null;
+let consecutiveFailures = 0;
+let isSyncing = false;
+
+function checkUrlHealth(urlStr, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    try {
+      const parsed = new URL(urlStr);
+      const mod = parsed.protocol === 'https:' ? https : http;
+      const req = mod.get(urlStr, { timeout: timeoutMs }, (res) => {
+        resolve(res.statusCode === 200);
+      });
+      req.on('timeout', () => {
+        req.destroy();
+        resolve(false);
+      });
+      req.on('error', () => {
+        resolve(false);
+      });
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+async function syncTunnelToGitHub(newUrl) {
+  if (isSyncing) {
+    console.log('[Supervisor] Sync already in progress, skipping...');
+    return;
+  }
+  isSyncing = true;
+
   try {
+    console.log('[Supervisor] Syncing tunnel URL to GitHub/Vercel: ' + newUrl);
+
+    // 1. Fetch latest changes from GitHub and reset working tree cleanly
+    try {
+      execSync('git fetch origin main', { cwd: REPO_DIR, timeout: 20000 });
+      execSync('git reset --hard origin/main', { cwd: REPO_DIR, timeout: 10000 });
+    } catch (gitFetchErr) {
+      console.warn('[Supervisor] git fetch/reset warning:', gitFetchErr.message);
+    }
+
+    // 2. Update vercel.json and frontend/vercel.json
     const targets = [
       path.join(REPO_DIR, 'vercel.json'),
       path.join(REPO_DIR, 'frontend', 'vercel.json'),
@@ -32,7 +78,7 @@ function updateVercelJson(newUrl) {
       if (fileChanged) {
         fs.writeFileSync(file, JSON.stringify(current, null, 2) + '\n', 'utf8');
         changed = true;
-        console.log('[Supervisor] Updated ' + file + ' with ' + newUrl);
+        console.log('[Supervisor] Updated ' + path.basename(file) + ' with ' + newUrl);
       }
     }
 
@@ -41,47 +87,85 @@ function updateVercelJson(newUrl) {
       execSync('git config user.name "Levlox Auto Sync"', { cwd: REPO_DIR });
       execSync('git config user.email "bot@levloxstudent.com"', { cwd: REPO_DIR });
       execSync('git add vercel.json frontend/vercel.json', { cwd: REPO_DIR });
-      execSync('git commit -m "fix: auto-sync active tunnel URL to vercel.json"', { cwd: REPO_DIR });
-      execSync('git push origin main', { cwd: REPO_DIR });
-      console.log('[Supervisor] Successfully pushed updated tunnel URL to GitHub/Vercel!');
+      execSync('git commit -m "fix(infra): auto-sync active tunnel URL to vercel.json [skip ci]"', { cwd: REPO_DIR });
+      execSync('git push origin main', { cwd: REPO_DIR, timeout: 30000 });
+      lastSyncedUrl = newUrl;
+      console.log('[Supervisor] Successfully pushed updated tunnel URL to GitHub! Vercel will auto-deploy.');
     } else {
-      console.log('[Supervisor] vercel.json is already up to date with ' + newUrl);
+      lastSyncedUrl = newUrl;
+      console.log('[Supervisor] vercel.json is already pointing to ' + newUrl);
     }
   } catch (err) {
     console.error('[Supervisor] Failed to update/push vercel.json:', err.message);
+    // Retry in 15 seconds if failed
+    setTimeout(() => {
+      if (currentTunnelUrl && lastSyncedUrl !== currentTunnelUrl) {
+        syncTunnelToGitHub(currentTunnelUrl);
+      }
+    }, 15000);
+  } finally {
+    isSyncing = false;
   }
 }
 
 function startTunnel() {
   console.log('[Supervisor] Launching cloudflared tunnel...');
-  const child = spawn('cloudflared', ['tunnel', '--url', 'http://localhost:20020'], {
+  consecutiveFailures = 0;
+
+  tunnelProcess = spawn('cloudflared', ['tunnel', '--url', 'http://localhost:20020'], {
     stdio: ['ignore', 'pipe', 'pipe']
   });
-
-  let urlFound = false;
 
   function parseOutput(data) {
     const text = data.toString();
     process.stderr.write(text);
 
-    if (!urlFound) {
-      const match = text.match(/https:\/\/[a-zA-Z0-9.-]+\.trycloudflare\.com/);
-      if (match) {
-        urlFound = true;
-        const activeUrl = match[0];
+    const match = text.match(/https:\/\/[a-zA-Z0-9.-]+\.trycloudflare\.com/);
+    if (match) {
+      const activeUrl = match[0];
+      if (activeUrl !== currentTunnelUrl) {
+        currentTunnelUrl = activeUrl;
         console.log('[Supervisor] Active tunnel URL detected: ' + activeUrl);
-        updateVercelJson(activeUrl);
+        syncTunnelToGitHub(activeUrl);
       }
     }
   }
 
-  child.stdout.on('data', parseOutput);
-  child.stderr.on('data', parseOutput);
+  tunnelProcess.stdout.on('data', parseOutput);
+  tunnelProcess.stderr.on('data', parseOutput);
 
-  child.on('exit', (code, sig) => {
-    console.warn('[Supervisor] cloudflared exited with code ' + code + ', signal ' + sig + '. Restarting in 5s...');
+  tunnelProcess.on('exit', (code, sig) => {
+    console.warn(`[Supervisor] cloudflared exited (code: ${code}, sig: ${sig}). Restarting in 5s...`);
+    currentTunnelUrl = null;
+    tunnelProcess = null;
     setTimeout(startTunnel, 5000);
   });
 }
+
+// Periodic health monitor and sync verification (every 30s)
+setInterval(async () => {
+  if (!currentTunnelUrl) return;
+
+  const healthy = await checkUrlHealth(`${currentTunnelUrl}/health`);
+  if (healthy) {
+    consecutiveFailures = 0;
+  } else {
+    consecutiveFailures++;
+    console.warn(`[Supervisor] Tunnel health check failed (${consecutiveFailures}/3) for ${currentTunnelUrl}/health`);
+    if (consecutiveFailures >= 3) {
+      console.error('[Supervisor] Tunnel failed 3 consecutive health checks. Restarting cloudflared...');
+      if (tunnelProcess) {
+        tunnelProcess.kill('SIGKILL');
+      }
+      return;
+    }
+  }
+
+  // Check if vercel.json on origin/main is synced with currentTunnelUrl
+  if (healthy && lastSyncedUrl !== currentTunnelUrl && !isSyncing) {
+    console.log('[Supervisor] Synced URL mismatch detected. Re-triggering sync...');
+    syncTunnelToGitHub(currentTunnelUrl);
+  }
+}, 30000);
 
 startTunnel();
