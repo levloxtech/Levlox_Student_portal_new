@@ -12,7 +12,7 @@ let tunnelProcess = null;
 let consecutiveFailures = 0;
 let isSyncing = false;
 
-function checkUrlHealth(urlStr, timeoutMs = 8000) {
+function checkUrlHealth(urlStr, timeoutMs = 10000) {
   return new Promise((resolve) => {
     try {
       const parsed = new URL(urlStr);
@@ -83,26 +83,27 @@ async function syncTunnelToGitHub(newUrl) {
     }
 
     if (changed) {
-      console.log('[Supervisor] Committing and pushing updated vercel.json to GitHub...');
+      console.log('[Supervisor] Committing and pushing updated vercel.json to GitHub (without skip ci)...');
       execSync('git config user.name "Levlox Auto Sync"', { cwd: REPO_DIR });
       execSync('git config user.email "bot@levloxstudent.com"', { cwd: REPO_DIR });
       execSync('git add vercel.json frontend/vercel.json', { cwd: REPO_DIR });
-      execSync('git commit -m "fix(infra): auto-sync active tunnel URL to vercel.json [skip ci]"', { cwd: REPO_DIR });
+      // IMPORTANT: DO NOT USE [skip ci] so Vercel deploys immediately!
+      execSync('git commit -m "fix(infra): auto-sync active tunnel URL to vercel.json"', { cwd: REPO_DIR });
       execSync('git push origin main', { cwd: REPO_DIR, timeout: 30000 });
       lastSyncedUrl = newUrl;
-      console.log('[Supervisor] Successfully pushed updated tunnel URL to GitHub! Vercel will auto-deploy.');
+      console.log('[Supervisor] Successfully pushed updated tunnel URL to GitHub! Vercel is now deploying.');
     } else {
       lastSyncedUrl = newUrl;
       console.log('[Supervisor] vercel.json is already pointing to ' + newUrl);
     }
   } catch (err) {
     console.error('[Supervisor] Failed to update/push vercel.json:', err.message);
-    // Retry in 15 seconds if failed
+    // Retry in 30 seconds if failed
     setTimeout(() => {
       if (currentTunnelUrl && lastSyncedUrl !== currentTunnelUrl) {
         syncTunnelToGitHub(currentTunnelUrl);
       }
-    }, 15000);
+    }, 30000);
   } finally {
     isSyncing = false;
   }
@@ -135,14 +136,14 @@ function startTunnel() {
   tunnelProcess.stderr.on('data', parseOutput);
 
   tunnelProcess.on('exit', (code, sig) => {
-    console.warn(`[Supervisor] cloudflared exited (code: ${code}, sig: ${sig}). Restarting in 5s...`);
+    console.warn(`[Supervisor] cloudflared exited (code: ${code}, sig: ${sig}). Restarting in 10s...`);
     currentTunnelUrl = null;
     tunnelProcess = null;
-    setTimeout(startTunnel, 5000);
+    setTimeout(startTunnel, 10000);
   });
 }
 
-// Periodic health monitor and sync verification (every 30s)
+// Gentle health monitor: verify every 60s, do NOT kill cloudflared in a loop
 setInterval(async () => {
   if (!currentTunnelUrl) return;
 
@@ -151,11 +152,13 @@ setInterval(async () => {
     consecutiveFailures = 0;
   } else {
     consecutiveFailures++;
-    console.warn(`[Supervisor] Tunnel health check failed (${consecutiveFailures}/3) for ${currentTunnelUrl}/health`);
-    if (consecutiveFailures >= 3) {
-      console.error('[Supervisor] Tunnel failed 3 consecutive health checks. Restarting cloudflared...');
+    console.warn(`[Supervisor] Health check warning (${consecutiveFailures}/10) for ${currentTunnelUrl}/health`);
+    // Only if it has been continuously dead for 10 minutes (10 checks), gently restart
+    if (consecutiveFailures >= 10) {
+      console.error('[Supervisor] Tunnel unreachable for 10 minutes. Restarting cloudflared...');
+      consecutiveFailures = 0;
       if (tunnelProcess) {
-        tunnelProcess.kill('SIGKILL');
+        tunnelProcess.kill('SIGTERM');
       }
       return;
     }
@@ -166,6 +169,6 @@ setInterval(async () => {
     console.log('[Supervisor] Synced URL mismatch detected. Re-triggering sync...');
     syncTunnelToGitHub(currentTunnelUrl);
   }
-}, 30000);
+}, 60000);
 
 startTunnel();
