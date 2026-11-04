@@ -2,15 +2,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://cooper-fingers-cope-hawaii.trycloudflare.com/api/:path*"
+      "destination": "https://var-enjoying-theoretical-flow.trycloudflare.com/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://cooper-fingers-cope-hawaii.trycloudflare.com/health"
+      "destination": "https://var-enjoying-theoretical-flow.trycloudflare.com/health"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://cooper-fingers-cope-hawaii.trycloudflare.com/uploads/:path*"
+      "destination": "https://var-enjoying-theoretical-flow.trycloudflare.com/uploads/:path*"
     },
     {
       "source": "/(.*)",
