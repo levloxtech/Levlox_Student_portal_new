@@ -2,15 +2,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://controversy-progress-months-club.trycloudflare.com/api/:path*"
+      "destination": "https://ooo-merry-cruz-valley.trycloudflare.com/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://controversy-progress-months-club.trycloudflare.com/health"
+      "destination": "https://ooo-merry-cruz-valley.trycloudflare.com/health"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://controversy-progress-months-club.trycloudflare.com/uploads/:path*"
+      "destination": "https://ooo-merry-cruz-valley.trycloudflare.com/uploads/:path*"
     },
     {
       "source": "/(.*)",
