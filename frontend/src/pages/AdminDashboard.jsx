@@ -2,9 +2,9 @@ import BatchChatPage from './BatchChatPage';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  GraduationCap, Users, Video, Clock, BookOpen, 
-  Megaphone, Wallet, Settings, Trash2, Plus, 
+import {
+  GraduationCap, Users, Video, Clock, BookOpen,
+  Megaphone, Wallet, Settings, Trash2, Plus,
   LogOut, CheckCircle, Award, Percent, CalendarCheck,
   Pencil, Eye, ChevronLeft, ChevronRight, Search, Filter,
   PlayCircle, Clock3, TriangleAlert, CircleAlert, Wallet as WalletIcon, Trophy,
@@ -199,9 +199,9 @@ const CustomDropdown = ({ label, value, options, onChange, placeholder, width = 
 
   return (
     <div className="custom-dropdown-container" ref={dropdownRef} style={{ width }}>
-      <button 
+      <button
         type="button"
-        className="custom-dropdown-trigger" 
+        className="custom-dropdown-trigger"
         style={{ width: '100%' }}
         onClick={() => setIsOpen(!isOpen)}
       >
@@ -210,14 +210,14 @@ const CustomDropdown = ({ label, value, options, onChange, placeholder, width = 
         </span>
         <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease', flexShrink: 0 }} />
       </button>
-      
+
       {isOpen && (
         <div className="custom-dropdown-menu">
           {options.map((opt) => {
             const isSelected = opt.value === value;
             return (
-              <div 
-                key={opt.value} 
+              <div
+                key={opt.value}
                 className={`custom-dropdown-option ${isSelected ? 'selected' : ''}`}
                 onClick={() => {
                   onChange(opt.value);
@@ -250,8 +250,8 @@ const ExportDropdown = ({ onExportCSV, onExportExcel, onExportPDF }) => {
 
   return (
     <div className="export-container-relative" ref={dropdownRef}>
-      <button 
-        type="button" 
+      <button
+        type="button"
         className="export-btn-premium-gradient"
         onClick={() => setIsOpen(!isOpen)}
       >
@@ -263,25 +263,25 @@ const ExportDropdown = ({ onExportCSV, onExportExcel, onExportPDF }) => {
       </button>
       {isOpen && (
         <div className="export-menu-floating" style={{ right: 0, left: 'auto' }}>
-          <button 
+          <button
             type="button"
-            className="export-menu-row" 
+            className="export-menu-row"
             onClick={() => { onExportCSV(); setIsOpen(false); }}
           >
             <FileText size={16} />
             <span>Export CSV</span>
           </button>
-          <button 
+          <button
             type="button"
-            className="export-menu-row" 
+            className="export-menu-row"
             onClick={() => { onExportExcel(); setIsOpen(false); }}
           >
             <FileSpreadsheet size={16} />
             <span>Export Excel</span>
           </button>
-          <button 
+          <button
             type="button"
-            className="export-menu-row" 
+            className="export-menu-row"
             onClick={() => { onExportPDF(); setIsOpen(false); }}
           >
             <FileText size={16} style={{ color: '#EF4444' }} />
@@ -324,7 +324,7 @@ const AdminDashboard = () => {
     }, { replace: true });
     try {
       queryClient.invalidateQueries();
-    } catch (_) {}
+    } catch (_) { }
   };
 
   useEffect(() => {
@@ -621,13 +621,13 @@ const AdminDashboard = () => {
     if (statusVal) filtered = filtered.filter(s => s.status === statusVal);
     if (feesVal) filtered = filtered.filter(s => s.feesStatus === feesVal);
     if (courseVal) {
-      filtered = filtered.filter(s => 
+      filtered = filtered.filter(s =>
         String(s.course || s.course_name || '').toLowerCase() === String(courseVal).toLowerCase()
       );
     }
     if (batchVal) {
-      filtered = filtered.filter(s => 
-        String(s.batch_id || s.batchId || '') === String(batchVal) || 
+      filtered = filtered.filter(s =>
+        String(s.batch_id || s.batchId || '') === String(batchVal) ||
         String(s.batch_name || s.batch || '') === String(batchVal)
       );
     }
@@ -723,8 +723,8 @@ const AdminDashboard = () => {
     const numbers = '23456789';
     const all = uppercase + lowercase + numbers;
     let pass = uppercase.charAt(Math.floor(Math.random() * uppercase.length)) +
-               lowercase.charAt(Math.floor(Math.random() * lowercase.length)) +
-               numbers.charAt(Math.floor(Math.random() * numbers.length));
+      lowercase.charAt(Math.floor(Math.random() * lowercase.length)) +
+      numbers.charAt(Math.floor(Math.random() * numbers.length));
     for (let i = 3; i < 9; i++) {
       pass += all.charAt(Math.floor(Math.random() * all.length));
     }
@@ -865,7 +865,7 @@ const AdminDashboard = () => {
   // Export State and Functions
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const exportDropdownRef = useRef(null);
-  
+
   useEffect(() => {
     const handleClickOutsideExport = (event) => {
       if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target)) {
@@ -1288,28 +1288,28 @@ const AdminDashboard = () => {
 
     return allAvailableClasses.filter(c => {
       const query = sessionSearch.toLowerCase();
-      const matchesSearch = c.title?.toLowerCase().includes(query) || 
-                            c.instructor?.toLowerCase().includes(query) ||
-                            c.batch_name?.toLowerCase().includes(query);
-      
+      const matchesSearch = c.title?.toLowerCase().includes(query) ||
+        c.instructor?.toLowerCase().includes(query) ||
+        c.batch_name?.toLowerCase().includes(query);
+
       if (!matchesSearch) return false;
-      
+
       if (!c.date) return true;
       const classDate = new Date(c.date);
       const now = new Date();
-      
+
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-      
+
       if (dateFilter === 'Today') {
         return classDate >= startOfToday && classDate <= endOfToday;
       } else if (dateFilter === 'This Week') {
         const firstDayOfWeek = new Date(now);
         firstDayOfWeek.setDate(firstDayOfWeek.getDate() - firstDayOfWeek.getDay());
-        firstDayOfWeek.setHours(0,0,0,0);
+        firstDayOfWeek.setHours(0, 0, 0, 0);
         const lastDayOfWeek = new Date(firstDayOfWeek);
         lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 7);
-        lastDayOfWeek.setHours(23,59,59,999);
+        lastDayOfWeek.setHours(23, 59, 59, 999);
         return classDate >= firstDayOfWeek && classDate <= lastDayOfWeek;
       } else if (dateFilter === 'This Month') {
         const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -2119,13 +2119,13 @@ const AdminDashboard = () => {
   // Compute filtered datasets for client-side filtered tabs
   const filteredAttSheets = attSheetsHistory.filter(sheet => {
     const query = attSearchQuery.toLowerCase();
-    const matchesSearch = !query || 
+    const matchesSearch = !query ||
       (sheet.batch_name || '').toLowerCase().includes(query) ||
       (sheet.course_name || '').toLowerCase().includes(query);
-      
+
     const matchesCourse = !attCourseFilter || sheet.course_name === attCourseFilter;
     const matchesBatch = !attBatchFilter || sheet.batch_id === attBatchFilter || sheet.batch_name === attBatchFilter;
-    
+
     const pct = sheet.attendance_percentage ?? 100;
     let matchesStatus = true;
     if (attStatusFilter === 'high') matchesStatus = pct >= 80;
@@ -2143,10 +2143,10 @@ const AdminDashboard = () => {
       } else if (attDateFilter === 'This Week') {
         const firstDayOfWeek = new Date(now);
         firstDayOfWeek.setDate(firstDayOfWeek.getDate() - firstDayOfWeek.getDay());
-        firstDayOfWeek.setHours(0,0,0,0);
+        firstDayOfWeek.setHours(0, 0, 0, 0);
         const lastDayOfWeek = new Date(firstDayOfWeek);
         lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 7);
-        lastDayOfWeek.setHours(23,59,59,999);
+        lastDayOfWeek.setHours(23, 59, 59, 999);
         matchesDate = sheetDate >= firstDayOfWeek && sheetDate <= lastDayOfWeek;
       } else if (attDateFilter === 'This Month') {
         const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -2169,7 +2169,7 @@ const AdminDashboard = () => {
         }
       }
     }
-    
+
     return matchesSearch && matchesCourse && matchesBatch && matchesStatus && matchesDate;
   });
 
@@ -2177,17 +2177,17 @@ const AdminDashboard = () => {
     const now = new Date();
     let start = null;
     let end = null;
-    
+
     if (filterType === 'Today') {
       start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
     } else if (filterType === 'This Week') {
       start = new Date(now);
       start.setDate(start.getDate() - start.getDay());
-      start.setHours(0,0,0,0);
+      start.setHours(0, 0, 0, 0);
       end = new Date(start);
       end.setDate(end.getDate() + 7);
-      end.setHours(23,59,59,999);
+      end.setHours(23, 59, 59, 999);
     } else if (filterType === 'This Month') {
       start = new Date(now.getFullYear(), now.getMonth(), 1);
       end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
@@ -2203,7 +2203,7 @@ const AdminDashboard = () => {
         end.setHours(23, 59, 59);
       }
     }
-    
+
     return {
       startDate: start ? start.toISOString() : '',
       endDate: end ? end.toISOString() : ''
@@ -2216,19 +2216,19 @@ const AdminDashboard = () => {
       const itemDate = new Date(dateStr);
       if (isNaN(itemDate.getTime())) return true;
       const now = new Date();
-      
+
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-      
+
       if (dateFilterType === 'Today') {
         return itemDate >= startOfToday && itemDate <= endOfToday;
       } else if (dateFilterType === 'This Week') {
         const firstDayOfWeek = new Date(now);
         firstDayOfWeek.setDate(firstDayOfWeek.getDate() - firstDayOfWeek.getDay());
-        firstDayOfWeek.setHours(0,0,0,0);
+        firstDayOfWeek.setHours(0, 0, 0, 0);
         const lastDayOfWeek = new Date(firstDayOfWeek);
         lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 7);
-        lastDayOfWeek.setHours(23,59,59,999);
+        lastDayOfWeek.setHours(23, 59, 59, 999);
         return itemDate >= firstDayOfWeek && itemDate <= lastDayOfWeek;
       } else if (dateFilterType === 'This Month') {
         const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -2254,14 +2254,14 @@ const AdminDashboard = () => {
 
   const filteredBatches = batches.filter(b => {
     const query = batchSearchQuery.toLowerCase();
-    const matchesSearch = !query || 
+    const matchesSearch = !query ||
       (b.code || '').toLowerCase().includes(query) ||
       (b.name || '').toLowerCase().includes(query) ||
       (b.course_name || '').toLowerCase().includes(query) ||
       (b.trainer_name || '').toLowerCase().includes(query);
     const matchesCourse = !batchCourseFilter || b.course_name === batchCourseFilter;
     const matchesTrainer = !batchTrainerFilter || b.trainer_name === batchTrainerFilter;
-    
+
     // Lifecycle Duration Check (e.g. 50 days active window)
     const durationInfo = calculateBatchDurationInfo(b.start_date, b.end_date, b.duration_days);
     if (batchLifecycleFilter === 'active_only' && !durationInfo.isActive) return false;
@@ -2283,7 +2283,7 @@ const AdminDashboard = () => {
 
   const filteredAnnouncements = announcements.filter(item => {
     const query = annSearchQuery.toLowerCase();
-    const matchesSearch = !query || 
+    const matchesSearch = !query ||
       (item.title || '').toLowerCase().includes(query) ||
       (item.content || '').toLowerCase().includes(query);
     const matchesBatch = !annBatchFilter || item.batch_id === annBatchFilter;
@@ -2294,41 +2294,41 @@ const AdminDashboard = () => {
     else if (annAudienceFilter === 'high') matchesAudience = item.priority === 'High';
     else if (annAudienceFilter === 'medium') matchesAudience = item.priority === 'Medium';
     else if (annAudienceFilter === 'low') matchesAudience = item.priority === 'Low';
-    
+
     // Apply date filter
     const matchesDate = filterByDateRange(item.date || item.uploaded_at, annDateFilter, annStartDateFilter, annEndDateFilter);
-    
+
     return matchesSearch && matchesBatch && matchesCourse && matchesAudience && matchesDate;
   });
 
   const filteredRecorded = recordedClasses.filter(c => {
     const query = recordedSearchQuery.toLowerCase();
-    const matchesSearch = !query || 
+    const matchesSearch = !query ||
       (c.title || '').toLowerCase().includes(query) ||
       (c.module || '').toLowerCase().includes(query);
     const matchesCourse = !recordedCourseFilter || c.course_title === recordedCourseFilter;
     const matchesBatch = !recordedBatchFilter || c.batch_id === recordedBatchFilter;
     const matchesVisibility = !recordedVisibilityFilter || c.visibility === recordedVisibilityFilter;
-    
+
     let uploadType = 'Google Drive';
     if (c.video_source_type === 'upload') {
       uploadType = 'Uploaded';
     }
     const matchesUploadType = !recordedUploadTypeFilter || uploadType === recordedUploadTypeFilter;
-    
+
     // Apply date filter
     const matchesDate = filterByDateRange(c.created_at || c.date, recordedDateFilter, recordedStartDateFilter, recordedEndDateFilter);
-    
+
     return matchesSearch && matchesCourse && matchesBatch && matchesVisibility && matchesUploadType && matchesDate;
   });
 
   // Client-side sub-filtering for Fees (since Payment Method & Date Range are client-only)
   const filteredStudentsForFees = students.filter(s => {
     const matchesPaymentMethod = !feesPaymentMethodFilter || (s.paymentMethod || 'Credit Card').toLowerCase() === feesPaymentMethodFilter.toLowerCase();
-    
+
     // Apply date filter
     const matchesDate = filterByDateRange(s.feesPaymentDate, feesDateFilter, feesStartDateFilter, feesEndDateFilter);
-    
+
     return matchesPaymentMethod && matchesDate;
   });
 
@@ -2338,11 +2338,11 @@ const AdminDashboard = () => {
   }, [batches, feesBatchFilter]);
 
   const batchFeesSummary = React.useMemo(() => {
-    const targetStudents = feesBatchFilter 
-      ? allStudents.filter(s => 
-          String(s.batch_id || s.batchId || '') === String(feesBatchFilter) || 
-          String(s.batch_name || s.batch || '') === String(feesBatchFilter)
-        )
+    const targetStudents = feesBatchFilter
+      ? allStudents.filter(s =>
+        String(s.batch_id || s.batchId || '') === String(feesBatchFilter) ||
+        String(s.batch_name || s.batch || '') === String(feesBatchFilter)
+      )
       : filteredStudentsForFees;
 
     let totalExpected = 0;
@@ -2378,26 +2378,26 @@ const AdminDashboard = () => {
 
   const filteredActivityLogs = activityLogs.filter(l => {
     const query = activitySearchQuery.toLowerCase();
-    const matchesSearch = !query || 
+    const matchesSearch = !query ||
       (l.student_name || '').toLowerCase().includes(query) ||
       (l.student_roll || l.rollNumber || '').toLowerCase().includes(query);
-    
+
     const matchesBatch = !activityBatchFilter || l.batch_id === activityBatchFilter || l.batch_name === activityBatchFilter;
-    
+
     const logBatch = batches.find(b => b.id === l.batch_id || b.name === l.batch_name);
     const matchesCourse = !activityCourseFilter || (logBatch && logBatch.course_name === activityCourseFilter);
-    
+
     const matchesType = !activityTypeFilter || (l.activity_type || '').toLowerCase().includes(activityTypeFilter.toLowerCase());
-    
+
     const points = l.points || 0;
     let matchesScore = true;
     if (activityScoreMin === 'positive') matchesScore = points >= 0;
     else if (activityScoreMin === 'negative') matchesScore = points < 0;
     else if (activityScoreMin === 'high') matchesScore = points > 5;
-    
+
     // Apply date filter
     const matchesDate = filterByDateRange(l.date, activityDateFilter, activityStartDateFilter, activityEndDateFilter);
-    
+
     return matchesSearch && matchesBatch && matchesCourse && matchesType && matchesScore && matchesDate;
   });
 
@@ -2801,7 +2801,7 @@ const AdminDashboard = () => {
           if (authErr?.code === 'auth/email-already-in-use') {
             const cleanEmailLower = trainerEmail.trim().toLowerCase();
             const cleanPhone = trainerPhone ? normalizeMobile(trainerPhone) : '';
-            
+
             // 1. Direct Firestore query on 'trainers'
             const trainersByEmail = await getDocuments('trainers', [where('email', '==', cleanEmailLower)]).catch(() => []);
             if (trainersByEmail.length > 0 && trainersByEmail[0].id) {
@@ -2884,11 +2884,11 @@ const AdminDashboard = () => {
               phone: trainerPhone.trim()
             })
           });
-        } catch (_) {}
+        } catch (_) { }
 
         await createTrainerProfile(uid, payload);
-        await deleteDocument('students', uid).catch(() => {});
-        
+        await deleteDocument('students', uid).catch(() => { });
+
         setShowTrainerModal(false);
         setCreatedTrainerCredentials({
           name: trainerName.trim(),
@@ -3047,7 +3047,7 @@ const AdminDashboard = () => {
   };
 
   const toggleStudentAssign = (studentId) => {
-    setSelectedStudentIds(prev => 
+    setSelectedStudentIds(prev =>
       prev.includes(studentId) ? prev.filter(id => id !== studentId) : [...prev, studentId]
     );
   };
@@ -3146,7 +3146,7 @@ const AdminDashboard = () => {
       const isCurrentlyPaid = student?.feesStatus === 'Paid';
       const newStatus = isCurrentlyPaid ? 'Pending Payment' : 'Paid';
       const totalFee = Number(student?.feesTotal) > 0 ? Number(student.feesTotal) : 20000;
-      
+
       const patch = {
         feesStatus: newStatus,
         feesPaidAmount: !isCurrentlyPaid ? totalFee : 0,
@@ -3171,7 +3171,7 @@ const AdminDashboard = () => {
       const isCurrentlyActive = (studentObj?.status || '').toLowerCase() === 'active';
       const newStatus = isCurrentlyActive ? 'deactivated' : 'active';
       const days = Number(studentObj?.accessDays || studentObj?.validityDays) || 90;
-      const patch = { 
+      const patch = {
         status: newStatus,
         isDeactivated: isCurrentlyActive,
       };
@@ -3231,7 +3231,7 @@ const AdminDashboard = () => {
 
       // 3. Delete student document from database
       await deleteStudentDoc('students', studentToDelete);
-      await deleteStudentDoc('users', studentToDelete).catch(() => {});
+      await deleteStudentDoc('users', studentToDelete).catch(() => { });
 
       // 3. Refresh students & stats
       fetchStudents();
@@ -3339,8 +3339,8 @@ const AdminDashboard = () => {
 
           // Check if student profile exists in loaded list
           if (!targetUid) {
-            const existingInList = allStudents.find(s => 
-              s.email?.trim().toLowerCase() === emailLower || 
+            const existingInList = allStudents.find(s =>
+              s.email?.trim().toLowerCase() === emailLower ||
               (cleanPhone && s.phone === cleanPhone)
             );
             if (existingInList) targetUid = existingInList.id;
@@ -3652,7 +3652,7 @@ const AdminDashboard = () => {
       const records = await getAttendanceByBatchAndDate(batchId, dateVal);
       // Fetch assigned students for the batch
       let batchStudents = await getStudentsByBatch(batchId).catch(() => []);
-      
+
       const batchObj = batches.find(b => b.id === batchId || b.code === batchId || b.batchId === batchId);
       const bCode = batchObj?.code || batchObj?.batchId;
       const bName = batchObj?.name;
@@ -3713,7 +3713,7 @@ const AdminDashboard = () => {
     try {
       const { orderBy } = await import('firebase/firestore');
       const { getDocuments } = await import('../services/firebaseService');
-      
+
       // Try attendanceSheets first
       const sheets = await getDocuments('attendanceSheets', [orderBy('date', 'desc')]).catch(() => []);
       if (sheets.length > 0) {
@@ -3772,7 +3772,7 @@ const AdminDashboard = () => {
   };
 
   const handleStatusChange = (studentId, newStatus) => {
-    setAttendanceRecords(prev => 
+    setAttendanceRecords(prev =>
       prev.map(r => (r.student_id === studentId || r.studentId === studentId) ? { ...r, status: newStatus } : r)
     );
   };
@@ -4169,7 +4169,7 @@ const AdminDashboard = () => {
       setEditingRecordedClass(null);
       setShowRecordedClassModal(false);
       await refetchAdminData();
-      fetchRecordedClasses(); 
+      fetchRecordedClasses();
       fetchStats();
       showModal('Success', isEditing ? 'Lesson updated successfully!' : 'New LMS Lesson posted successfully!', 'success');
     } catch (error) {
@@ -4229,7 +4229,7 @@ const AdminDashboard = () => {
       // Unlink any recorded classes attached to this playlist
       const linkedRecordings = (recordedClasses || []).filter(r => String(r.playlist_id) === String(playlistId));
       for (const rec of linkedRecordings) {
-        await updateRecordedClass(rec.id || rec.uid, { playlist_id: '', playlist_name: '' }).catch(() => {});
+        await updateRecordedClass(rec.id || rec.uid, { playlist_id: '', playlist_name: '' }).catch(() => { });
       }
       if (selectedPlaylistBatch?.id === playlistId || selectedPlaylistBatch?.uid === playlistId) {
         setSelectedPlaylistBatch(null);
@@ -4264,7 +4264,7 @@ const AdminDashboard = () => {
     try {
       await deleteRecordedClass(id);
       await refetchAdminData();
-      fetchRecordedClasses(); 
+      fetchRecordedClasses();
       fetchStats();
       showModal('Deleted', 'Recorded class deleted successfully.', 'success');
     } catch (error) {
@@ -4368,8 +4368,8 @@ const AdminDashboard = () => {
               <span className="srms-sidebar-brand-sub">Admin Operations Center</span>
             </>
           )}
-          <button 
-            className="sidebar-toggle-btn" 
+          <button
+            className="sidebar-toggle-btn"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             style={{
               position: 'absolute',
@@ -4397,7 +4397,7 @@ const AdminDashboard = () => {
             <Clock size={18} />
             <span className="sidebar-link-text">Dashboard</span>
           </button>
-          
+
           <button className={`sidebar-link ${activeTab === 'students' ? 'active' : ''}`} onClick={() => handleNavTabClick('students', () => setCurrentPage(1))}>
             <Users size={18} />
             <span className="sidebar-link-text">Students</span>
@@ -4407,7 +4407,7 @@ const AdminDashboard = () => {
             <GraduationCap size={18} />
             <span className="sidebar-link-text">Batch Management</span>
           </button>
-          
+
           <button className={`sidebar-link ${activeTab === 'live-classes' ? 'active' : ''}`} onClick={() => handleNavTabClick('live-classes')}>
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
               <Video size={18} />
@@ -4435,38 +4435,38 @@ const AdminDashboard = () => {
               )}
             </span>
           </button>
-          
+
           <button className={`sidebar-link ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => handleNavTabClick('attendance', () => setCurrentPage(1))}>
             <Percent size={18} />
             <span className="sidebar-link-text">Attendance</span>
           </button>
-          
+
           <button className={`sidebar-link ${activeTab === 'recorded-classes' ? 'active' : ''}`} onClick={() => handleNavTabClick('recorded-classes')}>
             <PlayCircle size={18} />
             <span className="sidebar-link-text">Recorded Classes</span>
           </button>
 
-          
+
           <button className={`sidebar-link ${activeTab === 'announcements' ? 'active' : ''}`} onClick={() => handleNavTabClick('announcements')}>
             <Megaphone size={18} />
             <span className="sidebar-link-text">Announcements</span>
           </button>
-          
+
           <button className={`sidebar-link ${activeTab === 'assignments' ? 'active' : ''}`} onClick={() => handleNavTabClick('assignments')}>
             <FileText size={18} />
             <span className="sidebar-link-text">Assignments</span>
           </button>
-          
+
           <button className={`sidebar-link ${activeTab === 'chat' || activeTab === 'batch-chat' ? 'active' : ''}`} onClick={() => handleNavTabClick('chat')}>
             <MessageSquare size={18} />
             <span className="sidebar-link-text">Batch Chat</span>
           </button>
-          
+
           <button className={`sidebar-link ${activeTab === 'fees-management' ? 'active' : ''}`} onClick={() => handleNavTabClick('fees-management', () => setCurrentPage(1))}>
             <Wallet size={18} />
             <span className="sidebar-link-text">Fees Management</span>
           </button>
-          
+
           <button className={`sidebar-link ${activeTab === 'activity-score' ? 'active' : ''}`} onClick={() => handleNavTabClick('activity-score')}>
             <Trophy size={18} />
             <span className="sidebar-link-text">Activity Scores</span>
@@ -4500,7 +4500,7 @@ const AdminDashboard = () => {
 
       {/* Main Content */}
       <main className={`main-content ${sidebarCollapsed ? 'expanded' : ''}`}>
-        
+
         {/* Top Navbar */}
         <header className="top-navbar">
           <button className="drawer-toggle-btn" onClick={() => setMobileMenuOpen(true)}>
@@ -4533,7 +4533,7 @@ const AdminDashboard = () => {
           <div>
             {/* Top Statistics Row (4 Cards) */}
             <div className="stats-grid-premium" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-              
+
               {/* Card 1: Total Students */}
               <div className="stat-card-premium" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px', borderRadius: '12px' }}>
                 <div className="stat-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -4596,10 +4596,10 @@ const AdminDashboard = () => {
 
             {/* Rearranged Content Grid (2 Columns) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px', marginBottom: '20px' }}>
-              
+
               {/* Left Column */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                
+
                 {/* Section 1: Recent Student Registrations */}
                 <div className="dashboard-card-section" style={{ display: 'flex', flexDirection: 'column' }}>
                   <h3 className="section-title-premium" style={{ marginBottom: '16px', fontSize: '15px' }}>
@@ -4683,10 +4683,10 @@ const AdminDashboard = () => {
                 </div>
 
               </div>
-              
+
               {/* Right Column */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                
+
                 {/* Section 3: Recent Announcements */}
                 <div className="dashboard-card-section">
                   <h3 className="section-title-premium" style={{ marginBottom: '16px', fontSize: '15px' }}>
@@ -4719,7 +4719,7 @@ const AdminDashboard = () => {
                     <Clock size={18} style={{ color: 'var(--primary-color)' }} />
                     Recent Activity Timeline
                   </h3>
-                  
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', paddingLeft: '20px', borderLeft: '2px solid var(--border-color)' }}>
                     {stats.recentActivity && stats.recentActivity.length > 0 ? (
                       stats.recentActivity.map((act, index) => {
@@ -4735,7 +4735,7 @@ const AdminDashboard = () => {
                           <div key={index} style={{ position: 'relative' }}>
                             {/* Timeline point dot */}
                             <div style={{ position: 'absolute', left: '-27px', top: '4px', width: '12px', height: '12px', borderRadius: '50%', background: dotColor, border: '2.5px solid white', boxShadow: '0 0 0 1px var(--border-color)' }} />
-                            
+
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
                               <span style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '500' }}>{act.message}</span>
                               <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '500' }}>{act.date}</span>
@@ -4758,7 +4758,7 @@ const AdminDashboard = () => {
         {/* Batches Management Tab */}
         {activeTab === 'batches' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '22px', width: '100%' }}>
-            
+
             {/* Top Stat Cards for Batches */}
             <div className="batch-stats-grid">
               <div className="batch-stat-card">
@@ -4906,12 +4906,12 @@ const AdminDashboard = () => {
                 <div>
                   <h4 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
                     {batchLifecycleFilter === 'active_only' ? 'Active Institutional Batches (Within Duration)' :
-                     batchLifecycleFilter === 'completed' ? 'Completed & Expired Batches (Eligible for Extension)' :
-                     batchLifecycleFilter === 'upcoming' ? 'Scheduled Upcoming Batches' : 'All Institutional Batches'}
+                      batchLifecycleFilter === 'completed' ? 'Completed & Expired Batches (Eligible for Extension)' :
+                        batchLifecycleFilter === 'upcoming' ? 'Scheduled Upcoming Batches' : 'All Institutional Batches'}
                   </h4>
                   <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                    {batchLifecycleFilter === 'active_only' 
-                      ? 'Displaying only batches that are currently running within their active duration.' 
+                    {batchLifecycleFilter === 'active_only'
+                      ? 'Displaying only batches that are currently running within their active duration.'
                       : 'Manage course cohorts, daily timing schedules, and duration extensions.'}
                   </p>
                 </div>
@@ -5025,7 +5025,7 @@ const AdminDashboard = () => {
 
                               {/* Title & Instructor */}
                               <div>
-                                <h5 
+                                <h5
                                   style={{ fontWeight: '800', fontSize: '19px', color: 'var(--primary-color)', margin: '0 0 6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                                   onClick={() => navigate(`/admin/batches/${batch.id}`)}
                                   title="Click to view Batch Details"
@@ -5046,13 +5046,13 @@ const AdminDashboard = () => {
                                   <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
                                     Day {duration.currentDay} of {duration.totalDays} Days ({duration.progressPercent}%)
                                   </span>
-                                  <span style={{ 
-                                    fontSize: '11px', 
-                                    fontWeight: 700, 
-                                    padding: '2px 8px', 
+                                  <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    padding: '2px 8px',
                                     borderRadius: '6px',
                                     background: duration.isExpired ? '#FEE2E2' : (duration.isActive ? '#D1FAE5' : '#E0E7FF'),
-                                    color: duration.isExpired ? '#DC2626' : (duration.isActive ? '#047857' : '#4338CA') 
+                                    color: duration.isExpired ? '#DC2626' : (duration.isActive ? '#047857' : '#4338CA')
                                   }}>
                                     {duration.daysNotice}
                                   </span>
@@ -5244,231 +5244,231 @@ const AdminDashboard = () => {
               <div className="section-header-premium" style={{ gap: '16px', flexWrap: 'wrap', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h3 className="section-title-premium" style={{ margin: 0 }}>Student Accounts Registry</h3>
               </div>
-            <div className="table-container-scrollable table-desktop-view">
-              <table className="table-premium compact-tablet">
-                <thead>
-                  <tr>
-                    <th className="col-profile">Profile</th>
-                    <th className="col-name">Student Name</th>
-                    <th className="col-id">Student ID</th>
-                    <th className="col-email">Email</th>
-                    <th className="col-mobile">Mobile</th>
-                    <th className="col-course">Course</th>
-                    <th className="col-batch">Batch</th>
-                    <th className="col-fee">Fee Status</th>
-                    <th className="col-status">Account Status</th>
-                    <th className="col-delivery">Delivery & Verification</th>
-                    <th className="col-actions">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((student) => {
-                    const initials = student.name ? student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ST';
-                    const isPendingVerification = student.status === 'Pending Email Verification' || student.status === 'pending_verification';
-                    const isExpired = Boolean(student.accessExpiresAt && new Date(student.accessExpiresAt).getTime() < Date.now());
-                    const isDeactivated = student.status === 'deactivated' || student.status === 'disabled' || student.status === 'inactive' || student.isDeactivated === true || isExpired;
-                    const isActive = !isPendingVerification && !isDeactivated && (student.status === 'active' || student.status === 'Active');
+              <div className="table-container-scrollable table-desktop-view">
+                <table className="table-premium compact-tablet">
+                  <thead>
+                    <tr>
+                      <th className="col-profile">Profile</th>
+                      <th className="col-name">Student Name</th>
+                      <th className="col-id">Student ID</th>
+                      <th className="col-email">Email</th>
+                      <th className="col-mobile">Mobile</th>
+                      <th className="col-course">Course</th>
+                      <th className="col-batch">Batch</th>
+                      <th className="col-fee">Fee Status</th>
+                      <th className="col-status">Account Status</th>
+                      <th className="col-delivery">Delivery & Verification</th>
+                      <th className="col-actions">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.map((student) => {
+                      const initials = student.name ? student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ST';
+                      const isPendingVerification = student.status === 'Pending Email Verification' || student.status === 'pending_verification';
+                      const isExpired = Boolean(student.accessExpiresAt && new Date(student.accessExpiresAt).getTime() < Date.now());
+                      const isDeactivated = student.status === 'deactivated' || student.status === 'disabled' || student.status === 'inactive' || student.isDeactivated === true || isExpired;
+                      const isActive = !isPendingVerification && !isDeactivated && (student.status === 'active' || student.status === 'Active');
 
-                    return (
-                      <tr key={student.id} style={{ cursor: 'pointer' }} onClick={() => handleViewStudentDetails(student.id)}>
-                        <td className="col-profile" onClick={(e) => e.stopPropagation()}>
-                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)' }}>
-                            {(student.profile_pic || student.profilePhotoUrl) && (student.profile_pic || student.profilePhotoUrl).trim() !== '' ? (
-                              <img src={student.profile_pic || student.profilePhotoUrl} alt={student.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--primary-color)' }}>{initials}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="col-name"><strong>{student.name}</strong></td>
-                        <td className="col-id"><code>{student.rollNumber}</code></td>
-                        <td className="col-email">
-                          <div className="col-limit-email" title={student.email}>
-                            {student.email}
-                          </div>
-                        </td>
-                        <td className="col-mobile">{student.phone}</td>
-                        <td className="col-course">
-                          <div className="col-limit-course" title={student.course}>
-                            {student.course}
-                          </div>
-                        </td>
-                        <td className="col-batch">
-                          <div className="col-limit-batch" title={student.batch_name || 'Not Assigned'}>
-                            {student.batch_name || 'Not Assigned'}
-                          </div>
-                        </td>
-                        <td className="col-fee">
-                          <span className={`badge-status-fixed ${student.feesStatus === 'Paid' ? 'paid' : 'unpaid'}`} onClick={(e) => { e.stopPropagation(); toggleFees(student.id); }} style={{ cursor: 'pointer' }}>
+                      return (
+                        <tr key={student.id} style={{ cursor: 'pointer' }} onClick={() => handleViewStudentDetails(student.id)}>
+                          <td className="col-profile" onClick={(e) => e.stopPropagation()}>
+                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)' }}>
+                              {(student.profile_pic || student.profilePhotoUrl) && (student.profile_pic || student.profilePhotoUrl).trim() !== '' ? (
+                                <img src={student.profile_pic || student.profilePhotoUrl} alt={student.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--primary-color)' }}>{initials}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="col-name"><strong>{student.name}</strong></td>
+                          <td className="col-id"><code>{student.rollNumber}</code></td>
+                          <td className="col-email">
+                            <div className="col-limit-email" title={student.email}>
+                              {student.email}
+                            </div>
+                          </td>
+                          <td className="col-mobile">{student.phone}</td>
+                          <td className="col-course">
+                            <div className="col-limit-course" title={student.course}>
+                              {student.course}
+                            </div>
+                          </td>
+                          <td className="col-batch">
+                            <div className="col-limit-batch" title={student.batch_name || 'Not Assigned'}>
+                              {student.batch_name || 'Not Assigned'}
+                            </div>
+                          </td>
+                          <td className="col-fee">
+                            <span className={`badge-status-fixed ${student.feesStatus === 'Paid' ? 'paid' : 'unpaid'}`} onClick={(e) => { e.stopPropagation(); toggleFees(student.id); }} style={{ cursor: 'pointer' }}>
+                              {student.feesStatus === 'Paid' ? 'Paid' : 'Pending'}
+                            </span>
+                          </td>
+                          <td className="col-status">
+                            <span
+                              className="badge-status-fixed"
+                              onClick={(e) => { e.stopPropagation(); toggleStatus(student.id); }}
+                              title="Click to toggle account activation"
+                              style={{
+                                cursor: 'pointer',
+                                padding: '4px 10px',
+                                borderRadius: 12,
+                                fontSize: 11.5,
+                                fontWeight: 700,
+                                background: isPendingVerification ? '#FEF3C7' : (isActive ? '#D1FAE5' : (isExpired ? '#FEE2E2' : '#F3F4F6')),
+                                color: isPendingVerification ? '#D97706' : (isActive ? '#059669' : (isExpired ? '#DC2626' : '#4B5563')),
+                                border: '1px solid currentColor',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {isPendingVerification ? 'Pending Email Verification' : (isActive ? `Active (${student.accessDays || student.validityDays || 90}d)` : (isExpired ? 'Deactivated (Expired)' : 'Deactivated'))}
+                            </span>
+                          </td>
+                          <td className="col-delivery">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11.5px' }}>
+                              <span style={{ color: 'var(--text-secondary)' }}>
+                                Delivery: <strong style={{ color: student.emailDeliveryStatus === 'Failed' ? '#EF4444' : '#10B981' }}>{student.emailDeliveryStatus || 'Sent'}</strong>
+                              </span>
+                              <span>
+                                Verified: <strong style={{ color: student.emailVerified ? '#10B981' : '#F59E0B' }}>{student.emailVerified ? 'Yes' : 'Pending'}</strong>
+                              </span>
+                            </div>
+                          </td>
+                          <td className="col-actions" onClick={(e) => e.stopPropagation()}>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                              <button
+                                className="action-icon-btn"
+                                style={{ color: '#6C3CF0' }}
+                                data-tooltip="Resend Welcome Email"
+                                onClick={(e) => { e.stopPropagation(); sendStudentWelcomeEmail(student); }}
+                              >
+                                <RefreshCw size={15} />
+                              </button>
+                              {student.email && (
+                                <a
+                                  href={`mailto:${student.email}`}
+                                  className="action-icon-btn"
+                                  style={{ textDecoration: 'none', color: 'var(--primary-color)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                  data-tooltip="Send Mail"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Mail size={16} />
+                                </a>
+                              )}
+                              <button className="action-icon-btn btn-view" data-tooltip="View Profile" onClick={() => handleViewStudentDetails(student.id)}>
+                                <Eye size={16} />
+                              </button>
+                              <button className="action-icon-btn btn-edit" data-tooltip="Edit Student" onClick={() => handleEditClick(student)}>
+                                <Pencil size={16} />
+                              </button>
+                              <button className="action-icon-btn btn-delete" data-tooltip="Delete" onClick={() => deleteStudent(student.id)}>
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile View: Student Cards */}
+              <div className="mobile-student-cards">
+                {students.map((student) => {
+                  const initials = student.name ? student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ST';
+                  const isPendingVerification = student.status === 'Pending Email Verification' || student.status === 'pending_verification';
+                  const isExpired = Boolean(student.accessExpiresAt && new Date(student.accessExpiresAt).getTime() < Date.now());
+                  const isDeactivated = student.status === 'deactivated' || student.status === 'disabled' || student.status === 'inactive' || student.isDeactivated === true || isExpired;
+                  const isActive = !isPendingVerification && !isDeactivated && (student.status === 'active' || student.status === 'Active');
+                  return (
+                    <div key={student.id} className="student-mobile-card" onClick={() => handleViewStudentDetails(student.id)}>
+                      <div className="student-card-header">
+                        <div style={{ width: '38px', height: '38px', borderRadius: '50%', overflow: 'hidden', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', flexShrink: 0 }}>
+                          {(student.profile_pic || student.profilePhotoUrl) && (student.profile_pic || student.profilePhotoUrl).trim() !== '' ? (
+                            <img src={student.profile_pic || student.profilePhotoUrl} alt={student.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--primary-color)' }}>{initials}</span>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h4 style={{ fontSize: '14px', fontWeight: '800', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{student.name}</h4>
+                          <code style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{student.rollNumber}</code>
+                        </div>
+                      </div>
+                      <div className="student-card-body">
+                        <div>
+                          <span className="student-card-label">Email</span>
+                          <span className="student-card-value" style={{ wordBreak: 'break-all' }}>{student.email}</span>
+                        </div>
+                        <div>
+                          <span className="student-card-label">Mobile</span>
+                          <span className="student-card-value">{student.phone}</span>
+                        </div>
+                        <div>
+                          <span className="student-card-label">Course</span>
+                          <span className="student-card-value">{student.course}</span>
+                        </div>
+                        <div>
+                          <span className="student-card-label">Batch</span>
+                          <span className="student-card-value">{student.batch_name || 'Not Assigned'}</span>
+                        </div>
+                        <div>
+                          <span className="student-card-label">Fee Status</span>
+                          <span className={`badge-status-fixed ${student.feesStatus === 'Paid' ? 'paid' : 'unpaid'}`} onClick={(e) => { e.stopPropagation(); toggleFees(student.id); }} style={{ cursor: 'pointer', display: 'inline-flex' }}>
                             {student.feesStatus === 'Paid' ? 'Paid' : 'Pending'}
                           </span>
-                        </td>
-                        <td className="col-status">
-                          <span
-                            className="badge-status-fixed"
-                            onClick={(e) => { e.stopPropagation(); toggleStatus(student.id); }}
-                            title="Click to toggle account activation"
-                            style={{
-                              cursor: 'pointer',
-                              padding: '4px 10px',
-                              borderRadius: 12,
-                              fontSize: 11.5,
-                              fontWeight: 700,
-                              background: isPendingVerification ? '#FEF3C7' : (isActive ? '#D1FAE5' : (isExpired ? '#FEE2E2' : '#F3F4F6')),
-                              color: isPendingVerification ? '#D97706' : (isActive ? '#059669' : (isExpired ? '#DC2626' : '#4B5563')),
-                              border: '1px solid currentColor',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {isPendingVerification ? 'Pending Email Verification' : (isActive ? `Active (${student.accessDays || student.validityDays || 90}d)` : (isExpired ? 'Deactivated (Expired)' : 'Deactivated'))}
+                        </div>
+                        <div>
+                          <span className="student-card-label">Status</span>
+                          <span className={`badge-status-fixed ${isActive ? 'paid' : 'unpaid'}`} onClick={(e) => { e.stopPropagation(); toggleStatus(student.id); }} style={{ cursor: 'pointer', display: 'inline-flex' }}>
+                            {isPendingVerification ? 'Pending' : (isActive ? 'Active' : (isExpired ? 'Expired' : 'Deactivated'))}
                           </span>
-                        </td>
-                        <td className="col-delivery">
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11.5px' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>
-                              Delivery: <strong style={{ color: student.emailDeliveryStatus === 'Failed' ? '#EF4444' : '#10B981' }}>{student.emailDeliveryStatus || 'Sent'}</strong>
-                            </span>
-                            <span>
-                              Verified: <strong style={{ color: student.emailVerified ? '#10B981' : '#F59E0B' }}>{student.emailVerified ? 'Yes' : 'Pending'}</strong>
-                            </span>
-                          </div>
-                        </td>
-                        <td className="col-actions" onClick={(e) => e.stopPropagation()}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                            <button
-                              className="action-icon-btn"
-                              style={{ color: '#6C3CF0' }}
-                              data-tooltip="Resend Welcome Email"
-                              onClick={(e) => { e.stopPropagation(); sendStudentWelcomeEmail(student); }}
-                            >
-                              <RefreshCw size={15} />
-                            </button>
-                            {student.email && (
-                              <a
-                                href={`mailto:${student.email}`}
-                                className="action-icon-btn"
-                                style={{ textDecoration: 'none', color: 'var(--primary-color)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                                data-tooltip="Send Mail"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Mail size={16} />
-                              </a>
-                            )}
-                            <button className="action-icon-btn btn-view" data-tooltip="View Profile" onClick={() => handleViewStudentDetails(student.id)}>
-                              <Eye size={16} />
-                            </button>
-                            <button className="action-icon-btn btn-edit" data-tooltip="Edit Student" onClick={() => handleEditClick(student)}>
-                              <Pencil size={16} />
-                            </button>
-                            <button className="action-icon-btn btn-delete" data-tooltip="Delete" onClick={() => deleteStudent(student.id)}>
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile View: Student Cards */}
-            <div className="mobile-student-cards">
-              {students.map((student) => {
-                const initials = student.name ? student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ST';
-                const isPendingVerification = student.status === 'Pending Email Verification' || student.status === 'pending_verification';
-                const isExpired = Boolean(student.accessExpiresAt && new Date(student.accessExpiresAt).getTime() < Date.now());
-                const isDeactivated = student.status === 'deactivated' || student.status === 'disabled' || student.status === 'inactive' || student.isDeactivated === true || isExpired;
-                const isActive = !isPendingVerification && !isDeactivated && (student.status === 'active' || student.status === 'Active');
-                return (
-                  <div key={student.id} className="student-mobile-card" onClick={() => handleViewStudentDetails(student.id)}>
-                    <div className="student-card-header">
-                      <div style={{ width: '38px', height: '38px', borderRadius: '50%', overflow: 'hidden', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', flexShrink: 0 }}>
-                        {(student.profile_pic || student.profilePhotoUrl) && (student.profile_pic || student.profilePhotoUrl).trim() !== '' ? (
-                          <img src={student.profile_pic || student.profilePhotoUrl} alt={student.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--primary-color)' }}>{initials}</span>
+                        </div>
+                      </div>
+                      <div className="student-card-actions" onClick={(e) => e.stopPropagation()} style={{ gap: '8px' }}>
+                        {student.email && (
+                          <a
+                            href={`mailto:${student.email}`}
+                            className="action-icon-btn"
+                            style={{ textDecoration: 'none', color: 'var(--primary-color)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            data-tooltip="Send Mail"
+                          >
+                            <Mail size={16} />
+                          </a>
                         )}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <h4 style={{ fontSize: '14px', fontWeight: '800', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{student.name}</h4>
-                        <code style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{student.rollNumber}</code>
-                      </div>
-                    </div>
-                    <div className="student-card-body">
-                      <div>
-                        <span className="student-card-label">Email</span>
-                        <span className="student-card-value" style={{ wordBreak: 'break-all' }}>{student.email}</span>
-                      </div>
-                      <div>
-                        <span className="student-card-label">Mobile</span>
-                        <span className="student-card-value">{student.phone}</span>
-                      </div>
-                      <div>
-                        <span className="student-card-label">Course</span>
-                        <span className="student-card-value">{student.course}</span>
-                      </div>
-                      <div>
-                        <span className="student-card-label">Batch</span>
-                        <span className="student-card-value">{student.batch_name || 'Not Assigned'}</span>
-                      </div>
-                      <div>
-                        <span className="student-card-label">Fee Status</span>
-                        <span className={`badge-status-fixed ${student.feesStatus === 'Paid' ? 'paid' : 'unpaid'}`} onClick={(e) => { e.stopPropagation(); toggleFees(student.id); }} style={{ cursor: 'pointer', display: 'inline-flex' }}>
-                          {student.feesStatus === 'Paid' ? 'Paid' : 'Pending'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="student-card-label">Status</span>
-                        <span className={`badge-status-fixed ${isActive ? 'paid' : 'unpaid'}`} onClick={(e) => { e.stopPropagation(); toggleStatus(student.id); }} style={{ cursor: 'pointer', display: 'inline-flex' }}>
-                          {isPendingVerification ? 'Pending' : (isActive ? 'Active' : (isExpired ? 'Expired' : 'Deactivated'))}
-                        </span>
+                        <button className="action-icon-btn btn-view" data-tooltip="View Profile" onClick={() => handleViewStudentDetails(student.id)}>
+                          <Eye size={16} />
+                        </button>
+                        <button className="action-icon-btn btn-edit" data-tooltip="Edit Student" onClick={() => handleEditClick(student)}>
+                          <Pencil size={16} />
+                        </button>
+                        <button className="action-icon-btn" data-tooltip="Reset Password" onClick={() => handleResetPassword(student.id)}>
+                          <Key size={16} />
+                        </button>
+                        <button className="action-icon-btn btn-delete" data-tooltip="Delete" onClick={() => deleteStudent(student.id)}>
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </div>
-                    <div className="student-card-actions" onClick={(e) => e.stopPropagation()} style={{ gap: '8px' }}>
-                      {student.email && (
-                        <a
-                          href={`mailto:${student.email}`}
-                          className="action-icon-btn"
-                          style={{ textDecoration: 'none', color: 'var(--primary-color)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                          data-tooltip="Send Mail"
-                        >
-                          <Mail size={16} />
-                        </a>
-                      )}
-                      <button className="action-icon-btn btn-view" data-tooltip="View Profile" onClick={() => handleViewStudentDetails(student.id)}>
-                        <Eye size={16} />
-                      </button>
-                      <button className="action-icon-btn btn-edit" data-tooltip="Edit Student" onClick={() => handleEditClick(student)}>
-                        <Pencil size={16} />
-                      </button>
-                      <button className="action-icon-btn" data-tooltip="Reset Password" onClick={() => handleResetPassword(student.id)}>
-                        <Key size={16} />
-                      </button>
-                      <button className="action-icon-btn btn-delete" data-tooltip="Delete" onClick={() => deleteStudent(student.id)}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
 
-            {/* Pagination Fixed at bottom of Registry Container */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', borderTop: '1px solid var(--border-light)', paddingTop: '15px' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                Viewing page <strong>{currentPage}</strong> of {totalPages}
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '12px', height: '32px' }} disabled={currentPage === 1} onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}>
-                  Prev
-                </button>
-                <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '12px', height: '32px' }} disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}>
-                  Next
-                </button>
+              {/* Pagination Fixed at bottom of Registry Container */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', borderTop: '1px solid var(--border-light)', paddingTop: '15px' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  Viewing page <strong>{currentPage}</strong> of {totalPages}
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '12px', height: '32px' }} disabled={currentPage === 1} onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}>
+                    Prev
+                  </button>
+                  <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '12px', height: '32px' }} disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}>
+                    Next
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
           </div>
         )}
 
@@ -5481,26 +5481,26 @@ const AdminDashboard = () => {
 
           const filteredClasses = allAvailableClasses.filter(c => {
             const query = sessionSearch.toLowerCase();
-            const matchesSearch = c.title?.toLowerCase().includes(query) || 
-                                  c.instructor?.toLowerCase().includes(query) ||
-                                  c.batch_name?.toLowerCase().includes(query);
-            
+            const matchesSearch = c.title?.toLowerCase().includes(query) ||
+              c.instructor?.toLowerCase().includes(query) ||
+              c.batch_name?.toLowerCase().includes(query);
+
             if (!matchesSearch) return false;
-            
+
             const classBatch = batches.find(b => b.id === c.batch_id || b.name === c.batch_name);
             const matchesCourse = !liveCourseFilter || (classBatch && classBatch.course_name === liveCourseFilter);
             const matchesBatch = !liveBatchFilter || c.batch_id === liveBatchFilter || c.batch_name === liveBatchFilter;
             const matchesStatus = !liveStatusFilter || c.status === liveStatusFilter;
-            
+
             if (!matchesCourse || !matchesBatch || !matchesStatus) return false;
 
             if (!c.date) return true;
             const classDate = new Date(c.date);
             const now = new Date();
-            
+
             const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-            
+
             if (dateFilter === 'All' || !dateFilter) {
               return true;
             } else if (dateFilter === 'Today') {
@@ -5508,10 +5508,10 @@ const AdminDashboard = () => {
             } else if (dateFilter === 'This Week') {
               const firstDayOfWeek = new Date(now);
               firstDayOfWeek.setDate(firstDayOfWeek.getDate() - firstDayOfWeek.getDay());
-              firstDayOfWeek.setHours(0,0,0,0);
+              firstDayOfWeek.setHours(0, 0, 0, 0);
               const lastDayOfWeek = new Date(firstDayOfWeek);
               lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 7);
-              lastDayOfWeek.setHours(23,59,59,999);
+              lastDayOfWeek.setHours(23, 59, 59, 999);
               return classDate >= firstDayOfWeek && classDate <= lastDayOfWeek;
             } else if (dateFilter === 'This Month') {
               const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -5814,19 +5814,19 @@ const AdminDashboard = () => {
           const year = calendarMonth.getFullYear();
           const month = calendarMonth.getMonth();
           const monthName = calendarMonth.toLocaleString('default', { month: 'long' });
-          
+
           const firstDayOfMonth = new Date(year, month, 1).getDay();
           const daysInMonth = new Date(year, month + 1, 0).getDate();
-          
+
           const prevMonthDays = [];
           for (let i = 0; i < firstDayOfMonth; i++) prevMonthDays.push(null);
-          
+
           const daysArray = [];
           for (let d = 1; d <= daysInMonth; d++) {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
             daysArray.push({ day: d, dateStr });
           }
-          
+
           const calendarGrid = [...prevMonthDays, ...daysArray];
 
           // Compute summary stats for current sheet
@@ -5843,7 +5843,7 @@ const AdminDashboard = () => {
           });
 
           // Check if attendance is already saved for selected date & batch
-          const hasSavedAttendanceForDate = attSheetsHistory.some(s => 
+          const hasSavedAttendanceForDate = attSheetsHistory.some(s =>
             s.date === attendanceDate && (!attBatchId || s.batch_id === attBatchId || s.batchId === attBatchId)
           );
 
@@ -5855,7 +5855,7 @@ const AdminDashboard = () => {
           );
 
           // Filter batches by selected Course dropdown
-          const filteredBatchOptions = attCourse 
+          const filteredBatchOptions = attCourse
             ? batches.filter(b => b.course_name === attCourse)
             : batches;
 
@@ -5911,7 +5911,7 @@ const AdminDashboard = () => {
 
               {/* Main Workspace Grid: Left Attendance Sheet (Main) | Right Calendar (Side) */}
               <div className="attendance-workspace-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: '20px', alignItems: 'start' }}>
-                
+
                 {/* LEFT COLUMN: Attendance Sheet & Interactive Roster */}
                 <div className="dashboard-card-section" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid var(--border-light)', paddingBottom: '14px' }}>
@@ -5927,8 +5927,8 @@ const AdminDashboard = () => {
                     {/* Batch Selection Controls */}
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                       <div style={{ minWidth: '160px' }}>
-                        <select 
-                          className="form-select" 
+                        <select
+                          className="form-select"
                           style={{ height: '38px', fontSize: '13px', width: '100%', background: 'white' }}
                           value={attCourse}
                           onChange={(e) => {
@@ -5947,8 +5947,8 @@ const AdminDashboard = () => {
                       </div>
 
                       <div style={{ minWidth: '200px' }}>
-                        <select 
-                          className="form-select" 
+                        <select
+                          className="form-select"
                           style={{ height: '38px', fontSize: '13px', width: '100%', fontWeight: 700, borderColor: 'var(--primary-color)', background: 'white' }}
                           value={attBatchId}
                           onChange={(e) => handleBatchChange(e)}
@@ -6161,10 +6161,10 @@ const AdminDashboard = () => {
 
                 {/* RIGHT COLUMN: Attendance Interactive Calendar & Agenda */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  
+
                   {/* Calendar Card */}
                   <div className="dashboard-card-section" style={{ padding: '18px', background: '#FFFFFF', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-                    
+
                     {/* Month Header & Controls */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                       <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)' }}>
@@ -6282,108 +6282,108 @@ const AdminDashboard = () => {
               </div>
 
               {/* Attendance History Section */}
-                  <div className="dashboard-card-section" style={{ marginTop: '10px' }}>
-                    <h3 className="section-title-premium" style={{ marginBottom: '18px' }}>Attendance History Logs</h3>
-                    <div className="table-container-premium">
-                      <table className="table-premium">
+              <div className="dashboard-card-section" style={{ marginTop: '10px' }}>
+                <h3 className="section-title-premium" style={{ marginBottom: '18px' }}>Attendance History Logs</h3>
+                <div className="table-container-premium">
+                  <table className="table-premium">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Batch</th>
+                        <th>Present Count</th>
+                        <th>Absent Count</th>
+                        <th>Attendance Rate</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAttSheets.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
+                            No attendance logs history found matching the filters.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredAttSheets.map((sheet, idx) => (
+                          <tr key={sheet.id || idx}>
+                            <td><strong>{sheet.date}</strong></td>
+                            <td>{sheet.batch_name}</td>
+                            <td style={{ color: 'var(--success-color)', fontWeight: '600' }}>{sheet.present_count ?? 0} students</td>
+                            <td style={{ color: 'var(--danger-color)', fontWeight: '600' }}>{sheet.absent_count ?? 0} students</td>
+                            <td style={{ color: 'var(--primary-color)', fontWeight: '700' }}>{sheet.attendance_percentage ?? 100}%</td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline"
+                                  style={{ padding: '6px 12px', fontSize: '12px' }}
+                                  onClick={() => {
+                                    setViewingHistoryRecord(sheet);
+                                  }}
+                                >
+                                  View Logs
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline"
+                                  style={{ padding: '6px 12px', fontSize: '12px' }}
+                                  onClick={() => handleEditHistoryRecord(sheet)}
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Attendance View Detail Modal */}
+              {viewingHistoryRecord && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+                  <div style={{ background: 'white', borderRadius: '20px', padding: '24px', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow-lg)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
+                      <h4 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Attendance Logs Detail</h4>
+                      <button type="button" className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => setViewingHistoryRecord(null)}>Close</button>
+                    </div>
+
+                    <div style={{ marginBottom: '16px', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                      <p style={{ margin: '4px 0' }}><strong>Batch Name:</strong> {viewingHistoryRecord.batch_name}</p>
+                      <p style={{ margin: '4px 0' }}><strong>Course:</strong> {viewingHistoryRecord.course_name}</p>
+                      <p style={{ margin: '4px 0' }}><strong>Date:</strong> {viewingHistoryRecord.date}</p>
+                      <p style={{ margin: '4px 0' }}><strong>Attendance Rate:</strong> {viewingHistoryRecord.attendance_percentage}%</p>
+                    </div>
+
+                    <div className="table-container-premium" style={{ border: '1px solid var(--border-light)', borderRadius: '12px' }}>
+                      <table className="table-premium" style={{ fontSize: '13px' }}>
                         <thead>
                           <tr>
-                            <th>Date</th>
-                            <th>Batch</th>
-                            <th>Present Count</th>
-                            <th>Absent Count</th>
-                            <th>Attendance Rate</th>
-                            <th>Actions</th>
+                            <th>Roll No.</th>
+                            <th>Student Name</th>
+                            <th>Status</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredAttSheets.length === 0 ? (
-                            <tr>
-                              <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
-                                No attendance logs history found matching the filters.
+                          {(viewingHistoryRecord.records || []).map((rec, idx) => (
+                            <tr key={rec.student_id || idx}>
+                              <td>{rec.rollNumber}</td>
+                              <td>{rec.student_name}</td>
+                              <td>
+                                <span className={`badge-status ${rec.status === 'Present' ? 'paid' : 'unpaid'}`} style={{ textTransform: 'capitalize' }}>
+                                  {rec.status}
+                                </span>
                               </td>
                             </tr>
-                          ) : (
-                            filteredAttSheets.map((sheet, idx) => (
-                              <tr key={sheet.id || idx}>
-                                <td><strong>{sheet.date}</strong></td>
-                                <td>{sheet.batch_name}</td>
-                                <td style={{ color: 'var(--success-color)', fontWeight: '600' }}>{sheet.present_count ?? 0} students</td>
-                                <td style={{ color: 'var(--danger-color)', fontWeight: '600' }}>{sheet.absent_count ?? 0} students</td>
-                                <td style={{ color: 'var(--primary-color)', fontWeight: '700' }}>{sheet.attendance_percentage ?? 100}%</td>
-                                <td>
-                                  <div style={{ display: 'flex', gap: '8px' }}>
-                                    <button 
-                                      type="button" 
-                                      className="btn btn-outline" 
-                                      style={{ padding: '6px 12px', fontSize: '12px' }}
-                                      onClick={() => {
-                                        setViewingHistoryRecord(sheet);
-                                      }}
-                                    >
-                                      View Logs
-                                    </button>
-                                    <button 
-                                      type="button" 
-                                      className="btn btn-outline" 
-                                      style={{ padding: '6px 12px', fontSize: '12px' }}
-                                      onClick={() => handleEditHistoryRecord(sheet)}
-                                    >
-                                      Edit
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))
-                          )}
+                          ))}
                         </tbody>
                       </table>
                     </div>
                   </div>
-
-                  {/* Attendance View Detail Modal */}
-                  {viewingHistoryRecord && (
-                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-                      <div style={{ background: 'white', borderRadius: '20px', padding: '24px', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow-lg)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
-                          <h4 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Attendance Logs Detail</h4>
-                          <button type="button" className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => setViewingHistoryRecord(null)}>Close</button>
-                        </div>
-                        
-                        <div style={{ marginBottom: '16px', fontSize: '14px', color: 'var(--text-secondary)' }}>
-                          <p style={{ margin: '4px 0' }}><strong>Batch Name:</strong> {viewingHistoryRecord.batch_name}</p>
-                          <p style={{ margin: '4px 0' }}><strong>Course:</strong> {viewingHistoryRecord.course_name}</p>
-                          <p style={{ margin: '4px 0' }}><strong>Date:</strong> {viewingHistoryRecord.date}</p>
-                          <p style={{ margin: '4px 0' }}><strong>Attendance Rate:</strong> {viewingHistoryRecord.attendance_percentage}%</p>
-                        </div>
-
-                        <div className="table-container-premium" style={{ border: '1px solid var(--border-light)', borderRadius: '12px' }}>
-                          <table className="table-premium" style={{ fontSize: '13px' }}>
-                            <thead>
-                              <tr>
-                                <th>Roll No.</th>
-                                <th>Student Name</th>
-                                <th>Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(viewingHistoryRecord.records || []).map((rec, idx) => (
-                                <tr key={rec.student_id || idx}>
-                                  <td>{rec.rollNumber}</td>
-                                  <td>{rec.student_name}</td>
-                                  <td>
-                                    <span className={`badge-status ${rec.status === 'Present' ? 'paid' : 'unpaid'}`} style={{ textTransform: 'capitalize' }}>
-                                      {rec.status}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                </div>
+              )}
 
             </div>
           );
@@ -6432,472 +6432,90 @@ const AdminDashboard = () => {
               );
             })()
           ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
-            <FilterBar
-              searchPlaceholder="Search Recorded Class"
-              searchValue={recordedSearchQuery}
-              onSearchChange={(val) => { setRecordedSearchQuery(val); setRecordedPage(1); }}
-              filters={[
-                {
-                  label: 'Course',
-                  value: recordedCourseFilter,
-                  onChange: (val) => { setRecordedCourseFilter(val); setRecordedPage(1); },
-                  options: Array.from(new Set(recordedClasses.map(c => c.course_title))).filter(Boolean).map(c => ({ value: c, label: c }))
-                },
-                {
-                  label: 'Batch',
-                  value: recordedBatchFilter,
-                  onChange: (val) => { setRecordedBatchFilter(val); setRecordedPage(1); },
-                  options: batches.map(b => ({ value: b.id, label: b.name }))
-                },
-                {
-                  label: 'Status',
-                  value: recordedVisibilityFilter,
-                  onChange: (val) => { setRecordedVisibilityFilter(val); setRecordedPage(1); },
-                  options: [
-                    { value: 'everyone', label: 'Everyone' },
-                    { value: 'paid', label: 'Paid Only' }
-                  ]
-                }
-              ]}
-              showDateFilter={true}
-              activeQuickFilter={recordedDateFilter}
-              onQuickFilterChange={(pill) => { setRecordedDateFilter(pill); setRecordedPage(1); }}
-              startDateValue={recordedStartDateFilter}
-              endDateValue={recordedEndDateFilter}
-              onStartDateChange={(val) => { setRecordedStartDateFilter(val); setRecordedPage(1); }}
-              onEndDateChange={(val) => { setRecordedEndDateFilter(val); setRecordedPage(1); }}
-              onExportCSV={exportRecordedClassesToCSV}
-              onExportExcel={exportRecordedClassesToExcel}
-              onExportPDF={exportRecordedClassesToPDF}
-              actionLabel="+ Add Recorded Class"
-              onActionClick={() => {
-                setEditingRecordedClass(null);
-                const targetPl = customPlaylists[0];
-                setSelectedBatchId(targetPl ? `playlist:${targetPl.id}` : '');
-                if (targetPl && targetPl.course_name) {
-                  setRecCourseTitle(targetPl.course_name);
-                }
-                setShowRecordedClassModal(true);
-              }}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+              <FilterBar
+                searchPlaceholder="Search Recorded Class"
+                searchValue={recordedSearchQuery}
+                onSearchChange={(val) => { setRecordedSearchQuery(val); setRecordedPage(1); }}
+                filters={[
+                  {
+                    label: 'Course',
+                    value: recordedCourseFilter,
+                    onChange: (val) => { setRecordedCourseFilter(val); setRecordedPage(1); },
+                    options: Array.from(new Set(recordedClasses.map(c => c.course_title))).filter(Boolean).map(c => ({ value: c, label: c }))
+                  },
+                  {
+                    label: 'Batch',
+                    value: recordedBatchFilter,
+                    onChange: (val) => { setRecordedBatchFilter(val); setRecordedPage(1); },
+                    options: batches.map(b => ({ value: b.id, label: b.name }))
+                  },
+                  {
+                    label: 'Status',
+                    value: recordedVisibilityFilter,
+                    onChange: (val) => { setRecordedVisibilityFilter(val); setRecordedPage(1); },
+                    options: [
+                      { value: 'everyone', label: 'Everyone' },
+                      { value: 'paid', label: 'Paid Only' }
+                    ]
+                  }
+                ]}
+                showDateFilter={true}
+                activeQuickFilter={recordedDateFilter}
+                onQuickFilterChange={(pill) => { setRecordedDateFilter(pill); setRecordedPage(1); }}
+                startDateValue={recordedStartDateFilter}
+                endDateValue={recordedEndDateFilter}
+                onStartDateChange={(val) => { setRecordedStartDateFilter(val); setRecordedPage(1); }}
+                onEndDateChange={(val) => { setRecordedEndDateFilter(val); setRecordedPage(1); }}
+                onExportCSV={exportRecordedClassesToCSV}
+                onExportExcel={exportRecordedClassesToExcel}
+                onExportPDF={exportRecordedClassesToPDF}
+                actionLabel="+ Add Recorded Class"
+                onActionClick={() => {
+                  setEditingRecordedClass(null);
+                  const targetPl = customPlaylists[0];
+                  setSelectedBatchId(targetPl ? `playlist:${targetPl.id}` : '');
+                  if (targetPl && targetPl.course_name) {
+                    setRecCourseTitle(targetPl.course_name);
+                  }
+                  setShowRecordedClassModal(true);
+                }}
+              />
 
-            {/* ─── TWO-LEVEL PLAYLIST CONTAINER SYSTEM ─── */}
-            {!selectedPlaylistBatch ? (
-              /* LEVEL 1: PLAYLIST CONTAINERS DIRECTORY */
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                minHeight: '520px',
-                width: '100%',
-                gap: '24px',
-                background: 'linear-gradient(135deg, rgba(240, 249, 255, 0.65) 0%, rgba(245, 243, 255, 0.75) 45%, rgba(254, 243, 199, 0.35) 80%, rgba(236, 253, 245, 0.65) 100%)',
-                backdropFilter: 'blur(30px)',
-                WebkitBackdropFilter: 'blur(30px)',
-                border: '1px solid rgba(255, 255, 255, 0.9)',
-                borderRadius: 28,
-                padding: '26px 28px',
-                boxShadow: '0 20px 45px -10px rgba(99, 102, 241, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02)',
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
-                  <div>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(8px)', padding: '4px 12px', borderRadius: 999, border: '1px solid rgba(255, 255, 255, 0.95)', marginBottom: 6 }}>
-                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6366F1' }} />
-                      <span style={{ fontSize: 11, fontWeight: 750, color: '#4F46E5', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Curriculum & Recording Studio</span>
-                    </div>
-                    <h4 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 4px', color: '#0F172A', letterSpacing: '-0.3px' }}>
-                      Course Playlists & Recording Containers
-                    </h4>
-                    <p style={{ fontSize: '13px', color: '#64748B', margin: 0, fontWeight: 500 }}>
-                      Automatic batch curriculum playlists and custom curated playlists with audience controls.
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => {
-                        setEditingPlaylist(null);
-                        setPlaylistFormName('');
-                        setPlaylistFormCourse('');
-                        setPlaylistFormDescription('');
-                        setPlaylistFormThumbnail('');
-                        setPlaylistThumbnailType('url');
-                        setPlaylistFormAccess('all');
-                        setPlaylistFormBatchId('');
-                        setShowPlaylistModal(true);
-                      }}
-                      style={{
-                        borderRadius: 999,
-                        padding: '8px 18px',
-                        fontWeight: 750,
-                        fontSize: '13px',
-                        background: 'rgba(255, 255, 255, 0.9)',
-                        backdropFilter: 'blur(8px)',
-                        border: '1px solid rgba(203, 213, 225, 0.85)',
-                        color: '#0F172A',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      <Plus size={15} /> Create Playlist
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => {
-                        setEditingRecordedClass(null);
-                        const targetPl = customPlaylists[0];
-                        setSelectedBatchId(targetPl ? `playlist:${targetPl.id}` : '');
-                        if (targetPl && targetPl.course_name) {
-                          setRecCourseTitle(targetPl.course_name);
-                        }
-                        setShowRecordedClassModal(true);
-                      }}
-                      style={{
-                        borderRadius: 999,
-                        padding: '8px 18px',
-                        fontWeight: 750,
-                        fontSize: '13px',
-                        background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      <Plus size={15} /> Upload Video
-                    </button>
-                  </div>
-                </div>
-
-                {/* PLAYLIST CONTAINERS GRID */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '22px' }}>
-                  
-                  {/* CURATED & CUSTOM PLAYLISTS */}
-                  
-                  {customPlaylists.map((playlist, idx) => {
-                    const plId = String(playlist.id || playlist.uid);
-                    const plRecordings = recordedClasses.filter(r => String(r.playlist_id) === plId || String(r.batch_id) === plId);
-                    const plDurationSec = plRecordings.reduce((acc, r) => acc + parseDurationToSeconds(r.duration), 0);
-                    const isAll = playlist.access_type === 'all' || !playlist.batch_id;
-                    const theme = PLAYLIST_CARD_THEMES[idx % PLAYLIST_CARD_THEMES.length];
-
-                    return (
-                      <div
-                        key={`custom-${plId}`}
-                        style={{
-                          background: theme.bg,
-                          border: `1.5px solid ${theme.border}`,
-                          borderRadius: 24,
-                          overflow: 'hidden',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          boxShadow: theme.shadow,
-                          transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
-                          position: 'relative',
-                          backdropFilter: 'blur(20px)',
-                          WebkitBackdropFilter: 'blur(20px)',
-                        }}
-                        className="clickable-card-hover"
-                      >
-                        {/* Sleek Typography & Track Header - Zero Images, Modern Clean UI */}
-                        <div style={{ padding: '12px 12px 0 12px' }}>
-                          <div style={{
-                            minHeight: 140,
-                            position: 'relative',
-                            borderRadius: 18,
-                            overflow: 'hidden',
-                            background: `linear-gradient(135deg, ${theme.accent}2A 0%, #0F172A 100%)`,
-                            boxShadow: '0 6px 18px rgba(15, 23, 42, 0.12)',
-                            border: `1px solid ${theme.border}`,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            padding: '16px 18px',
-                          }}>
-                            {/* Decorative background subtle glow */}
-                            <div style={{
-                              position: 'absolute',
-                              right: -20,
-                              top: -20,
-                              width: 130,
-                              height: 130,
-                              borderRadius: '50%',
-                              background: theme.accent,
-                              opacity: 0.22,
-                              filter: 'blur(35px)',
-                              pointerEvents: 'none'
-                            }} />
-
-                            {/* Top Row: Track Badge + Access Pill + Action Buttons */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 2 }}>
-                              <span style={{
-                                fontSize: 11,
-                                fontWeight: 750,
-                                background: 'rgba(255, 255, 255, 0.15)',
-                                backdropFilter: 'blur(10px)',
-                                WebkitBackdropFilter: 'blur(10px)',
-                                color: '#FFFFFF',
-                                padding: '4px 12px',
-                                borderRadius: 999,
-                                border: '1px solid rgba(255, 255, 255, 0.2)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 6,
-                              }}>
-                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: theme.accent, boxShadow: `0 0 8px ${theme.accent}` }} />
-                                {playlist.course_name || 'Curriculum Track'}
-                              </span>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{
-                                  fontSize: 11,
-                                  fontWeight: 800,
-                                  background: isAll ? 'rgba(16, 185, 129, 0.25)' : 'rgba(124, 58, 237, 0.25)',
-                                  border: `1px solid ${isAll ? '#10B981' : '#A78BFA'}`,
-                                  color: isAll ? '#6EE7B7' : '#DDD6FE',
-                                  padding: '4px 10px',
-                                  borderRadius: 999,
-                                  backdropFilter: 'blur(6px)',
-                                }}>
-                                  {isAll ? '🌐 All' : `🔒 ${playlist.batch_name || 'Cohort'}`}
-                                </span>
-
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingPlaylist(playlist);
-                                    setPlaylistFormName(playlist.name || '');
-                                    setPlaylistFormCourse(playlist.course_name || '');
-                                    setPlaylistFormDescription(playlist.description || '');
-                                    setPlaylistFormAccess(playlist.access_type || 'all');
-                                    setPlaylistFormBatchId(playlist.batch_id || '');
-                                    setShowPlaylistModal(true);
-                                  }}
-                                  style={{
-                                    width: 28,
-                                    height: 28,
-                                    borderRadius: '50%',
-                                    background: 'rgba(255, 255, 255, 0.18)',
-                                    backdropFilter: 'blur(6px)',
-                                    border: '1px solid rgba(255, 255, 255, 0.25)',
-                                    color: '#FFFFFF',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-                                  }}
-                                  title="Edit Playlist"
-                                >
-                                  <Pencil size={12} />
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeletePlaylist(plId);
-                                  }}
-                                  style={{
-                                    width: 28,
-                                    height: 28,
-                                    borderRadius: '50%',
-                                    background: '#EF4444',
-                                    border: 'none',
-                                    color: '#FFFFFF',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                                  }}
-                                  title="Delete Playlist"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Bottom Row: Modern Tile Icon + Playlist Title */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 2, marginTop: 14 }}>
-                              <div style={{
-                                width: 40,
-                                height: 40,
-                                borderRadius: 12,
-                                background: `linear-gradient(135deg, ${theme.accent} 0%, #1E293B 100%)`,
-                                border: '1px solid rgba(255, 255, 255, 0.25)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0,
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                              }}>
-                                <BookOpen size={19} color="#FFFFFF" />
-                              </div>
-                              <h5 style={{
-                                fontSize: '17px',
-                                fontWeight: '850',
-                                margin: 0,
-                                color: '#FFFFFF',
-                                textShadow: '0 2px 6px rgba(0,0,0,0.7)',
-                                letterSpacing: '-0.3px',
-                                lineHeight: 1.25,
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden'
-                              }}>
-                                {playlist.name}
-                              </h5>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Lower Body with Pastel Glass Styling */}
-                        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-                          <p style={{
-                            fontSize: '12.5px',
-                            color: '#475569',
-                            margin: 0,
-                            lineHeight: 1.45,
-                            minHeight: 36,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden'
-                          }}>
-                            {playlist.description || 'Custom curated lecture playlist and study materials.'}
-                          </p>
-
-                          {/* Calculated Metrics Sub-box (Frosted Glass Widget) */}
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: 10,
-                            background: 'rgba(255, 255, 255, 0.75)',
-                            backdropFilter: 'blur(10px)',
-                            WebkitBackdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(255, 255, 255, 0.9)',
-                            padding: '10px 14px',
-                            borderRadius: 14,
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                          }}>
-                            <div>
-                              <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Videos</div>
-                              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginTop: 1 }}>
-                                {plRecordings.length} Lessons
-                              </div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Duration</div>
-                              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginTop: 1 }}>
-                                {formatSecondsToDisplay(plDurationSec)}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Bottom Actions */}
-                          <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 4 }}>
-                            <button
-                              type="button"
-                              className="btn"
-                              onClick={() => {
-                                setSelectedBatchId(`playlist:${plId}`);
-                                if (playlist.course_name) setRecCourseTitle(playlist.course_name);
-                                setShowRecordedClassModal(true);
-                              }}
-                              style={{
-                                flex: 1,
-                                padding: '9px 12px',
-                                fontSize: '12px',
-                                borderRadius: 999,
-                                fontWeight: 750,
-                                background: 'rgba(255, 255, 255, 0.85)',
-                                border: '1px solid rgba(203, 213, 225, 0.8)',
-                                color: '#1E293B',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 5,
-                                transition: 'all 0.18s ease',
-                              }}
-                            >
-                              <Plus size={13} /> Add Video
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-primary"
-                              onClick={() => setSelectedPlaylistBatch({ ...playlist, isCustom: true })}
-                              style={{
-                                flex: 1.3,
-                                padding: '9px 14px',
-                                fontSize: '12px',
-                                borderRadius: 999,
-                                fontWeight: 750,
-                                background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
-                                color: '#FFFFFF',
-                                border: 'none',
-                                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 6,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              <span>Open Playlist</span>
-                              <ArrowRight size={13} />
-                            </button>
-                          </div>
-                        </div>
+              {/* ─── TWO-LEVEL PLAYLIST CONTAINER SYSTEM ─── */}
+              {!selectedPlaylistBatch ? (
+                /* LEVEL 1: PLAYLIST CONTAINERS DIRECTORY */
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: '520px',
+                  width: '100%',
+                  gap: '24px',
+                  background: 'linear-gradient(135deg, rgba(240, 249, 255, 0.65) 0%, rgba(245, 243, 255, 0.75) 45%, rgba(254, 243, 199, 0.35) 80%, rgba(236, 253, 245, 0.65) 100%)',
+                  backdropFilter: 'blur(30px)',
+                  WebkitBackdropFilter: 'blur(30px)',
+                  border: '1px solid rgba(255, 255, 255, 0.9)',
+                  borderRadius: 28,
+                  padding: '26px 28px',
+                  boxShadow: '0 20px 45px -10px rgba(99, 102, 241, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                    <div>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(8px)', padding: '4px 12px', borderRadius: 999, border: '1px solid rgba(255, 255, 255, 0.95)', marginBottom: 6 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6366F1' }} />
+                        <span style={{ fontSize: 11, fontWeight: 750, color: '#4F46E5', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Curriculum & Recording Studio</span>
                       </div>
-                    );
-                  })}
-
-                  {customPlaylists.length === 0 && (
-                    <div style={{
-                      gridColumn: '1 / -1',
-                      padding: '60px 24px',
-                      textAlign: 'center',
-                      background: 'rgba(255, 255, 255, 0.85)',
-                      borderRadius: 24,
-                      border: '1.5px dashed rgba(203, 213, 225, 0.9)',
-                      backdropFilter: 'blur(12px)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <div style={{
-                        width: 68,
-                        height: 68,
-                        borderRadius: '50%',
-                        background: 'rgba(99, 102, 241, 0.12)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: 16,
-                        color: '#4F46E5',
-                      }}>
-                        <PlayCircle size={36} />
-                      </div>
-                      <h4 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 6px', color: '#0F172A' }}>No Playlists Created Yet</h4>
-                      <p style={{ fontSize: 13, color: '#64748B', maxWidth: 440, margin: '0 0 20px', lineHeight: 1.5 }}>
-                        Create dedicated playlists for open access (all students) or restrict them to specific batch cohorts. Lessons are organized cleanly within playlists.
+                      <h4 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 4px', color: '#0F172A', letterSpacing: '-0.3px' }}>
+                        Course Playlists & Recording Containers
+                      </h4>
+                      <p style={{ fontSize: '13px', color: '#64748B', margin: 0, fontWeight: 500 }}>
+                        Automatic batch curriculum playlists and custom curated playlists with audience controls.
                       </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                       <button
                         type="button"
-                        className="btn btn-primary"
+                        className="btn"
                         onClick={() => {
                           setEditingPlaylist(null);
                           setPlaylistFormName('');
@@ -6911,258 +6529,640 @@ const AdminDashboard = () => {
                         }}
                         style={{
                           borderRadius: 999,
-                          padding: '10px 24px',
+                          padding: '8px 18px',
                           fontWeight: 750,
                           fontSize: '13px',
+                          background: 'rgba(255, 255, 255, 0.9)',
+                          backdropFilter: 'blur(8px)',
+                          border: '1px solid rgba(203, 213, 225, 0.85)',
+                          color: '#0F172A',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
                         }}
                       >
-                        <Plus size={15} /> Create First Playlist
+                        <Plus size={15} /> Create Playlist
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          setEditingRecordedClass(null);
+                          const targetPl = customPlaylists[0];
+                          setSelectedBatchId(targetPl ? `playlist:${targetPl.id}` : '');
+                          if (targetPl && targetPl.course_name) {
+                            setRecCourseTitle(targetPl.course_name);
+                          }
+                          setShowRecordedClassModal(true);
+                        }}
+                        style={{
+                          borderRadius: 999,
+                          padding: '8px 18px',
+                          fontWeight: 750,
+                          fontSize: '13px',
+                          background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <Plus size={15} /> Upload Video
                       </button>
                     </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              /* LEVEL 2: DRILL-DOWN VIDEOS WITH TOPICS INSIDE SELECTED PLAYLIST */
-              <div className="dashboard-card-section" style={{ display: 'flex', flexDirection: 'column', minHeight: '500px', width: '100%', gap: '16px' }}>
-                {/* Back button & Playlist Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, borderBottom: '1.5px solid #F1F5F9', paddingBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedPlaylistBatch(null)}
-                      style={{
-                        background: '#F1F5F9',
-                        border: 'none',
-                        borderRadius: 999,
-                        padding: '8px 16px',
-                        cursor: 'pointer',
+                  </div>
+
+                  {/* PLAYLIST CONTAINERS GRID */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '22px' }}>
+
+                    {/* CURATED & CUSTOM PLAYLISTS */}
+
+                    {customPlaylists.map((playlist, idx) => {
+                      const plId = String(playlist.id || playlist.uid);
+                      const plRecordings = recordedClasses.filter(r => String(r.playlist_id) === plId || String(r.batch_id) === plId);
+                      const plDurationSec = plRecordings.reduce((acc, r) => acc + parseDurationToSeconds(r.duration), 0);
+                      const isAll = playlist.access_type === 'all' || !playlist.batch_id;
+                      const theme = PLAYLIST_CARD_THEMES[idx % PLAYLIST_CARD_THEMES.length];
+
+                      return (
+                        <div
+                          key={`custom-${plId}`}
+                          style={{
+                            background: theme.bg,
+                            border: `1.5px solid ${theme.border}`,
+                            borderRadius: 24,
+                            overflow: 'hidden',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            boxShadow: theme.shadow,
+                            transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+                            position: 'relative',
+                            backdropFilter: 'blur(20px)',
+                            WebkitBackdropFilter: 'blur(20px)',
+                          }}
+                          className="clickable-card-hover"
+                        >
+                          {/* Sleek Typography & Track Header - Zero Images, Modern Clean UI */}
+                          <div style={{ padding: '12px 12px 0 12px' }}>
+                            <div style={{
+                              minHeight: 140,
+                              position: 'relative',
+                              borderRadius: 18,
+                              overflow: 'hidden',
+                              background: `linear-gradient(135deg, ${theme.accent}2A 0%, #0F172A 100%)`,
+                              boxShadow: '0 6px 18px rgba(15, 23, 42, 0.12)',
+                              border: `1px solid ${theme.border}`,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              padding: '16px 18px',
+                            }}>
+                              {/* Decorative background subtle glow */}
+                              <div style={{
+                                position: 'absolute',
+                                right: -20,
+                                top: -20,
+                                width: 130,
+                                height: 130,
+                                borderRadius: '50%',
+                                background: theme.accent,
+                                opacity: 0.22,
+                                filter: 'blur(35px)',
+                                pointerEvents: 'none'
+                              }} />
+
+                              {/* Top Row: Track Badge + Access Pill + Action Buttons */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 2 }}>
+                                <span style={{
+                                  fontSize: 11,
+                                  fontWeight: 750,
+                                  background: 'rgba(255, 255, 255, 0.15)',
+                                  backdropFilter: 'blur(10px)',
+                                  WebkitBackdropFilter: 'blur(10px)',
+                                  color: '#FFFFFF',
+                                  padding: '4px 12px',
+                                  borderRadius: 999,
+                                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                }}>
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: theme.accent, boxShadow: `0 0 8px ${theme.accent}` }} />
+                                  {playlist.course_name || 'Curriculum Track'}
+                                </span>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{
+                                    fontSize: 11,
+                                    fontWeight: 800,
+                                    background: isAll ? 'rgba(16, 185, 129, 0.25)' : 'rgba(124, 58, 237, 0.25)',
+                                    border: `1px solid ${isAll ? '#10B981' : '#A78BFA'}`,
+                                    color: isAll ? '#6EE7B7' : '#DDD6FE',
+                                    padding: '4px 10px',
+                                    borderRadius: 999,
+                                    backdropFilter: 'blur(6px)',
+                                  }}>
+                                    {isAll ? '🌐 All' : `🔒 ${playlist.batch_name || 'Cohort'}`}
+                                  </span>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingPlaylist(playlist);
+                                      setPlaylistFormName(playlist.name || '');
+                                      setPlaylistFormCourse(playlist.course_name || '');
+                                      setPlaylistFormDescription(playlist.description || '');
+                                      setPlaylistFormAccess(playlist.access_type || 'all');
+                                      setPlaylistFormBatchId(playlist.batch_id || '');
+                                      setShowPlaylistModal(true);
+                                    }}
+                                    style={{
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: '50%',
+                                      background: 'rgba(255, 255, 255, 0.18)',
+                                      backdropFilter: 'blur(6px)',
+                                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                                      color: '#FFFFFF',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                                    }}
+                                    title="Edit Playlist"
+                                  >
+                                    <Pencil size={12} />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePlaylist(plId);
+                                    }}
+                                    style={{
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: '50%',
+                                      background: '#EF4444',
+                                      border: 'none',
+                                      color: '#FFFFFF',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                                    }}
+                                    title="Delete Playlist"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Bottom Row: Modern Tile Icon + Playlist Title */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 2, marginTop: 14 }}>
+                                <div style={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: 12,
+                                  background: `linear-gradient(135deg, ${theme.accent} 0%, #1E293B 100%)`,
+                                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                                }}>
+                                  <BookOpen size={19} color="#FFFFFF" />
+                                </div>
+                                <h5 style={{
+                                  fontSize: '17px',
+                                  fontWeight: '850',
+                                  margin: 0,
+                                  color: '#FFFFFF',
+                                  textShadow: '0 2px 6px rgba(0,0,0,0.7)',
+                                  letterSpacing: '-0.3px',
+                                  lineHeight: 1.25,
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden'
+                                }}>
+                                  {playlist.name}
+                                </h5>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Lower Body with Pastel Glass Styling */}
+                          <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+                            <p style={{
+                              fontSize: '12.5px',
+                              color: '#475569',
+                              margin: 0,
+                              lineHeight: 1.45,
+                              minHeight: 36,
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden'
+                            }}>
+                              {playlist.description || 'Custom curated lecture playlist and study materials.'}
+                            </p>
+
+                            {/* Calculated Metrics Sub-box (Frosted Glass Widget) */}
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: 10,
+                              background: 'rgba(255, 255, 255, 0.75)',
+                              backdropFilter: 'blur(10px)',
+                              WebkitBackdropFilter: 'blur(10px)',
+                              border: '1px solid rgba(255, 255, 255, 0.9)',
+                              padding: '10px 14px',
+                              borderRadius: 14,
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                            }}>
+                              <div>
+                                <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Videos</div>
+                                <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginTop: 1 }}>
+                                  {plRecordings.length} Lessons
+                                </div>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Duration</div>
+                                <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginTop: 1 }}>
+                                  {formatSecondsToDisplay(plDurationSec)}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Bottom Actions */}
+                            <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 4 }}>
+                              <button
+                                type="button"
+                                className="btn"
+                                onClick={() => {
+                                  setSelectedBatchId(`playlist:${plId}`);
+                                  if (playlist.course_name) setRecCourseTitle(playlist.course_name);
+                                  setShowRecordedClassModal(true);
+                                }}
+                                style={{
+                                  flex: 1,
+                                  padding: '9px 12px',
+                                  fontSize: '12px',
+                                  borderRadius: 999,
+                                  fontWeight: 750,
+                                  background: 'rgba(255, 255, 255, 0.85)',
+                                  border: '1px solid rgba(203, 213, 225, 0.8)',
+                                  color: '#1E293B',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 5,
+                                  transition: 'all 0.18s ease',
+                                }}
+                              >
+                                <Plus size={13} /> Add Video
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => setSelectedPlaylistBatch({ ...playlist, isCustom: true })}
+                                style={{
+                                  flex: 1.3,
+                                  padding: '9px 14px',
+                                  fontSize: '12px',
+                                  borderRadius: 999,
+                                  fontWeight: 750,
+                                  background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 6,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <span>Open Playlist</span>
+                                <ArrowRight size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {customPlaylists.length === 0 && (
+                      <div style={{
+                        gridColumn: '1 / -1',
+                        padding: '60px 24px',
+                        textAlign: 'center',
+                        background: 'rgba(255, 255, 255, 0.85)',
+                        borderRadius: 24,
+                        border: '1.5px dashed rgba(203, 213, 225, 0.9)',
+                        backdropFilter: 'blur(12px)',
                         display: 'flex',
+                        flexDirection: 'column',
                         alignItems: 'center',
-                        gap: 6,
-                        fontSize: '13px',
-                        fontWeight: 700,
-                        color: '#334155',
-                      }}
-                    >
-                      <ArrowLeft size={15} />
-                      Back to All Playlists
-                    </button>
-                    <div>
-                      <h4 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 2px', color: '#1E293B' }}>
-                        {selectedPlaylistBatch.name}
-                      </h4>
-                      <span style={{ fontSize: '12.5px', color: '#64748B' }}>
-                        {selectedPlaylistBatch.course_name || 'Course Curriculum'} • {selectedPlaylistBatch.isCustom ? 'Custom Playlist' : 'Batch Cohort'}
-                      </span>
+                        justifyContent: 'center',
+                      }}>
+                        <div style={{
+                          width: 68,
+                          height: 68,
+                          borderRadius: '50%',
+                          background: 'rgba(99, 102, 241, 0.12)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginBottom: 16,
+                          color: '#4F46E5',
+                        }}>
+                          <PlayCircle size={36} />
+                        </div>
+                        <h4 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 6px', color: '#0F172A' }}>No Playlists Created Yet</h4>
+                        <p style={{ fontSize: 13, color: '#64748B', maxWidth: 440, margin: '0 0 20px', lineHeight: 1.5 }}>
+                          Create dedicated playlists for open access (all students) or restrict them to specific batch cohorts. Lessons are organized cleanly within playlists.
+                        </p>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => {
+                            setEditingPlaylist(null);
+                            setPlaylistFormName('');
+                            setPlaylistFormCourse('');
+                            setPlaylistFormDescription('');
+                            setPlaylistFormThumbnail('');
+                            setPlaylistThumbnailType('url');
+                            setPlaylistFormAccess('all');
+                            setPlaylistFormBatchId('');
+                            setShowPlaylistModal(true);
+                          }}
+                          style={{
+                            borderRadius: 999,
+                            padding: '10px 24px',
+                            fontWeight: 750,
+                            fontSize: '13px',
+                          }}
+                        >
+                          <Plus size={15} /> Create First Playlist
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* LEVEL 2: DRILL-DOWN VIDEOS WITH TOPICS INSIDE SELECTED PLAYLIST */
+                <div className="dashboard-card-section" style={{ display: 'flex', flexDirection: 'column', minHeight: '500px', width: '100%', gap: '16px' }}>
+                  {/* Back button & Playlist Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, borderBottom: '1.5px solid #F1F5F9', paddingBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPlaylistBatch(null)}
+                        style={{
+                          background: '#F1F5F9',
+                          border: 'none',
+                          borderRadius: 999,
+                          padding: '8px 16px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          color: '#334155',
+                        }}
+                      >
+                        <ArrowLeft size={15} />
+                        Back to All Playlists
+                      </button>
+                      <div>
+                        <h4 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 2px', color: '#1E293B' }}>
+                          {selectedPlaylistBatch.name}
+                        </h4>
+                        <span style={{ fontSize: '12.5px', color: '#64748B' }}>
+                          {selectedPlaylistBatch.course_name || 'Course Curriculum'} • {selectedPlaylistBatch.isCustom ? 'Custom Playlist' : 'Batch Cohort'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingPlaylist(selectedPlaylistBatch);
+                          setPlaylistFormName(selectedPlaylistBatch.name || '');
+                          setPlaylistFormCourse(selectedPlaylistBatch.course_name || '');
+                          setPlaylistFormDescription(selectedPlaylistBatch.description || '');
+                          setPlaylistFormThumbnail(selectedPlaylistBatch.thumbnail || '');
+                          setPlaylistThumbnailType(selectedPlaylistBatch.thumbnail ? 'url' : 'url');
+                          setPlaylistFormAccess(selectedPlaylistBatch.access_type || 'all');
+                          setPlaylistFormBatchId(selectedPlaylistBatch.batch_id || '');
+                          setShowPlaylistModal(true);
+                        }}
+                        className="btn btn-outline"
+                        style={{ borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: '13px' }}
+                      >
+                        <Pencil size={14} /> Edit Playlist
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePlaylist(selectedPlaylistBatch.id || selectedPlaylistBatch.uid)}
+                        style={{
+                          background: '#FEE2E2',
+                          color: '#DC2626',
+                          border: '1px solid #FECACA',
+                          borderRadius: 999,
+                          padding: '8px 16px',
+                          fontWeight: 700,
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <Trash2 size={14} /> Delete Playlist
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          setSelectedBatchId(`playlist:${selectedPlaylistBatch.id}`);
+                          if (selectedPlaylistBatch.course_name) setRecCourseTitle(selectedPlaylistBatch.course_name);
+                          setShowRecordedClassModal(true);
+                        }}
+                        style={{ borderRadius: 999, padding: '8px 18px', fontWeight: 700 }}
+                      >
+                        <Plus size={15} /> Add Lesson to this Playlist
+                      </button>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingPlaylist(selectedPlaylistBatch);
-                        setPlaylistFormName(selectedPlaylistBatch.name || '');
-                        setPlaylistFormCourse(selectedPlaylistBatch.course_name || '');
-                        setPlaylistFormDescription(selectedPlaylistBatch.description || '');
-                        setPlaylistFormThumbnail(selectedPlaylistBatch.thumbnail || '');
-                        setPlaylistThumbnailType(selectedPlaylistBatch.thumbnail ? 'url' : 'url');
-                        setPlaylistFormAccess(selectedPlaylistBatch.access_type || 'all');
-                        setPlaylistFormBatchId(selectedPlaylistBatch.batch_id || '');
-                        setShowPlaylistModal(true);
-                      }}
-                      className="btn btn-outline"
-                      style={{ borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: '13px' }}
-                    >
-                      <Pencil size={14} /> Edit Playlist
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePlaylist(selectedPlaylistBatch.id || selectedPlaylistBatch.uid)}
-                      style={{
-                        background: '#FEE2E2',
-                        color: '#DC2626',
-                        border: '1px solid #FECACA',
-                        borderRadius: 999,
-                        padding: '8px 16px',
-                        fontWeight: 700,
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      <Trash2 size={14} /> Delete Playlist
-                    </button>
+                  {/* Filter and List for this Playlist */}
+                  {(() => {
+                    const targetId = String(selectedPlaylistBatch.id || selectedPlaylistBatch.uid);
+                    const isCustom = selectedPlaylistBatch.isCustom;
+                    const playlistLessons = recordedClasses.filter(r => {
+                      if (isCustom) {
+                        return String(r.playlist_id) === targetId || String(r.batch_id) === targetId;
+                      }
+                      return String(r.batch_id || r.batchId) === targetId || String(r.playlist_id) === targetId;
+                    });
 
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => {
-                        setSelectedBatchId(`playlist:${selectedPlaylistBatch.id}`);
-                        if (selectedPlaylistBatch.course_name) setRecCourseTitle(selectedPlaylistBatch.course_name);
-                        setShowRecordedClassModal(true);
-                      }}
-                      style={{ borderRadius: 999, padding: '8px 18px', fontWeight: 700 }}
-                    >
-                      <Plus size={15} /> Add Lesson to this Playlist
-                    </button>
-                  </div>
-                </div>
+                    const playlistTotalDuration = playlistLessons.reduce((acc, r) => acc + parseDurationToSeconds(r.duration), 0);
 
-                {/* Filter and List for this Playlist */}
-                {(() => {
-                  const targetId = String(selectedPlaylistBatch.id || selectedPlaylistBatch.uid);
-                  const isCustom = selectedPlaylistBatch.isCustom;
-                  const playlistLessons = recordedClasses.filter(r => {
-                    if (isCustom) {
-                      return String(r.playlist_id) === targetId || String(r.batch_id) === targetId;
-                    }
-                    return String(r.batch_id || r.batchId) === targetId || String(r.playlist_id) === targetId;
-                  });
-
-                  const playlistTotalDuration = playlistLessons.reduce((acc, r) => acc + parseDurationToSeconds(r.duration), 0);
-
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                      {/* Metric Banner for the Playlist */}
-                      <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', background: '#F8FAFC', padding: '12px 18px', borderRadius: 14, fontSize: '13px' }}>
-                        <span style={{ fontWeight: 700, color: '#1E293B' }}>
-                          Playlist Overview:
-                        </span>
-                        <span style={{ background: '#FFFFFF', padding: '4px 10px', borderRadius: 8, border: '1px solid #E2E8F0', fontWeight: 650, color: '#334155' }}>
-                          📚 {playlistLessons.length} Lessons Total
-                        </span>
-                        <span style={{ background: '#FFFFFF', padding: '4px 10px', borderRadius: 8, border: '1px solid #E2E8F0', fontWeight: 650, color: '#334155' }}>
-                          ⏱ {formatSecondsToDisplay(playlistTotalDuration)} Total Duration
-                        </span>
-                        {playlistLessons.length > 0 && (
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            style={{
-                              marginLeft: 'auto',
-                              borderRadius: 999,
-                              padding: '6px 16px',
-                              fontSize: 12.5,
-                              fontWeight: 750,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 6,
-                            }}
-                            onClick={() => setPreviewRecordedClass(playlistLessons[0])}
-                          >
-                            <PlayCircle size={14} />
-                            <span>Open Course Player</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {playlistLessons.length === 0 ? (
-                        <div style={{ padding: '60px 20px', textAlign: 'center', background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0' }}>
-                          <PlayCircle size={44} color="#94A3B8" style={{ margin: '0 auto 12px', opacity: 0.6 }} />
-                          <h5 style={{ fontSize: '16px', fontWeight: '800', color: '#1E293B', margin: '0 0 6px' }}>No Lessons in this Playlist Yet</h5>
-                          <p style={{ fontSize: '13px', color: '#64748B', maxWidth: 360, margin: '0 auto 16px' }}>
-                            Upload Google Drive video links to populate this playlist with topics and recordings.
-                          </p>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={() => {
-                              const targetVal = selectedPlaylistBatch.isCustom ? `playlist:${selectedPlaylistBatch.id}` : `batch:${selectedPlaylistBatch.id}`;
-                              setSelectedBatchId(targetVal);
-                              if (selectedPlaylistBatch.course_name) setRecCourseTitle(selectedPlaylistBatch.course_name);
-                              setShowRecordedClassModal(true);
-                            }}
-                            style={{ borderRadius: 999 }}
-                          >
-                            <Plus size={14} /> Upload First Lesson
-                          </button>
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        {/* Metric Banner for the Playlist */}
+                        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', background: '#F8FAFC', padding: '12px 18px', borderRadius: 14, fontSize: '13px' }}>
+                          <span style={{ fontWeight: 700, color: '#1E293B' }}>
+                            Playlist Overview:
+                          </span>
+                          <span style={{ background: '#FFFFFF', padding: '4px 10px', borderRadius: 8, border: '1px solid #E2E8F0', fontWeight: 650, color: '#334155' }}>
+                            📚 {playlistLessons.length} Lessons Total
+                          </span>
+                          <span style={{ background: '#FFFFFF', padding: '4px 10px', borderRadius: 8, border: '1px solid #E2E8F0', fontWeight: 650, color: '#334155' }}>
+                            ⏱ {formatSecondsToDisplay(playlistTotalDuration)} Total Duration
+                          </span>
+                          {playlistLessons.length > 0 && (
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              style={{
+                                marginLeft: 'auto',
+                                borderRadius: 999,
+                                padding: '6px 16px',
+                                fontSize: 12.5,
+                                fontWeight: 750,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 6,
+                              }}
+                              onClick={() => setPreviewRecordedClass(playlistLessons[0])}
+                            >
+                              <PlayCircle size={14} />
+                              <span>Open Course Player</span>
+                            </button>
+                          )}
                         </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          {playlistLessons.map((item, idx) => (
-                            <div key={item.id || idx} style={{ background: '#FFFFFF', border: '1.5px solid #F1F5F9', borderRadius: 14, padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                              <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-                                {/* Sort # badge */}
-                                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--primary-light)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, flexShrink: 0 }}>
-                                  {item.sort_order || idx + 1}
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
-                                    <div>
-                                      <h5 style={{ fontWeight: '800', fontSize: '15px', margin: '0 0 4px', color: '#1E293B' }}>{item.title}</h5>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: '12px', color: '#64748B' }}>
-                                        <span style={{ fontWeight: 700, color: 'var(--primary-color)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: 6 }}>
-                                          Topic: {item.module || 'Core Curriculum'}
-                                        </span>
-                                        <span>·</span>
-                                        <span>⏱ Duration: <strong style={{ color: '#334155' }}>{item.duration || '1h 30m'}</strong></span>
-                                        <span>·</span>
-                                        <span>{item.course_title || selectedPlaylistBatch.course_name}</span>
+
+                        {playlistLessons.length === 0 ? (
+                          <div style={{ padding: '60px 20px', textAlign: 'center', background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0' }}>
+                            <PlayCircle size={44} color="#94A3B8" style={{ margin: '0 auto 12px', opacity: 0.6 }} />
+                            <h5 style={{ fontSize: '16px', fontWeight: '800', color: '#1E293B', margin: '0 0 6px' }}>No Lessons in this Playlist Yet</h5>
+                            <p style={{ fontSize: '13px', color: '#64748B', maxWidth: 360, margin: '0 auto 16px' }}>
+                              Upload Google Drive video links to populate this playlist with topics and recordings.
+                            </p>
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              onClick={() => {
+                                const targetVal = selectedPlaylistBatch.isCustom ? `playlist:${selectedPlaylistBatch.id}` : `batch:${selectedPlaylistBatch.id}`;
+                                setSelectedBatchId(targetVal);
+                                if (selectedPlaylistBatch.course_name) setRecCourseTitle(selectedPlaylistBatch.course_name);
+                                setShowRecordedClassModal(true);
+                              }}
+                              style={{ borderRadius: 999 }}
+                            >
+                              <Plus size={14} /> Upload First Lesson
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {playlistLessons.map((item, idx) => (
+                              <div key={item.id || idx} style={{ background: '#FFFFFF', border: '1.5px solid #F1F5F9', borderRadius: 14, padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                                  {/* Sort # badge */}
+                                  <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--primary-light)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, flexShrink: 0 }}>
+                                    {item.sort_order || idx + 1}
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                                      <div>
+                                        <h5 style={{ fontWeight: '800', fontSize: '15px', margin: '0 0 4px', color: '#1E293B' }}>{item.title}</h5>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: '12px', color: '#64748B' }}>
+                                          <span style={{ fontWeight: 700, color: 'var(--primary-color)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: 6 }}>
+                                            Topic: {item.module || 'Core Curriculum'}
+                                          </span>
+                                          <span>·</span>
+                                          <span>⏱ Duration: <strong style={{ color: '#334155' }}>{item.duration || '1h 30m'}</strong></span>
+                                          <span>·</span>
+                                          <span>{item.course_title || selectedPlaylistBatch.course_name}</span>
+                                        </div>
                                       </div>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                                      <button 
-                                        type="button"
-                                        className="btn btn-outline" 
-                                        style={{ padding: '5px 14px', fontSize: 12, height: '32px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', color: 'var(--primary-color)', borderColor: 'var(--primary-color)', backgroundColor: 'var(--primary-light)', gap: 5 }}
-                                        onClick={() => setPreviewRecordedClass(item)}
-                                        title="Preview Video in Portal"
-                                      >
-                                        <PlayCircle size={14} />
-                                        Watch
-                                      </button>
-                                      <button 
-                                        type="button"
-                                        className="btn btn-outline" 
-                                        style={{ padding: '5px 14px', fontSize: 12, height: '32px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: '600', color: '#1E293B', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' }}
-                                        onClick={() => {
-                                          setEditingRecordedClass(item);
-                                          setRecTitle(item.title || '');
-                                          setRecModule(item.module || '');
-                                          setRecCourseTitle(item.course_title || '');
-                                          setRecVideoUrl(item.video_url || '');
-                                          setRecThumbnailUrl(item.thumbnail || '');
-                                          setRecLessonDescription(item.description || '');
-                                          setRecNotesUrl(item.notes_url || '');
-                                          setRecAssignment(item.assignment || '');
-                                          setRecVisibility(item.visibility || 'everyone');
-                                          setRecSortOrder(item.sort_order?.toString() || '');
-                                          setSelectedBatchId(item.playlist_id ? `playlist:${item.playlist_id}` : (item.batch_id ? `batch:${item.batch_id}` : ''));
-                                          setRecDuration(item.duration || '1h 30m');
-                                          setVideoSourceType(item.video_source_type || 'link');
-                                          setRecStudyMaterials(item.study_materials || []);
-                                          setShowRecordedClassModal(true);
-                                        }}
-                                      >
-                                        Edit
-                                      </button>
-                                      <button 
-                                        type="button" 
-                                        className="btn btn-danger" 
-                                        style={{ width: '32px', height: '32px', padding: 0, borderRadius: '50%', backgroundColor: '#EF4444', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 'none' }} 
-                                        onClick={() => deleteRecordedClassHandler(item.id || item.uid || item._id)}
-                                        title="Delete Recording"
-                                      >
-                                        <Trash2 size={14} />
-                                      </button>
+                                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                                        <button
+                                          type="button"
+                                          className="btn btn-outline"
+                                          style={{ padding: '5px 14px', fontSize: 12, height: '32px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', color: 'var(--primary-color)', borderColor: 'var(--primary-color)', backgroundColor: 'var(--primary-light)', gap: 5 }}
+                                          onClick={() => setPreviewRecordedClass(item)}
+                                          title="Preview Video in Portal"
+                                        >
+                                          <PlayCircle size={14} />
+                                          Watch
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="btn btn-outline"
+                                          style={{ padding: '5px 14px', fontSize: 12, height: '32px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: '600', color: '#1E293B', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' }}
+                                          onClick={() => {
+                                            setEditingRecordedClass(item);
+                                            setRecTitle(item.title || '');
+                                            setRecModule(item.module || '');
+                                            setRecCourseTitle(item.course_title || '');
+                                            setRecVideoUrl(item.video_url || '');
+                                            setRecThumbnailUrl(item.thumbnail || '');
+                                            setRecLessonDescription(item.description || '');
+                                            setRecNotesUrl(item.notes_url || '');
+                                            setRecAssignment(item.assignment || '');
+                                            setRecVisibility(item.visibility || 'everyone');
+                                            setRecSortOrder(item.sort_order?.toString() || '');
+                                            setSelectedBatchId(item.playlist_id ? `playlist:${item.playlist_id}` : (item.batch_id ? `batch:${item.batch_id}` : ''));
+                                            setRecDuration(item.duration || '1h 30m');
+                                            setVideoSourceType(item.video_source_type || 'link');
+                                            setRecStudyMaterials(item.study_materials || []);
+                                            setShowRecordedClassModal(true);
+                                          }}
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="btn btn-danger"
+                                          style={{ width: '32px', height: '32px', padding: 0, borderRadius: '50%', backgroundColor: '#EF4444', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}
+                                          onClick={() => deleteRecordedClassHandler(item.id || item.uid || item._id)}
+                                          title="Delete Recording"
+                                        >
+                                          <Trash2 size={14} />
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-          </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
           )
         )}
         {activeTab === 'announcements' && (
@@ -7214,7 +7214,7 @@ const AdminDashboard = () => {
               <div className="section-header-premium" style={{ marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <h4 style={{ fontSize: '15px', fontWeight: '700', margin: 0 }}>Broadcast Logs</h4>
               </div>
-              
+
               {filteredAnnouncements.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexGrow: 1, padding: '40px 20px', textAlign: 'center' }}>
                   <div style={{ width: '80px', height: '80px', background: 'var(--primary-light)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px', color: 'var(--primary-color)' }}>
@@ -7554,8 +7554,8 @@ const AdminDashboard = () => {
                           <td>{student.feesPaymentDate || 'N/A'}</td>
                           <td>
                             <div style={{ display: 'flex', gap: '6px' }}>
-                              <button 
-                                className={`btn ${student.feesStatus === 'Paid' ? 'btn-outline' : 'btn-primary'}`} 
+                              <button
+                                className={`btn ${student.feesStatus === 'Paid' ? 'btn-outline' : 'btn-primary'}`}
                                 style={{ padding: '6px 10px', fontSize: '11.5px' }}
                                 onClick={() => toggleFees(student.id)}
                               >
@@ -7573,24 +7573,24 @@ const AdminDashboard = () => {
                 </table>
               </div>
 
-            {/* Pagination */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', borderTop: '1px solid var(--border-light)', paddingTop: '15px' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                Viewing page <strong>{feesPage}</strong> of {totalPages}
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button type="button" className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '12px', height: '32px' }} disabled={feesPage === 1} onClick={() => setFeesPage(prev => Math.max(prev - 1, 1))}>
-                  Prev
-                </button>
-                <button type="button" className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '12px', height: '32px' }} disabled={feesPage === totalPages} onClick={() => setFeesPage(prev => Math.min(prev + 1, totalPages))}>
-                  Next
-                </button>
+              {/* Pagination */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', borderTop: '1px solid var(--border-light)', paddingTop: '15px' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  Viewing page <strong>{feesPage}</strong> of {totalPages}
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button type="button" className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '12px', height: '32px' }} disabled={feesPage === 1} onClick={() => setFeesPage(prev => Math.max(prev - 1, 1))}>
+                    Prev
+                  </button>
+                  <button type="button" className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '12px', height: '32px' }} disabled={feesPage === totalPages} onClick={() => setFeesPage(prev => Math.min(prev + 1, totalPages))}>
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>
 
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
         {activeTab === 'activity-score' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
@@ -7643,7 +7643,7 @@ const AdminDashboard = () => {
               <div className="section-header-premium" style={{ marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <h4 style={{ fontSize: '15px', fontWeight: '700', margin: 0 }}>Activity Logs History</h4>
               </div>
-              
+
               {filteredActivityLogs.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexGrow: 1, padding: '40px 20px', textAlign: 'center' }}>
                   <div style={{ width: '80px', height: '80px', background: 'var(--primary-light)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px', color: 'var(--primary-color)' }}>
@@ -7866,10 +7866,10 @@ const AdminDashboard = () => {
               </div>
             ) : (
               <div className="dashboard-main-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 24, alignItems: 'start' }}>
-                
+
                 {/* Left Column: Account details & Portal customization */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                  
+
                   {/* CARD 1: ACCOUNT MODULE */}
                   <div className="clickable-card-hover" style={{
                     background: '#FFF',
@@ -7925,7 +7925,7 @@ const AdminDashboard = () => {
                             boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
                             transition: 'background 0.2s'
                           }}
-                          className="photo-upload-badge"
+                            className="photo-upload-badge"
                           >
                             <Camera size={12} />
                             <input type="file" accept="image/*" onChange={handleAdminImageUpload} style={{ display: 'none' }} />
@@ -7941,7 +7941,7 @@ const AdminDashboard = () => {
 
                       {/* Editable Fields */}
                       <div style={{ display: 'flex', gap: 18, marginBottom: 24, flexDirection: 'column' }}>
-                        
+
                         {/* Full Name */}
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label className="form-label">Full Name</label>
@@ -7991,7 +7991,7 @@ const AdminDashboard = () => {
 
                 {/* Right Column: Password & Security */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                  
+
                   {/* CARD 3: PASSWORD & SECURITY MODULE */}
                   <div className="clickable-card-hover" style={{
                     background: '#FFF',
@@ -8385,8 +8385,8 @@ const AdminDashboard = () => {
               <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 Selected: <strong style={{ color: selectedStudentIds.length > (assigningBatch.max_students || 30) ? '#EF4444' : 'var(--primary-color)' }}>{selectedStudentIds.length}</strong> / {assigningBatch.max_students || 30} max capacity
               </span>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => {
                   if (selectedStudentIds.length === allStudentsForAssign.length) {
                     setSelectedStudentIds([]);
@@ -8428,7 +8428,7 @@ const AdminDashboard = () => {
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      onChange={() => {}}
+                      onChange={() => { }}
                       style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--primary-color)' }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -8462,7 +8462,7 @@ const AdminDashboard = () => {
             </div>
             <div className="modal-body">
               <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                Student: <strong>{attendanceStudent.name}</strong> | 
+                Student: <strong>{attendanceStudent.name}</strong> |
                 Roll Number: <strong>{attendanceStudent.rollNumber}</strong> | Attendance Rate: <strong>{attendanceStudent.attendance?.percentage}%</strong>
               </p>
               <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
@@ -9140,7 +9140,7 @@ const AdminDashboard = () => {
                   <strong style={{ fontSize: '14px', color: 'var(--text-primary)', fontFamily: 'monospace' }}>{createdCredentials.password}</strong>
                 </div>
               </div>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <button className="btn btn-outline" style={{ height: '40px', justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
                   navigator.clipboard.writeText(`Email: ${createdCredentials.email}\nStudent ID: ${createdCredentials.username}\nTemporary Password: ${createdCredentials.password}`);
@@ -9192,7 +9192,7 @@ const AdminDashboard = () => {
                   <strong style={{ fontSize: '14px', color: 'var(--text-primary)', fontFamily: 'monospace' }}>{createdTrainerCredentials.password}</strong>
                 </div>
               </div>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <button className="btn btn-outline" style={{ height: '40px', justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
                   navigator.clipboard.writeText(`Email: ${createdTrainerCredentials.email}\nTrainer ID: ${createdTrainerCredentials.trainerId}\nTemporary Password: ${createdTrainerCredentials.password}`);
@@ -9267,7 +9267,7 @@ const AdminDashboard = () => {
                   </div>
                   <h4 style={{ fontSize: '16px', fontWeight: '800', margin: '0 0 4px', color: 'var(--text-primary)' }}>{selectedStudentDetails.name}</h4>
                   <code style={{ fontSize: '11.5px', color: 'var(--text-secondary)', display: 'block', marginBottom: '14px' }}>{selectedStudentDetails.rollNumber}</code>
-                  
+
                   <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '14px', textAlign: 'left' }}>
                     <div>
                       <span style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700, display: 'block' }}>Attendance</span>
@@ -9279,9 +9279,9 @@ const AdminDashboard = () => {
                         {selectedStudentDetails.feesStatus || 'Pending'}
                       </span>
                     </div>
-                    <button 
-                      type="button" 
-                      className="btn btn-outline" 
+                    <button
+                      type="button"
+                      className="btn btn-outline"
                       style={{ width: '100%', marginTop: '6px', fontSize: '11.5px', padding: '6px 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontWeight: 700 }}
                       onClick={() => sendStudentWelcomeEmail(selectedStudentDetails)}
                     >
@@ -9306,8 +9306,8 @@ const AdminDashboard = () => {
                                 Active: {new Date(session.last_active).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             </div>
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               onClick={() => revokeStudentSession(session._id, selectedStudentDetails.id)}
                               style={{ border: 'none', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', fontSize: '9.5px', fontWeight: 800, padding: '4px 8px', borderRadius: '6px', cursor: 'pointer' }}
                             >
@@ -9404,9 +9404,9 @@ const AdminDashboard = () => {
               </div>
             </div>
             <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button 
-                type="button" 
-                className="btn btn-outline" 
+              <button
+                type="button"
+                className="btn btn-outline"
                 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}
                 onClick={() => sendStudentWelcomeEmail(selectedStudentDetails)}
               >
@@ -9432,12 +9432,12 @@ const AdminDashboard = () => {
 
       {/* Custom Delete Confirmation Modal */}
       {studentToDelete && (
-        <div 
-          className="confirm-modal-overlay" 
+        <div
+          className="confirm-modal-overlay"
           onClick={() => setStudentToDelete(null)}
         >
-          <div 
-            className="confirm-modal-card" 
+          <div
+            className="confirm-modal-card"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="confirm-modal-icon">
@@ -9449,17 +9449,17 @@ const AdminDashboard = () => {
               This action cannot be undone.
             </p>
             <div className="confirm-modal-actions">
-              <button 
+              <button
                 type="button"
-                className="confirm-modal-btn btn-cancel" 
+                className="confirm-modal-btn btn-cancel"
                 disabled={isDeletingStudent}
                 onClick={() => setStudentToDelete(null)}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 type="button"
-                className="confirm-modal-btn btn-delete" 
+                className="confirm-modal-btn btn-delete"
                 disabled={isDeletingStudent}
                 onClick={executeDeleteStudent}
               >
@@ -9783,7 +9783,7 @@ const AdminDashboard = () => {
 
               <form onSubmit={handleConfirmExtendBatch}>
                 <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '18px', padding: '20px 24px' }}>
-                  
+
                   {/* Current Batch Snapshot */}
                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px 16px' }}>
                     <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
@@ -10076,8 +10076,8 @@ const AdminDashboard = () => {
               <h3 className="modal-title">
                 {editingPlaylist ? 'Edit Custom Playlist' : 'Create Custom Playlist'}
               </h3>
-              <button 
-                className="modal-close-red" 
+              <button
+                className="modal-close-red"
                 onClick={() => {
                   setShowPlaylistModal(false);
                   setEditingPlaylist(null);
@@ -10086,7 +10086,7 @@ const AdminDashboard = () => {
                   setPlaylistFormDescription('');
                   setPlaylistFormAccess('all');
                   setPlaylistFormBatchId('');
-                }} 
+                }}
                 aria-label="Close modal"
               >
                 <X size={18} />
@@ -10246,17 +10246,17 @@ const AdminDashboard = () => {
                         + New Playlist
                       </button>
                     </div>
-                    <select 
-                      id="recBatchSelect" 
-                      className="form-select" 
-                      value={selectedBatchId} 
+                    <select
+                      id="recBatchSelect"
+                      className="form-select"
+                      value={selectedBatchId}
                       onChange={(e) => {
                         const val = e.target.value;
                         setSelectedBatchId(val);
                         const plId = val.replace('playlist:', '');
                         const plObj = customPlaylists.find(p => p.id === plId || p.uid === plId);
                         if (plObj && plObj.course_name) setRecCourseTitle(plObj.course_name);
-                      }} 
+                      }}
                       required
                     >
                       <option value="">-- Choose Target Playlist --</option>
@@ -10299,11 +10299,11 @@ const AdminDashboard = () => {
 
                     {videoSourceType === 'link' ? (
                       <div>
-                        <input 
-                          id="recVideoUrl" 
-                          type="url" 
-                          className="form-input" 
-                          value={recVideoUrl} 
+                        <input
+                          id="recVideoUrl"
+                          type="url"
+                          className="form-input"
+                          value={recVideoUrl}
                           onChange={(e) => {
                             const val = e.target.value;
                             setRecVideoUrl(val);
@@ -10313,8 +10313,8 @@ const AdminDashboard = () => {
                                 setRecThumbnailUrl(autoThumb);
                               }
                             }
-                          }} 
-                          placeholder="Paste YouTube Link (Public/Unlisted) or Google Drive Link or MP4 URL" 
+                          }}
+                          placeholder="Paste YouTube Link (Public/Unlisted) or Google Drive Link or MP4 URL"
                           required
                         />
                         {/* Dynamic Verification Banners */}
@@ -10386,10 +10386,10 @@ const AdminDashboard = () => {
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <input 
-                          type="file" 
-                          accept="video/*" 
-                          className="form-input" 
+                        <input
+                          type="file"
+                          accept="video/*"
+                          className="form-input"
                           onChange={async (e) => {
                             const file = e.target.files[0];
                             if (!file) return;
@@ -10399,7 +10399,7 @@ const AdminDashboard = () => {
                             if (res && res.url) {
                               setRecVideoUrl(res.url);
                             }
-                          }} 
+                          }}
                         />
                         {uploadingVideo && <span style={{ fontSize: 12, color: 'var(--primary-color)' }}>Uploading video file... Please wait.</span>}
                         {recVideoUrl && !uploadingVideo && (
@@ -10422,13 +10422,13 @@ const AdminDashboard = () => {
                   {/* Direct Lecture Notes / Document Link */}
                   <div className="form-group grid-col-span-2">
                     <label className="form-label" htmlFor="recNotesUrl">Lecture Notes / Document Link (PDF, Drive, Notion, GitHub)</label>
-                    <input 
-                      id="recNotesUrl" 
-                      type="url" 
-                      className="form-input" 
-                      value={recNotesUrl} 
-                      onChange={(e) => setRecNotesUrl(e.target.value)} 
-                      placeholder="https://drive.google.com/... or https://..." 
+                    <input
+                      id="recNotesUrl"
+                      type="url"
+                      className="form-input"
+                      value={recNotesUrl}
+                      onChange={(e) => setRecNotesUrl(e.target.value)}
+                      placeholder="https://drive.google.com/... or https://..."
                     />
                     <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
                       Direct notes link displayed prominently in the student video player for one-click opening.
@@ -10455,8 +10455,8 @@ const AdminDashboard = () => {
                                 {mat.name}
                               </span>
                             </div>
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
                               onClick={() => setRecStudyMaterials(prev => prev.filter((_, i) => i !== index))}
                             >
@@ -10469,13 +10469,13 @@ const AdminDashboard = () => {
 
                     {/* Add New Material Box */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8, borderTop: '1px solid var(--border-light)', paddingTop: 10 }}>
-                      <input 
-                        type="text" 
-                        placeholder="Material Title (e.g. Slide Deck Lecture 1, Source Code ZIP)" 
-                        className="form-input" 
+                      <input
+                        type="text"
+                        placeholder="Material Title (e.g. Slide Deck Lecture 1, Source Code ZIP)"
+                        className="form-input"
                         style={{ height: 36, fontSize: 12.5 }}
-                        value={newMaterialName} 
-                        onChange={(e) => setNewMaterialName(e.target.value)} 
+                        value={newMaterialName}
+                        onChange={(e) => setNewMaterialName(e.target.value)}
                       />
                       <div style={{ display: 'flex', gap: 16 }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 12.5, cursor: 'pointer' }}>
@@ -10490,17 +10490,17 @@ const AdminDashboard = () => {
 
                       {newMaterialSourceType === 'link' ? (
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <input 
-                            type="url" 
-                            placeholder="https://drive.google.com/... or resource link" 
-                            className="form-input" 
+                          <input
+                            type="url"
+                            placeholder="https://drive.google.com/... or resource link"
+                            className="form-input"
                             style={{ height: 36, fontSize: 12.5, flex: 1 }}
-                            value={newMaterialUrl} 
-                            onChange={(e) => setNewMaterialUrl(e.target.value)} 
+                            value={newMaterialUrl}
+                            onChange={(e) => setNewMaterialUrl(e.target.value)}
                           />
-                          <button 
-                            type="button" 
-                            className="btn btn-primary" 
+                          <button
+                            type="button"
+                            className="btn btn-primary"
                             style={{ padding: '0 14px', fontSize: 12, height: 36, flexShrink: 0 }}
                             onClick={() => {
                               if (!newMaterialUrl.trim()) {
@@ -10522,10 +10522,10 @@ const AdminDashboard = () => {
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <input 
-                            type="file" 
-                            accept=".pdf,.docx,.ppt,.pptx,.zip,.rar,image/*" 
-                            className="form-input" 
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.ppt,.pptx,.zip,.rar,image/*"
+                            className="form-input"
                             style={{ fontSize: 12 }}
                             onChange={async (e) => {
                               const file = e.target.files[0];
@@ -10544,7 +10544,7 @@ const AdminDashboard = () => {
                                 setNewMaterialUrl('');
                                 showModal("Attached", `"${matName}" successfully attached!`, "success");
                               }
-                            }} 
+                            }}
                           />
                           {uploadingMaterial && <span style={{ fontSize: 11, color: 'var(--primary-color)', fontWeight: 600 }}>Uploading file to server...</span>}
                         </div>
@@ -10683,7 +10683,7 @@ const AdminDashboard = () => {
                       ))}
                     </select>
                   </div>
-                  
+
                   <div className="form-group">
                     <label className="form-label" htmlFor="actStudentSelect">Select Student</label>
                     <select id="actStudentSelect" className="form-select" value={actStudentId} onChange={(e) => setActStudentId(e.target.value)} required>
@@ -10708,18 +10708,18 @@ const AdminDashboard = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <label className="form-label">Activity Preset Type</label>
                       {showPresetManager ? (
-                        <button 
-                          type="button" 
-                          className="text-link-btn" 
+                        <button
+                          type="button"
+                          className="text-link-btn"
                           style={{ fontSize: '11px', color: '#6C3CF0', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
                           onClick={() => setShowPresetManager(false)}
                         >
                           Close Preset Manager
                         </button>
                       ) : (
-                        <button 
-                          type="button" 
-                          className="text-link-btn" 
+                        <button
+                          type="button"
+                          className="text-link-btn"
                           style={{ fontSize: '11px', color: '#6C3CF0', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
                           onClick={() => setShowPresetManager(true)}
                         >
@@ -10764,9 +10764,9 @@ const AdminDashboard = () => {
                             activityPresets.map(p => (
                               <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', fontSize: '11px', borderBottom: '1px solid #F3F4F6' }}>
                                 <span>{p.label} ({p.points > 0 ? `+${p.points}` : p.points} pts)</span>
-                                <button 
-                                  type="button" 
-                                  onClick={() => handleDeletePreset(p.id)} 
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePreset(p.id)}
                                   style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: 0 }}
                                   title="Delete Preset"
                                 >
@@ -10776,30 +10776,30 @@ const AdminDashboard = () => {
                             ))
                           )}
                         </div>
-                        
+
                         <h4 style={{ margin: '0 0 6px 0', fontSize: '11px', color: '#374151', fontWeight: 600 }}>Create Preset</h4>
                         <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
-                          <input 
-                            type="text" 
-                            className="form-input" 
-                            placeholder="e.g. Completed Extra Lab Task" 
-                            value={newPresetLabel} 
-                            onChange={(e) => setNewPresetLabel(e.target.value)} 
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="e.g. Completed Extra Lab Task"
+                            value={newPresetLabel}
+                            onChange={(e) => setNewPresetLabel(e.target.value)}
                             style={{ flex: 2, height: '32px', fontSize: '11px', padding: '0 8px' }}
                           />
-                          <input 
-                            type="number" 
-                            className="form-input" 
-                            placeholder="Pts" 
-                            value={newPresetPoints} 
-                            onChange={(e) => setNewPresetPoints(e.target.value)} 
+                          <input
+                            type="number"
+                            className="form-input"
+                            placeholder="Pts"
+                            value={newPresetPoints}
+                            onChange={(e) => setNewPresetPoints(e.target.value)}
                             style={{ flex: 1, height: '32px', fontSize: '11px', padding: '0 8px' }}
                           />
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                          <button 
-                            type="button" 
-                            className="btn btn-primary" 
+                          <button
+                            type="button"
+                            className="btn btn-primary"
                             style={{ padding: '2px 10px', fontSize: '11px', height: '26px', lineHeight: '22px' }}
                             onClick={handleCreatePreset}
                           >
@@ -10819,19 +10819,19 @@ const AdminDashboard = () => {
                     <div className="form-group grid-col-span-2">
                       <label className="form-label" htmlFor="customActType">Custom Activity Title</label>
                       <div style={{ display: 'flex', gap: '10px' }}>
-                        <input 
-                          id="customActType" 
-                          type="text" 
-                          className="form-input" 
-                          placeholder="e.g. Completed Extra Lab Task" 
+                        <input
+                          id="customActType"
+                          type="text"
+                          className="form-input"
+                          placeholder="e.g. Completed Extra Lab Task"
                           value={actType}
-                          onChange={(e) => setActType(e.target.value)} 
-                          required 
+                          onChange={(e) => setActType(e.target.value)}
+                          required
                           style={{ flex: 1 }}
                         />
-                        <button 
-                          type="button" 
-                          className="btn btn-outline" 
+                        <button
+                          type="button"
+                          className="btn btn-outline"
                           style={{ padding: '0 16px', height: '44px', fontSize: '13px' }}
                           onClick={() => {
                             setIsCustomAct(false);
