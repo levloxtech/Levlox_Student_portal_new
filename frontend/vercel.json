@@ -2,15 +2,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://productive-andrews-gods-lessons.trycloudflare.com/api/:path*"
+      "destination": "https://joel-encoding-apache-monte.trycloudflare.com/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://productive-andrews-gods-lessons.trycloudflare.com/health"
+      "destination": "https://joel-encoding-apache-monte.trycloudflare.com/health"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://productive-andrews-gods-lessons.trycloudflare.com/uploads/:path*"
+      "destination": "https://joel-encoding-apache-monte.trycloudflare.com/uploads/:path*"
     },
     {
       "source": "/(.*)",
