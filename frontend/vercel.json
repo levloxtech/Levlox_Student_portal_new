@@ -2,15 +2,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://var-enjoying-theoretical-flow.trycloudflare.com/api/:path*"
+      "destination": "https://productive-andrews-gods-lessons.trycloudflare.com/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://var-enjoying-theoretical-flow.trycloudflare.com/health"
+      "destination": "https://productive-andrews-gods-lessons.trycloudflare.com/health"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://var-enjoying-theoretical-flow.trycloudflare.com/uploads/:path*"
+      "destination": "https://productive-andrews-gods-lessons.trycloudflare.com/uploads/:path*"
     },
     {
       "source": "/(.*)",
