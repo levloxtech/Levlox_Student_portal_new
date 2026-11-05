@@ -2,15 +2,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://managing-map-timeline-cottages.trycloudflare.com/api/:path*"
+      "destination": "https://purchase-angeles-bind-save.trycloudflare.com/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://managing-map-timeline-cottages.trycloudflare.com/health"
+      "destination": "https://purchase-angeles-bind-save.trycloudflare.com/health"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://managing-map-timeline-cottages.trycloudflare.com/uploads/:path*"
+      "destination": "https://purchase-angeles-bind-save.trycloudflare.com/uploads/:path*"
     },
     {
       "source": "/(.*)",
