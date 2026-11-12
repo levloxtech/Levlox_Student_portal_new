@@ -2,15 +2,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://purchase-angeles-bind-save.trycloudflare.com/api/:path*"
+      "destination": "https://bath-prospect-stress-trout.trycloudflare.com/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://purchase-angeles-bind-save.trycloudflare.com/health"
+      "destination": "https://bath-prospect-stress-trout.trycloudflare.com/health"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://purchase-angeles-bind-save.trycloudflare.com/uploads/:path*"
+      "destination": "https://bath-prospect-stress-trout.trycloudflare.com/uploads/:path*"
     },
     {
       "source": "/(.*)",
