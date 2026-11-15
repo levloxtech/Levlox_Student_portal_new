@@ -63,6 +63,8 @@ const RecordedClassesPage = ({
   recordedClasses = null,
   customPlaylists = null,
   isPaid = true,
+  isMembershipExpired = false,
+  onOpenRenewal = null,
 }) => {
   const { userProfile, currentUser } = useAuth();
   const studentId = userProfile?.id || userProfile?.uid || currentUser?.uid || 'student';
@@ -121,6 +123,14 @@ const RecordedClassesPage = ({
 
   const handlePlayLesson = (lesson, course = null) => {
     if (!lesson) return;
+    if (!isPaid || isMembershipExpired) {
+      if (typeof onOpenRenewal === 'function') {
+        onOpenRenewal();
+      } else {
+        alert('Your Academy Membership cycle has expired. Please renew your plan to unlock course recordings.');
+      }
+      return;
+    }
     const targetCourse = course || selectedCourse;
     const rawMaterials = lesson.study_materials || lesson.studyMaterials || [];
     const normalized = {
@@ -139,6 +149,24 @@ const RecordedClassesPage = ({
     };
     saveRecentlyViewedVideo(studentId, normalized);
     setActivePlayingLesson(normalized);
+  };
+
+  const openCourseViewer = (course, lesson = null) => {
+    if (!course) return;
+    if (!isPaid || isMembershipExpired) {
+      if (typeof onOpenRenewal === 'function') {
+        onOpenRenewal();
+      } else {
+        alert('Your Academy Membership cycle has lapsed. Please renew your plan to unlock course recordings.');
+      }
+      return;
+    }
+    setSelectedCourse(course);
+    if (lesson) {
+      handlePlayLesson(lesson, course);
+    } else if (course.lessons?.length > 0) {
+      handlePlayLesson(course.lessons[0], course);
+    }
   };
 
   // 100% Dynamic Playlists & Courses mapped with Real Progress & Batch Filtering
@@ -436,6 +464,62 @@ const RecordedClassesPage = ({
   return (
     <div className="levlox-courses-page" style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
 
+      {/* EXPIRED ACCESS NOTICE BANNER */}
+      {(!isPaid || isMembershipExpired) && (
+        <div style={{
+          background: 'linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%)',
+          border: '1.5px solid #FCA5A5',
+          borderRadius: 16,
+          padding: '16px 22px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          boxShadow: '0 4px 14px rgba(239, 68, 68, 0.08)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 42, height: 42, borderRadius: 12,
+              background: '#EF4444', color: '#FFFFFF',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }}>
+              <Lock size={20} />
+            </div>
+            <div>
+              <strong style={{ fontSize: 14.5, color: '#991B1B', display: 'block', marginBottom: 2 }}>
+                Video Lectures &amp; Capstone Projects Locked
+              </strong>
+              <span style={{ fontSize: 13, color: '#B91C1C' }}>
+                Your membership access period has expired. Please renew your plan (Monthly or Annual) to restore HD video streaming and full coursework.
+              </span>
+            </div>
+          </div>
+          {onOpenRenewal && (
+            <button
+              type="button"
+              onClick={onOpenRenewal}
+              style={{
+                background: '#EF4444',
+                color: '#FFFFFF',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: 10,
+                fontSize: 13.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)',
+                flexShrink: 0
+              }}
+            >
+              <Sparkles size={14} /> Renew Access Now →
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ─── 1. TOP LEARNING BANNER (CLEAN MODERN WHITE/INDIGO HERO) ─── */}
       <div style={{
         background: '#FFFFFF',
@@ -519,10 +603,7 @@ const RecordedClassesPage = ({
             <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
               <div 
                 onClick={() => {
-                  setSelectedCourse(currentlyLearningCourse);
-                  if (currentlyLearningCourse.lessons?.length > 0) {
-                    handlePlayLesson(currentlyLearningCourse.lessons[0], currentlyLearningCourse);
-                  }
+                  openCourseViewer(currentlyLearningCourse);
                 }}
                 style={{
                   width: 200,
@@ -600,10 +681,7 @@ const RecordedClassesPage = ({
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
                   <button
                     onClick={() => {
-                      setSelectedCourse(currentlyLearningCourse);
-                      if (currentlyLearningCourse.lessons?.length > 0) {
-                        handlePlayLesson(currentlyLearningCourse.lessons[0], currentlyLearningCourse);
-                      }
+                      openCourseViewer(currentlyLearningCourse);
                     }}
                     style={{
                       padding: '8px 18px',
@@ -867,8 +945,7 @@ const RecordedClassesPage = ({
                 <div
                   key={course.id}
                   onClick={() => {
-                    setSelectedCourse(course);
-                    if (course.lessons?.length > 0) handlePlayLesson(course.lessons[0], course);
+                    openCourseViewer(course);
                   }}
                   style={{
                     background: '#FFFFFF',
@@ -1010,8 +1087,7 @@ const RecordedClassesPage = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedCourse(course);
-                          if (course.lessons?.length > 0) handlePlayLesson(course.lessons[0], course);
+                          openCourseViewer(course);
                         }}
                         style={{
                           width: '100%',
@@ -1099,8 +1175,7 @@ const RecordedClassesPage = ({
               onClick={() => {
                 const target = courseDetailsModal;
                 setCourseDetailsModal(null);
-                setSelectedCourse(target);
-                if (target.lessons?.length > 0) handlePlayLesson(target.lessons[0], target);
+                openCourseViewer(target);
               }}
               style={{
                 width: '100%',

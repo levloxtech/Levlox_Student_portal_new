@@ -22,7 +22,10 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+if (fs.existsSync(path.join(process.cwd(), '.env'))) {
+  require('dotenv').config({ path: path.join(process.cwd(), '.env') });
+}
 const localDb = require('./localDb');
 
 // ── 100% Self-Hosted Local Database Engine ────────────────────────────────
@@ -250,6 +253,9 @@ app.get('/health', (req, res) => {
   });
 });
 
+// ── Membership & Registration Routes ─────────────────────────────────────────
+app.use('/api/membership', require('./routes/membershipRoutes'));
+
 // ════════════════════════════════════════════════════════════════════════════
 // SELF-HOSTED AUTHENTICATION API (Local Server Database)
 // ════════════════════════════════════════════════════════════════════════════
@@ -445,31 +451,20 @@ app.post('/api/auth/login', (req, res) => {
     }
   }
 
-  // Check if student profile is deactivated or validity period has expired
+  // Check if student profile is permanently disabled by administrator
   const studentRec = matchedStudent || (user.role === 'student' ? (localDb.getDocument('students', user.id) || localDb.getDocument('students', user.uid)) : null);
   if (studentRec) {
-    const isExplicitlyDeactivated = ['disabled', 'inactive', 'deactivated'].includes(String(studentRec.status || '').toLowerCase()) || studentRec.isDeactivated === true;
-    const expiresAt = studentRec.accessExpiresAt || studentRec.validUntil || studentRec.portalExpiresAt;
-    const isExpired = Boolean(expiresAt && new Date(expiresAt).getTime() < Date.now());
-
-    if (isExplicitlyDeactivated || isExpired) {
-      if (isExpired && studentRec.status !== 'deactivated') {
-        studentRec.status = 'deactivated';
-        studentRec.isDeactivated = true;
-        localDb.updateDocument('students', studentRec.id || studentRec.uid, {
-          status: 'deactivated',
-          isDeactivated: true,
-        });
-      }
+    const isManuallyDisabled = ['disabled'].includes(String(studentRec.status || '').toLowerCase()) || (studentRec.isDeactivated === true && !studentRec.accessExpiresAt && !studentRec.portalExpiresAt);
+    if (isManuallyDisabled) {
       return res.status(403).json({
-        error: 'Your account is deactivated. Please contact admin at sales@levlox.in to reactivate your portal access.'
+        error: 'Your account is disabled by administrator. Please contact admin at sales@levlox.in.'
       });
     }
   }
 
-  if (user.status === 'disabled' || user.status === 'inactive' || user.status === 'deactivated' || user.isDeactivated === true) {
+  if (user.status === 'disabled') {
     return res.status(403).json({
-      error: 'Your account is deactivated. Please contact admin at sales@levlox.in to reactivate your portal access.'
+      error: 'Your account is disabled by administrator. Please contact admin at sales@levlox.in.'
     });
   }
 
@@ -485,6 +480,15 @@ app.post('/api/auth/login', (req, res) => {
     profile = localDb.getDocument('students', user.id) || matchedStudent || user;
   }
 
+  if (profile && user.role === 'student') {
+    const expiresAt = profile.accessExpiresAt || profile.portalExpiresAt || profile.membership?.expiresAt;
+    const isExpired = Boolean(expiresAt && new Date(expiresAt).getTime() < Date.now());
+    profile.isMembershipExpired = isExpired;
+    profile.accessExpiresAt = expiresAt;
+    user.isMembershipExpired = isExpired;
+    user.accessExpiresAt = expiresAt;
+  }
+
   res.json({
     success: true,
     token,
@@ -496,6 +500,8 @@ app.post('/api/auth/login', (req, res) => {
       role: user.role,
       phone: user.phone || '',
       status: user.status || 'active',
+      isMembershipExpired: user.isMembershipExpired,
+      accessExpiresAt: user.accessExpiresAt,
     },
     profile,
   });
@@ -512,14 +518,18 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
   } else {
     profile = localDb.getDocument('students', userId) || user;
     if (profile) {
-      const isExplicitlyDeactivated = ['disabled', 'inactive', 'deactivated'].includes(String(profile.status || '').toLowerCase()) || profile.isDeactivated === true;
-      const expiresAt = profile.accessExpiresAt || profile.validUntil || profile.portalExpiresAt;
-      const isExpired = Boolean(expiresAt && new Date(expiresAt).getTime() < Date.now());
-      if (isExplicitlyDeactivated || isExpired) {
+      const isManuallyDisabled = ['disabled'].includes(String(profile.status || '').toLowerCase()) || (profile.isDeactivated === true && !profile.accessExpiresAt && !profile.portalExpiresAt);
+      if (isManuallyDisabled) {
         return res.status(403).json({
-          error: 'Your account is deactivated. Please contact admin at sales@levlox.in to reactivate your portal access.'
+          error: 'Your account is disabled by administrator. Please contact admin at sales@levlox.in.'
         });
       }
+      const expiresAt = profile.accessExpiresAt || profile.portalExpiresAt || profile.membership?.expiresAt;
+      const isExpired = Boolean(expiresAt && new Date(expiresAt).getTime() < Date.now());
+      profile.isMembershipExpired = isExpired;
+      profile.accessExpiresAt = expiresAt;
+      user.isMembershipExpired = isExpired;
+      user.accessExpiresAt = expiresAt;
     }
   }
   res.json({ user, profile });
@@ -1469,24 +1479,13 @@ app.delete('/api/notifications/user/:userId', (req, res) => {
 app.delete('/api/data/:collection/:id', (req, res) => {
   try {
     const { collection, id } = req.params;
-    let targetEmail = null;
-    if (collection === 'students' || collection === 'trainers' || collection === 'users') {
-      const doc = localDb.getDocument(collection, id);
-      if (doc?.email) targetEmail = String(doc.email).trim().toLowerCase();
-    }
-    const ok = localDb.deleteDocument(collection, id);
-    if (collection === 'students' || collection === 'trainers' || collection === 'users') {
-      localDb.deleteDocument('users', id);
-      if (targetEmail) {
-        const users = localDb.loadCollection('users');
-        const filtered = users.filter((u) => (u.email || '').toLowerCase() !== targetEmail);
-        if (filtered.length !== users.length) {
-          const userFilePath = path.join(STORAGE_ROOT, 'data', 'users.json');
-          fs.writeFileSync(userFilePath, JSON.stringify(filtered, null, 2), 'utf8');
-        }
-      }
-      // Revoke all active sessions for this user immediately
-      localDb.revokeUserSessions(id, targetEmail);
+    const explicitEmail = req.query.email || req.body?.email || null;
+
+    if (collection === 'students' || collection === 'trainers' || collection === 'users' || collection === 'leads') {
+      const purgeResult = localDb.purgeUserCompletely(id, explicitEmail);
+      console.log(`[LocalDb] Purged ${collection} ${id}:`, purgeResult);
+    } else {
+      localDb.deleteDocument(collection, id);
     }
 
     // If a batch is deleted, automatically delete all batch discussion messages
@@ -1505,7 +1504,7 @@ app.delete('/api/data/:collection/:id', (req, res) => {
       }
     }
 
-    res.json({ success: ok });
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

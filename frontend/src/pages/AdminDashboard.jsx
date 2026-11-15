@@ -11,7 +11,7 @@ import {
   Key, RefreshCw, ChevronDown, X, Download, FileText, FileSpreadsheet,
   User, Mail, Phone, Lock, EyeOff, Camera, Save, Shield, Menu,
   Calendar, Timer, Sparkles, FastForward, CheckCheck, History, ArrowUpRight, UserCheck,
-  Globe, ArrowLeft, ArrowRight, Upload, Image as ImageIcon, UploadCloud, MessageSquare
+  Globe, ArrowLeft, ArrowRight, Upload, Image as ImageIcon, UploadCloud, MessageSquare, Tag, Ticket, Laptop
 } from 'lucide-react';
 import CustomModal from '../components/Modal';
 import FilterBar from '../components/FilterBar';
@@ -22,6 +22,11 @@ import { uploadUniversalFile, getDownloadUrl } from '../services/apiService';
 import levloxLogo from '../assets/levlox-logo.png';
 const leveloxIcon = levloxLogo;
 import MasterDataPage from './MasterDataPage';
+import AcademyTestimonialsManager from '../components/AcademyTestimonialsManager';
+import PortalStudentsManager from '../components/PortalStudentsManager';
+import CouponsManager from '../components/CouponsManager';
+import DesktopOnlyGate from '../components/DesktopOnlyGate';
+import { isMobileDevice } from '../utils/device';
 import { useAuth } from '../context/AuthContext';
 import {
   listStudents,
@@ -3209,38 +3214,22 @@ const AdminDashboard = () => {
         }
       }
 
-      // 2. Track deleted user reference so re-creation can re-link existing Firebase Auth UID
-      if (studentObj) {
-        const emailLower = studentObj.email?.trim().toLowerCase();
-        const phoneAuthId = studentObj.phone ? mobileToAuthId(studentObj.phone) : null;
-        const keysToSave = [
-          emailLower,
-          phoneAuthId
-        ].filter(Boolean);
-
-        for (const key of keysToSave) {
-          const safeKey = key.replace(/[^a-zA-Z0-9]/g, '_');
-          await setDocument('deletedUsers', safeKey, {
-            uid: studentToDelete,
-            email: studentObj.email || '',
-            phone: studentObj.phone || '',
-            deletedAt: new Date().toISOString(),
-          }).catch(err => console.warn('[Admin] Save deleted user ref failed:', err));
-        }
-      }
-
-      // 3. Delete student document from database
-      await deleteStudentDoc('students', studentToDelete);
-      await deleteStudentDoc('users', studentToDelete).catch(() => { });
+      // 2. Permanently delete student and linked user records across all collections
+      const studentEmail = studentObj?.email || '';
+      await deleteStudentDoc('students', studentToDelete, studentEmail ? { email: studentEmail } : {});
+      await deleteStudentDoc('users', studentToDelete, studentEmail ? { email: studentEmail } : {}).catch(() => { });
 
       // 3. Refresh students & stats
+      if (typeof refetchAdminData === 'function') refetchAdminData();
+      if (typeof refetchAdminBatches === 'function') refetchAdminBatches();
+      queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
       fetchStudents();
       fetchStats();
-      showModal('Deleted', 'Student record deleted successfully.', 'success');
+      showModal('Deleted Permanently', 'Student and user account have been permanently deleted. The email address can now be re-registered or re-created.', 'success');
     } catch (error) {
       console.error('[Admin] Delete student error:', error);
       const errInfo = classifyFirestoreError(error);
-      showModal('Delete Failed', errInfo.message || 'Could not delete student record from Firestore.', 'error');
+      showModal('Delete Failed', errInfo.message || 'Could not delete student record from database.', 'error');
     } finally {
       setIsDeletingStudent(false);
       setStudentToDelete(null);
@@ -4344,6 +4333,10 @@ const AdminDashboard = () => {
     }
   };
 
+  if (isMobileDevice()) {
+    return <DesktopOnlyGate />;
+  }
+
   return (
     <div className="dashboard-layout">
       {/* Mobile Sidebar Backdrop */}
@@ -4408,6 +4401,16 @@ const AdminDashboard = () => {
             <span className="sidebar-link-text">Batch Management</span>
           </button>
 
+          <button className={`sidebar-link ${activeTab === 'portal-students' ? 'active' : ''}`} onClick={() => handleNavTabClick('portal-students', () => setCurrentPage(1))}>
+            <BookOpen size={18} />
+            <span className="sidebar-link-text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              Portal Students
+              <span style={{ fontSize: 10, fontWeight: 700, background: '#2563EB', color: '#FFF', padding: '2px 7px', borderRadius: 10 }}>
+                {allStudents.filter(s => (s.batch || s.batch_name || '').toLowerCase().includes('portal') || s.batch_id === 'batch_portal_students' || s.isPortalOnly).length}
+              </span>
+            </span>
+          </button>
+
           <button className={`sidebar-link ${activeTab === 'live-classes' ? 'active' : ''}`} onClick={() => handleNavTabClick('live-classes')}>
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
               <Video size={18} />
@@ -4467,6 +4470,11 @@ const AdminDashboard = () => {
             <span className="sidebar-link-text">Fees Management</span>
           </button>
 
+          <button className={`sidebar-link ${activeTab === 'coupons' ? 'active' : ''}`} onClick={() => handleNavTabClick('coupons')}>
+            <Tag size={18} />
+            <span className="sidebar-link-text">Coupons & Offers</span>
+          </button>
+
           <button className={`sidebar-link ${activeTab === 'activity-score' ? 'active' : ''}`} onClick={() => handleNavTabClick('activity-score')}>
             <Trophy size={18} />
             <span className="sidebar-link-text">Activity Scores</span>
@@ -4485,6 +4493,11 @@ const AdminDashboard = () => {
           <button className={`sidebar-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => handleNavTabClick('settings')}>
             <Settings size={18} />
             <span className="sidebar-link-text">Settings</span>
+          </button>
+
+          <button className={`sidebar-link ${activeTab === 'testimonials' ? 'active' : ''}`} onClick={() => handleNavTabClick('testimonials')}>
+            <Video size={18} />
+            <span className="sidebar-link-text">Academy Testimonials</span>
           </button>
 
         </nav>
@@ -8098,6 +8111,29 @@ const AdminDashboard = () => {
               </div>
             )}
           </div>
+        )}
+
+        {/* Academy Testimonials & Video Proofs Tab */}
+        {activeTab === 'testimonials' && (
+          <AcademyTestimonialsManager />
+        )}
+
+        {/* Dedicated Portal Students Batch Tab */}
+        {activeTab === 'portal-students' && (
+          <PortalStudentsManager
+            allStudents={allStudents}
+            batches={batches}
+            refetchStudents={() => {
+              if (typeof refetchAdminData === 'function') refetchAdminData();
+              if (typeof refetchAdminBatches === 'function') refetchAdminBatches();
+              queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
+            }}
+          />
+        )}
+
+        {/* Promotional Coupons & Date Validation Tab */}
+        {activeTab === 'coupons' && (
+          <CouponsManager />
         )}
       </main>
 

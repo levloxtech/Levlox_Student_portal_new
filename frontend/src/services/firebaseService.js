@@ -202,9 +202,14 @@ export const updateDocumentFields = async (collectionName, id, data) => {
 };
 
 /** Delete a document */
-export const deleteDocument = async (collectionName, id) => {
+export const deleteDocument = async (collectionName, id, extraParams = {}) => {
   try {
-    const res = await fetch(`${API_BASE}/api/data/${collectionName}/${id}`, {
+    let url = `${API_BASE}/api/data/${collectionName}/${id}`;
+    if (extraParams && typeof extraParams === 'object' && Object.keys(extraParams).length > 0) {
+      const q = new URLSearchParams(extraParams).toString();
+      if (q) url += `?${q}`;
+    }
+    const res = await fetch(url, {
       method: 'DELETE',
       headers: getHeaders(),
     });

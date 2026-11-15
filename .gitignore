@@ -46,7 +46,11 @@ ui-debug.log
 database-debug.log
 .firebase/
 
-# Backups
+# Backups and Storage
 storage/backups/
 storage/data/
 storage/uploads/
+storage/profiles/
+
+# Root temporary design screenshots
+frontend/*.png

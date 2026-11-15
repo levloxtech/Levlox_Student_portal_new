@@ -15,6 +15,8 @@ import {
 import CustomModal from '../components/Modal';
 import FilterBar from '../components/FilterBar';
 import NotificationBell from '../components/NotificationBell';
+import DesktopOnlyGate from '../components/DesktopOnlyGate';
+import { isMobileDevice } from '../utils/device';
 import levloxLogo from '../assets/levlox-logo.png';
 import { useAuth } from '../context/AuthContext';
 import TrainerOnboardingView from '../components/TrainerOnboardingView';
@@ -1453,6 +1455,10 @@ const TrainerDashboard = () => {
         showToast={showToast}
       />
     );
+  }
+
+  if (isMobileDevice()) {
+    return <DesktopOnlyGate />;
   }
 
   return (

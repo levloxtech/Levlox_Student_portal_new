@@ -2,6 +2,8 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import FullScreenLoader from './FullScreenLoader';
+import { isMobileDevice } from '../utils/device';
+import DesktopOnlyGate from './DesktopOnlyGate';
 
 /**
  * ProtectedRoute — guards routes based on Firebase Auth state and user role.
@@ -19,6 +21,11 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   // Not authenticated or session revoked → redirect to login immediately with history replacement
   if (!currentUser || !token) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Mobile Restriction Gate for Protected Portal Dashboards (Student, Admin, Trainer)
+  if (isMobileDevice()) {
+    return <DesktopOnlyGate />;
   }
 
   // Authenticated with Firebase but no matching students/admins document.

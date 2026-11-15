@@ -9,12 +9,15 @@ import {
   Clock, CheckCircle, AlertCircle, PlayCircle, Zap, TrendingUp,
   Award, Star, ArrowRight, Plus, X, Eye, Users, Menu,
   Crown, Medal, Flame, Activity, Trophy, TriangleAlert, XCircle, RefreshCw,
-  MessageSquare, Sparkles, Play, Shield, Monitor, Laptop, Smartphone, UploadCloud
+  MessageSquare, Sparkles, Play, Shield, Monitor, Laptop, Smartphone, UploadCloud, Mail
 } from 'lucide-react';
 
 import CustomModal from '../components/Modal';
 import NotificationBell from '../components/NotificationBell';
 import ErrorBoundary from '../components/ErrorBoundary';
+import DesktopOnlyGate from '../components/DesktopOnlyGate';
+import MembershipRenewalModal from '../components/MembershipRenewalModal';
+import { isMobileDevice } from '../utils/device';
 import { CardSkeleton, DashboardSkeleton } from '../components/Skeleton';
 import levloxLogo from '../assets/levlox-logo.png';
 import levloxWorkspace3D from '../assets/levlox-workspace-3d.png';
@@ -577,14 +580,38 @@ const StudentDashboard = () => {
   const studentBatchId = studentDoc?.batch_id || studentDoc?.batchId || user?.batch_id || user?.batchId || userProfile?.batch_id || userProfile?.batchId || '';
   const studentBatchName = (studentDoc?.batch || studentDoc?.batch_name || user?.batch_name || user?.batchName || userProfile?.batch_name || userProfile?.batchName || '').trim().toLowerCase();
   const studentCourseName = studentDoc?.course || studentDoc?.course_name || user?.course || userProfile?.course || 'Data Science & AI';
+  const isPortalBatch = Boolean(
+    studentBatchName.includes('portal') ||
+    studentBatchId === 'batch_portal_students' ||
+    studentDoc?.isPortalOnly ||
+    user?.isPortalOnly
+  );
 
   // Live dynamic fee calculations from database
   const dynamicFeesTotal = Number(studentDoc?.feesTotal ?? user?.feesTotal ?? userProfile?.feesTotal ?? 25000);
   const dynamicFeesPaid = Number(studentDoc?.feesPaidAmount ?? user?.feesPaidAmount ?? userProfile?.feesPaidAmount ?? 0);
   const dynamicFeesRemaining = Number(studentDoc?.feesRemainingAmount ?? Math.max(0, dynamicFeesTotal - dynamicFeesPaid));
   const dynamicFeesStatus = studentDoc?.feesStatus || user?.feesStatus || userProfile?.feesStatus || (dynamicFeesRemaining === 0 ? 'Paid' : (dynamicFeesPaid > 0 ? 'Partially Paid' : 'Pending Payment'));
-  const isPaid = dynamicFeesStatus === 'Paid';
+  const rawAccessExpiresAt = studentDoc?.accessExpiresAt || user?.accessExpiresAt || user?.portalExpiresAt || userProfile?.accessExpiresAt || userProfile?.membership?.expiresAt;
+  const isMembershipExpired = Boolean(user?.isMembershipExpired || userProfile?.isMembershipExpired || (rawAccessExpiresAt && new Date(rawAccessExpiresAt).getTime() < Date.now()));
+  const isPaid = dynamicFeesStatus === 'Paid' && !isMembershipExpired;
   const isPartial = dynamicFeesStatus === 'Partially Paid';
+  const [showRenewalModal, setShowRenewalModal] = useState(false);
+  const autoRenewalPromptedRef = useRef(false);
+
+  useEffect(() => {
+    if (isMembershipExpired && !autoRenewalPromptedRef.current) {
+      autoRenewalPromptedRef.current = true;
+      setShowRenewalModal(true);
+    }
+  }, [isMembershipExpired]);
+
+  // For Portal Students (self-paced), directly open Courses & Recorded Sessions
+  useEffect(() => {
+    if (isPortalBatch && activeTab === 'dashboard') {
+      setActiveTab('recorded-classes-tab');
+    }
+  }, [isPortalBatch]);
 
   // Helper to parse class date/time into timestamp for sorting
   const getClassTimestamp = (item) => {
@@ -1048,173 +1075,31 @@ const StudentDashboard = () => {
   ];
 
   /* ── SIDEBAR ITEMS (LEVLOX CLEAN DESIGN SYSTEM) ── */
-  const navItems = [
-    { id: 'dashboard', icon: <Bookmark size={18} strokeWidth={2} />, label: 'Dashboard' },
-    { id: 'recorded-classes-tab', icon: <BookOpen size={18} strokeWidth={2} />, label: 'Courses' },
-    { id: 'my-courses', icon: <Video size={18} strokeWidth={2} />, label: 'Live Classes' },
-    { id: 'batch-chat-tab', icon: <MessageSquare size={18} strokeWidth={2} />, label: 'Batch Chat' },
-    { id: 'assignments-tab', icon: <FileText size={18} strokeWidth={2} />, label: 'Assignments' },
-    { id: 'attendance-tab', icon: <CalendarCheck size={18} strokeWidth={2} />, label: 'Attendance' },
-    { id: 'announcements-tab', icon: <Megaphone size={18} strokeWidth={2} />, label: 'Notice Board' },
-    { id: 'profile', icon: <User size={18} strokeWidth={2} />, label: 'Profile' },
-  ];
+  const navItems = isPortalBatch
+    ? [
+        { id: 'recorded-classes-tab', icon: <BookOpen size={18} strokeWidth={2} />, label: 'Courses' },
+        { id: 'profile', icon: <User size={18} strokeWidth={2} />, label: 'Profile' },
+        { id: 'dashboard', icon: <Bookmark size={18} strokeWidth={2} />, label: 'Dashboard' },
+        { id: 'my-courses', icon: <Video size={18} strokeWidth={2} />, label: 'Live Classes' },
+        { id: 'batch-chat-tab', icon: <MessageSquare size={18} strokeWidth={2} />, label: 'Batch Chat' },
+        { id: 'assignments-tab', icon: <FileText size={18} strokeWidth={2} />, label: 'Assignments' },
+        { id: 'attendance-tab', icon: <CalendarCheck size={18} strokeWidth={2} />, label: 'Attendance' },
+        { id: 'announcements-tab', icon: <Megaphone size={18} strokeWidth={2} />, label: 'Notice Board' },
+      ]
+    : [
+        { id: 'dashboard', icon: <Bookmark size={18} strokeWidth={2} />, label: 'Dashboard' },
+        { id: 'recorded-classes-tab', icon: <BookOpen size={18} strokeWidth={2} />, label: 'Courses' },
+        { id: 'my-courses', icon: <Video size={18} strokeWidth={2} />, label: 'Live Classes' },
+        { id: 'batch-chat-tab', icon: <MessageSquare size={18} strokeWidth={2} />, label: 'Batch Chat' },
+        { id: 'assignments-tab', icon: <FileText size={18} strokeWidth={2} />, label: 'Assignments' },
+        { id: 'attendance-tab', icon: <CalendarCheck size={18} strokeWidth={2} />, label: 'Attendance' },
+        { id: 'announcements-tab', icon: <Megaphone size={18} strokeWidth={2} />, label: 'Notice Board' },
+        { id: 'profile', icon: <User size={18} strokeWidth={2} />, label: 'Profile' },
+      ];
 
   // ═══ DESKTOP-ONLY ACCESS GATE (ENFORCED SYSTEM ACCESS) ════════
-  if (isMobileScreen && !bypassDesktopGate) {
-    return (
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        width: '100vw',
-        height: '100dvh',
-        background: 'radial-gradient(circle at 50% 25%, #151D36 0%, #0B101D 70%, #060911 100%)',
-        zIndex: 9999999,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px 20px',
-        color: '#FFFFFF',
-        textAlign: 'center',
-        boxSizing: 'border-box',
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        margin: 0
-      }}>
-        <div style={{
-          maxWidth: '440px',
-          width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: 'auto',
-          boxSizing: 'border-box'
-        }}>
-          {/* Brand Logo with Glow */}
-          <div style={{
-            width: 76,
-            height: 76,
-            borderRadius: '50%',
-            background: 'rgba(69, 104, 245, 0.14)',
-            border: '2px solid rgba(69, 104, 245, 0.35)',
-            boxShadow: '0 0 35px rgba(69, 104, 245, 0.45)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 20
-          }}>
-            <img 
-              src={levloxLogo} 
-              alt="Levlox" 
-              style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'contain' }} 
-            />
-          </div>
-
-          {/* Badge */}
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 7,
-            padding: '6px 14px',
-            borderRadius: 999,
-            background: 'rgba(239, 68, 68, 0.12)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            color: '#F87171',
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: 0.6,
-            marginBottom: 16,
-            maxWidth: '100%',
-            boxSizing: 'border-box'
-          }}>
-            <Monitor size={14} /> SYSTEM ACCESS MANDATORY &bull; DESKTOP ONLY
-          </div>
-
-          <h2 style={{
-            fontSize: 'clamp(20px, 5.5vw, 24px)',
-            fontWeight: 800,
-            margin: '0 0 12px',
-            color: '#FFFFFF',
-            letterSpacing: -0.4,
-            lineHeight: 1.3,
-            textAlign: 'center',
-            width: '100%'
-          }}>
-            Desktop or Laptop System Required
-          </h2>
-
-          <p style={{
-            fontSize: 13.5,
-            color: '#94A3B8',
-            maxWidth: 380,
-            lineHeight: 1.6,
-            margin: '0 0 22px',
-            textAlign: 'center',
-            width: '100%'
-          }}>
-            The Levlox Student Portal is strictly designed for PC and Laptop workstations. Full DRM stream protection, live code sandboxes, and proctored assignment verification require computer access.
-          </p>
-
-          {/* System Spec Pill */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: 14,
-            padding: '16px 20px',
-            width: '100%',
-            maxWidth: 380,
-            marginBottom: 22,
-            textAlign: 'left',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: '#93C5FD',
-              marginBottom: 10,
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-              textAlign: 'center'
-            }}>
-              Required System Configuration
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5, color: '#CBD5E1' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Laptop size={16} color="#60A5FA" style={{ flexShrink: 0 }} />
-                <span>Windows PC, Mac, or Linux Computer</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Monitor size={16} color="#60A5FA" style={{ flexShrink: 0 }} />
-                <span>Minimum Resolution: 1024 &times; 768 pixels</span>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ fontSize: 13, color: '#94A3B8', marginBottom: 20, textAlign: 'center', lineHeight: 1.5 }}>
-            Access the portal through laptop. Mobile access is strictly restricted.
-          </div>
-
-          <button
-            onClick={handleLogout}
-            style={{
-              background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: '#FCA5A5',
-              padding: '11px 26px',
-              borderRadius: 12,
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all 0.18s ease'
-            }}
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
-    );
+  if (isMobileDevice() || (isMobileScreen && !bypassDesktopGate)) {
+    return <DesktopOnlyGate />;
   }
 
   return (
@@ -1260,11 +1145,12 @@ const StudentDashboard = () => {
           {navItems.map(item => {
             const isDisabled = mustChangePassword && item.id !== 'settings';
             const isActive = activeTab === item.id;
+            const isCohortLocked = isPortalBatch && ['dashboard', 'my-courses', 'batch-chat-tab', 'assignments-tab', 'attendance-tab', 'announcements-tab'].includes(item.id);
             return (
               <button
                 key={item.label}
                 className={`sidebar-link ${isActive ? 'active' : ''}`}
-                title={sidebarCollapsed ? item.label : undefined}
+                title={sidebarCollapsed ? (isCohortLocked ? `${item.label} (Upgrade Required)` : item.label) : undefined}
                 onClick={() => {
                   if (isDisabled) {
                     showModal('Security Alert', 'You are logged in with a temporary password. Please change your password to unlock the student portal.', 'warning');
@@ -1280,7 +1166,14 @@ const StudentDashboard = () => {
                 style={isDisabled ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
               >
                 {item.icon}
-                <span className="sidebar-link-text">{item.label}</span>
+                <span className="sidebar-link-text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  {item.label}
+                  {isCohortLocked && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 10, color: '#D97706', background: '#FEF3C7', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                      <Lock size={10} /> Locked
+                    </span>
+                  )}
+                </span>
               </button>
             );
           })}
@@ -1338,6 +1231,15 @@ const StudentDashboard = () => {
               <User size={15} color="var(--text-secondary)" /> View Profile
             </button>
             <button
+              onClick={() => {
+                setShowRenewalModal(true);
+                setShowProfileDropdown(false);
+              }}
+              style={{ width: '100%', padding: '9px 12px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13, color: isMembershipExpired ? '#DC2626' : '#2563EB', cursor: 'pointer', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'inherit', fontWeight: 700, marginTop: 2 }}
+            >
+              <Sparkles size={15} /> {isMembershipExpired ? 'Renew Membership' : 'Subscription Status'}
+            </button>
+            <button
               onClick={handleLogout}
               style={{ width: '100%', padding: '9px 12px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13, color: '#EF4444', cursor: 'pointer', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'inherit', fontWeight: 600, marginTop: 2 }}
             >
@@ -1346,15 +1248,204 @@ const StudentDashboard = () => {
           </div>
         )}
 
+        {/* MEMBERSHIP EXPIRED NOTICE BANNER */}
+        {isMembershipExpired && (
+          <div style={{
+            margin: '16px 28px 0',
+            padding: '14px 20px',
+            background: 'linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%)',
+            border: '1.5px solid #FCA5A5',
+            borderRadius: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 4px 14px rgba(239, 68, 68, 0.08)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: 10,
+                background: '#EF4444', color: '#FFFFFF',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }}>
+                <Lock size={20} />
+              </div>
+              <div>
+                <strong style={{ fontSize: 14, color: '#991B1B', display: 'block', marginBottom: 2 }}>
+                  Academy Membership Expired on {rawAccessExpiresAt ? new Date(rawAccessExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'recently'}
+                </strong>
+                <span style={{ fontSize: 12.5, color: '#B91C1C' }}>
+                  Recorded classes, video streaming, and coding modules are locked. Renew your plan to reactivate instant access.
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowRenewalModal(true)}
+              style={{
+                background: '#EF4444',
+                color: '#FFFFFF',
+                border: 'none',
+                padding: '9px 18px',
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)',
+                flexShrink: 0
+              }}
+            >
+              <Sparkles size={14} /> Renew Membership Now
+            </button>
+          </div>
+        )}
+
+        {/* ═══ PORTAL STUDENTS FEATURE GATE (SELF-PACED ONLY) ═══ */}
+        {isPortalBatch && ['dashboard', 'my-courses', 'batch-chat-tab', 'assignments-tab', 'attendance-tab', 'announcements-tab'].includes(activeTab) && (
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: 20,
+            border: '1px solid #E2E8F0',
+            padding: '48px 32px',
+            textAlign: 'center',
+            maxWidth: 620,
+            margin: '40px auto',
+            boxShadow: '0 12px 36px rgba(0,0,0,0.06)'
+          }}>
+            <div style={{
+              width: 68, height: 68, borderRadius: '50%', background: '#FEF3C7',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18
+            }}>
+              <Lock size={30} color="#D97706" />
+            </div>
+            <div style={{
+              display: 'inline-block', background: '#EFF6FF', color: '#2563EB',
+              fontSize: 12, fontWeight: 700, padding: '4px 14px', borderRadius: 20, marginBottom: 12
+            }}>
+              Your Plan: Self-Paced Learning (Recorded Courses)
+            </div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: '0 0 10px' }}>
+              Live Trainer Classes (Optional Upgrade)
+            </h2>
+            <p style={{ fontSize: 14, color: '#64748B', lineHeight: 1.6, margin: '0 0 20px' }}>
+              This section is for students attending daily live online classes with a trainer.
+              <br />
+              With your current membership, you already have <strong>24/7 unlimited access</strong> to all recorded courses, video lessons, and projects anytime!
+            </p>
+
+            <div style={{
+              background: '#F8FAFC', borderRadius: 12, padding: '16px 20px', border: '1px solid #E2E8F0',
+              textAlign: 'left', fontSize: 13, color: '#334155', marginBottom: 20
+            }}>
+              <div style={{ fontWeight: 700, color: '#0F172A', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <CheckCircle size={16} color="#10B981" /> Included in Your Student Portal:
+              </div>
+              <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <li>Python & Advanced Python (All Video Lessons)</li>
+                <li>Machine Learning & SQL Masterclasses</li>
+                <li>Hands-on Industry Practice Projects</li>
+                <li>Downloadable Notes & Study Materials</li>
+                <li>24/7 Trainer Query & Help Support</li>
+              </ul>
+            </div>
+
+            {/* UPGRADE / ADMISSIONS CONTACT BOX */}
+            <div style={{
+              background: 'linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)',
+              borderRadius: 14,
+              padding: '18px 20px',
+              border: '1.5px solid #BFDBFE',
+              textAlign: 'left',
+              marginBottom: 22,
+              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.05)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <Sparkles size={17} color="#2563EB" />
+                <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#1E293B' }}>
+                  Want to Join Daily Live Classes with a Trainer?
+                </h4>
+              </div>
+              <p style={{ margin: '0 0 14px', fontSize: 13, color: '#475569', lineHeight: 1.55 }}>
+                If you want to attend daily live online classes with an instructor and 1-on-1 code reviews, contact the Levlox Tech team to upgrade:
+              </p>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 12,
+                background: '#FFFFFF',
+                padding: '12px 14px',
+                borderRadius: 10,
+                border: '1px solid #DBEAFE'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: '50%', background: '#EFF6FF',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB', flexShrink: 0
+                  }}>
+                    <Mail size={16} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      Contact Levlox Tech
+                    </div>
+                    <a
+                      href="mailto:sales@levlox.in?subject=Upgrade%20to%20Live%20Classes&body=Hello%20Levlox%20Tech%20Team%2C%0A%0AI%20am%20a%20portal%20student%20and%20I%20would%20like%20to%20upgrade%20my%20plan%20to%20attend%20daily%20live%20classes%20with%20a%20trainer.%0A%0AMy%20Name%3A%20%0AMy%20Email%3A%20%0APhone%3A%20%0A%0AThank%20you!"
+                      style={{ fontSize: 14, fontWeight: 800, color: '#2563EB', textDecoration: 'none' }}
+                    >
+                      sales@levlox.in
+                    </a>
+                  </div>
+                </div>
+
+                <a
+                  href="mailto:sales@levlox.in?subject=Upgrade%20to%20Live%20Classes&body=Hello%20Levlox%20Tech%20Team%2C%0A%0AI%20am%20a%20portal%20student%20and%20I%20would%20like%20to%20upgrade%20my%20plan%20to%20attend%20daily%20live%20classes%20with%20a%20trainer.%0A%0AMy%20Name%3A%20%0AMy%20Email%3A%20%0APhone%20Number%3A%20%0A%0AThank%20you!"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: '#2563EB',
+                    color: '#FFFFFF',
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    padding: '9px 16px',
+                    borderRadius: 8,
+                    textDecoration: 'none',
+                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)'
+                  }}
+                >
+                  <Mail size={14} /> Contact Levlox Tech →
+                </a>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveTab('recorded-classes-tab')}
+              style={{
+                background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                color: '#FFF', fontSize: 14, fontWeight: 700, padding: '12px 26px',
+                borderRadius: 10, border: 'none', cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)'
+              }}
+            >
+              Watch Recorded Video Courses →
+            </button>
+          </div>
+        )}
+
         {/* ══════════════════════════════════════════
-            DASHBOARD TAB — PREMIUM LAYOUT
+            DASHBOARD TAB — PREMIUM LAYOUT (LIVE COHORT STUDENTS ONLY)
         ═══════════════════════════════════════════ */}
         {/* Core data still loading — show the shell with placeholders rather
             than an empty content area. */}
-        {activeTab === 'dashboard' && coreLoading && <DashboardSkeleton />}
+        {activeTab === 'dashboard' && !isPortalBatch && coreLoading && <DashboardSkeleton />}
 
         {/* Core load failed — explain it and offer a retry instead of a blank page. */}
-        {activeTab === 'dashboard' && !coreLoading && coreError && (
+        {activeTab === 'dashboard' && !isPortalBatch && !coreLoading && coreError && (
           <div style={{
             background: '#FFF',
             border: '1.5px solid #FCA5A5',
@@ -1375,7 +1466,7 @@ const StudentDashboard = () => {
           </div>
         )}
 
-        {activeTab === 'dashboard' && !coreLoading && !coreError && dashboardData && (
+        {activeTab === 'dashboard' && !isPortalBatch && !coreLoading && !coreError && dashboardData && (
           <div className="animate-fade-in">
             {/* 1. ULTRA-PREMIUM LEVLOX HERO WELCOME BANNER (MATCHING USER REFERENCE) */}
             <div className="levlox-welcome-banner">
@@ -2230,7 +2321,7 @@ const StudentDashboard = () => {
         )}
 
         {/* ENROLLED / LIVE CLASSES TAB */}
-        {activeTab === 'my-courses' && (
+        {activeTab === 'my-courses' && !isPortalBatch && (
           <div className="dashboard-card-section">
             {/* ── TOP SECTION HEADER WITH 3D GLASS ACCENT ── */}
             <div style={{
@@ -3006,7 +3097,7 @@ const StudentDashboard = () => {
           </div>
         }>
           {/* BATCH CHAT TAB */}
-          {activeTab === 'batch-chat-tab' && (
+          {activeTab === 'batch-chat-tab' && !isPortalBatch && (
             <div className="animate-fade-in" style={{ height: 'calc(100vh - 120px)', maxHeight: 'calc(100vh - 120px)', overflow: 'hidden' }}>
               <BatchChatPage user={user} userProfile={userProfile} />
             </div>
@@ -3018,13 +3109,15 @@ const StudentDashboard = () => {
               recordedClasses={dashboardData?.recordedClasses || null}
               customPlaylists={extrasData?.playlists || null}
               isPaid={isPaid}
+              isMembershipExpired={isMembershipExpired}
+              onOpenRenewal={() => setShowRenewalModal(true)}
               initialCourseId={replayTarget?.courseId || null}
               initialLessonId={replayTarget?.lessonId || null}
             />
           )}
 
           {/* ASSIGNMENTS & CAPSTONE PROJECTS TAB */}
-          {activeTab === 'assignments-tab' && (
+          {activeTab === 'assignments-tab' && !isPortalBatch && (
             <AssignmentsPage
               batchAssignments={batchAssignments}
               submissions={submissions}
@@ -3038,12 +3131,12 @@ const StudentDashboard = () => {
           )}
 
           {/* ATTENDANCE TAB */}
-          {activeTab === 'attendance-tab' && dashboardData && (
+          {activeTab === 'attendance-tab' && !isPortalBatch && dashboardData && (
             <AttendancePage dashboardData={dashboardData} />
           )}
 
           {/* ANNOUNCEMENTS TAB */}
-          {activeTab === 'announcements-tab' && dashboardData && (
+          {activeTab === 'announcements-tab' && !isPortalBatch && dashboardData && (
             <div className="dashboard-card-section">
               <div style={{
                 display: 'flex',
@@ -3399,6 +3492,16 @@ const StudentDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* MEMBERSHIP RENEWAL MODAL */}
+      <MembershipRenewalModal
+        isOpen={showRenewalModal}
+        onClose={() => setShowRenewalModal(false)}
+        onSuccess={() => {
+          setShowRenewalModal(false);
+          queryClient.invalidateQueries();
+        }}
+      />
     </div>
   );
 };

@@ -23,6 +23,10 @@ const PageTitleManager = () => {
       title = 'Levlox Trainer Portal';
     } else if (path.startsWith('/login')) {
       title = 'Levlox Portal — Login';
+    } else if (path.startsWith('/register')) {
+      title = 'Levlox Academy — Prospective Student Registration';
+    } else if (path.startsWith('/academy')) {
+      title = 'Levlox Academy — Explore & Membership Showcase';
     } else if (path.startsWith('/reset-password')) {
       title = 'Levlox Portal — Reset Password';
     } else if (path.startsWith('/verify-email')) {
@@ -46,6 +50,8 @@ const StudentDetailsPage = lazy(() => import('./pages/StudentDetailsPage'));
 const BatchDetailsPage = lazy(() => import('./pages/BatchDetailsPage'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const RegisterSignup = lazy(() => import('./pages/RegisterSignup'));
+const AcademyShowcase = lazy(() => import('./pages/AcademyShowcase'));
 
 /**
  * Root redirect — uses Firebase Auth state to send users to the right place.
@@ -74,6 +80,9 @@ function App() {
               <Routes>
                 {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<RegisterSignup />} />
+                <Route path="/academy" element={<AcademyShowcase />} />
+                <Route path="/register/showcase" element={<AcademyShowcase />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
 

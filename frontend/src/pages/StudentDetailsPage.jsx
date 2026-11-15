@@ -156,8 +156,9 @@ const StudentDetailsPage = () => {
     setIsDeleting(true);
     setDeleteError(null);
     try {
-      await deleteStudentDoc('students', studentId);
-      await deleteStudentDoc('users', studentId).catch(() => {});
+      const studentEmail = student?.email || '';
+      await deleteStudentDoc('students', studentId, studentEmail ? { email: studentEmail } : {});
+      await deleteStudentDoc('users', studentId, studentEmail ? { email: studentEmail } : {}).catch(() => {});
       queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
       navigate('/admin?tab=students', { state: { tab: 'students' } });
     } catch (err) {

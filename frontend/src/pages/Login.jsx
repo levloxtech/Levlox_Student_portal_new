@@ -17,6 +17,7 @@ import {
 
 
 import CustomModal from '../components/Modal';
+import { isMobileDevice } from '../utils/device';
 import leveloxLogo from '../assets/levelox-icon-transparent.png';
 import { normalizeMobile, mobileToAuthId, isValidMobile } from '../services/phoneIdentity';
 import { resendVerificationEmail } from '../services/emailService';
@@ -24,14 +25,6 @@ import { useAuth } from '../context/AuthContext';
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECONDS = 30;
-
-export const isMobileDevice = () => {
-  if (typeof window === 'undefined') return false;
-  const ua = navigator.userAgent || navigator.vendor || window.opera || '';
-  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(ua);
-  const isSmallTouch = window.innerWidth <= 768 && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-  return isMobileUA || isSmallTouch;
-};
 
 const Login = () => {
   /* ─── Form state ─── */
@@ -74,7 +67,15 @@ const Login = () => {
 
   /* ════ AUTO REDIRECT IF ALREADY AUTHENTICATED ════ */
   useEffect(() => {
+    // Never auto-redirect on mobile devices (portal is desktop only)
+    if (isMobileDevice()) return;
+
     const token = localStorage.getItem('levlox_auth_token');
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('switch') === 'true' || params.get('logout') === 'true') {
+      return;
+    }
+
     if (!authLoading && currentUser && token && userRole) {
       if (userRole === 'admin') window.location.replace('/admin');
       else if (userRole === 'trainer') window.location.replace('/trainer');
@@ -104,7 +105,7 @@ const Login = () => {
     const params = new URLSearchParams(window.location.search);
     const reason = params.get('reason');
     const reasonMessages = {
-      session_revoked: ['Session Revoked', 'Your user account has been removed or your session was terminated by the administrator.', 'warning'],
+      session_revoked: ['Logged Out on This Device', 'Your account was signed in from another device or browser. To protect your learning portal, only one active device session is permitted at a time.', 'warning'],
       session_expired: ['Session Expired', 'Your session has expired. Please sign in again.', 'info'],
       no_profile: ['Profile Not Found', 'Your sign-in succeeded but no portal profile is linked to this account. Please contact your Levlox administrator.', 'warning'],
     };
@@ -331,12 +332,12 @@ const Login = () => {
     if (!valid) return;
 
     if (isMobileDevice()) {
-      const isAdminEmail = rawInput.toLowerCase() === 'levloxtech@gmail.com' || rawInput.toLowerCase() === 'admin';
-      if (!isAdminEmail) {
-        setPassError('Access Restricted: Please access the portal through laptop. Mobile access is not permitted.');
-        showToast('Access Restricted', 'Please access the portal through laptop. Mobile phone access is not permitted.', 'warning');
-        return;
-      }
+      setPassError('Access Restricted: Please log in through laptop. Mobile access is not permitted for students or administrators.');
+      setModalTitle('Laptop / Desktop System Required');
+      setModalText('Portal access for students and administrators is strictly restricted to laptop and desktop workstations. Please log in through your laptop to access your dashboard.\n\nNote: You can view Academy plans and register on mobile at /academy.');
+      setModalType('warning');
+      setModalOpen(true);
+      return;
     }
 
     setLoading(true);
@@ -818,7 +819,31 @@ const Login = () => {
         confirmText="Dismiss"
         onConfirm={() => setModalOpen(false)}
       >
-        <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.65 }}>{modalText}</p>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: '0 0 16px', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{modalText}</p>
+        {isMobileDevice() && (
+          <div style={{ marginTop: 10 }}>
+            <a
+              href="/academy"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                width: '100%',
+                padding: '10px 16px',
+                borderRadius: 8,
+                background: '#4568F5',
+                color: '#FFFFFF',
+                fontWeight: 700,
+                fontSize: 13,
+                textDecoration: 'none',
+                boxSizing: 'border-box'
+              }}
+            >
+              Explore Academy Showcase →
+            </a>
+          </div>
+        )}
       </CustomModal>
 
       <style>{`

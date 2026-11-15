@@ -116,7 +116,7 @@ export const AuthProvider = ({ children }) => {
       } catch (err) {
         // Transient network error, ignore
       }
-    }, 4000);
+    }, 2500);
 
     return () => clearInterval(interval);
   }, [currentUser]);

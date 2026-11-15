@@ -227,19 +227,31 @@ function ensureSuperAdmin() {
   saveCollection('admins');
 }
 
-// Persistent token storage
+// Persistent token storage with Single-Device Concurrent Session Enforcement
 function createSession(user) {
+  const targetId = user.id || user.uid;
+  const targetEmail = (user.email || '').toLowerCase().trim();
+
+  // SINGLE DEVICE POLICY:
+  // Revoke all prior active sessions for this user so only one device can access the portal at a time.
+  const sessions = loadCollection('sessions');
+  const filtered = sessions.filter((s) => {
+    if (targetId && (String(s.userId) === String(targetId) || String(s.uid) === String(targetId))) return false;
+    if (targetEmail && (s.email || '').toLowerCase().trim() === targetEmail) return false;
+    return true;
+  });
+
   const token = crypto.randomBytes(32).toString('hex');
   const session = {
     token,
-    userId: user.id || user.uid,
-    email: user.email,
+    userId: targetId,
+    email: targetEmail,
     role: user.role,
     createdAt: Date.now(),
     expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
   };
-  const sessions = loadCollection('sessions');
-  sessions.push(session);
+  filtered.push(session);
+  cache['sessions'] = filtered;
   saveCollection('sessions');
   return token;
 }
@@ -286,6 +298,188 @@ function revokeUserSessions(userId, email) {
   saveCollection('sessions');
 }
 
+function purgeUserCompletely(identifier, explicitEmail) {
+  const emailsToPurge = new Set();
+  const idsToPurge = new Set();
+
+  if (explicitEmail && typeof explicitEmail === 'string' && explicitEmail.trim()) {
+    emailsToPurge.add(explicitEmail.trim().toLowerCase());
+  }
+
+  const idStr = identifier ? String(identifier).trim() : null;
+  if (idStr) {
+    if (idStr.includes('@')) {
+      emailsToPurge.add(idStr.toLowerCase());
+    } else {
+      idsToPurge.add(idStr);
+    }
+  }
+
+  // 1. Scan students to discover linked email and IDs
+  try {
+    const students = loadCollection('students');
+    students.forEach((s) => {
+      const matchId = (s.id && idsToPurge.has(String(s.id))) || (s.uid && idsToPurge.has(String(s.uid))) || (s.rollNumber && idsToPurge.has(String(s.rollNumber)));
+      const matchEmail = s.email && emailsToPurge.has(String(s.email).trim().toLowerCase());
+      if (matchId || matchEmail) {
+        if (s.id) idsToPurge.add(String(s.id));
+        if (s.uid) idsToPurge.add(String(s.uid));
+        if (s.rollNumber) idsToPurge.add(String(s.rollNumber));
+        if (s.email) emailsToPurge.add(String(s.email).trim().toLowerCase());
+      }
+    });
+  } catch (_) {}
+
+  // 2. Scan users
+  try {
+    const users = loadCollection('users');
+    users.forEach((u) => {
+      const matchId = (u.id && idsToPurge.has(String(u.id))) || (u.uid && idsToPurge.has(String(u.uid)));
+      const matchEmail = u.email && emailsToPurge.has(String(u.email).trim().toLowerCase());
+      if (matchId || matchEmail) {
+        if (u.id) idsToPurge.add(String(u.id));
+        if (u.uid) idsToPurge.add(String(u.uid));
+        if (u.email) emailsToPurge.add(String(u.email).trim().toLowerCase());
+      }
+    });
+  } catch (_) {}
+
+  // 3. Scan leads
+  try {
+    const leads = loadCollection('leads');
+    leads.forEach((l) => {
+      const matchId = (l.id && idsToPurge.has(String(l.id))) || (l.studentId && idsToPurge.has(String(l.studentId)));
+      const matchEmail = l.email && emailsToPurge.has(String(l.email).trim().toLowerCase());
+      if (matchId || matchEmail) {
+        if (l.id) idsToPurge.add(String(l.id));
+        if (l.studentId) idsToPurge.add(String(l.studentId));
+        if (l.email) emailsToPurge.add(String(l.email).trim().toLowerCase());
+      }
+    });
+  } catch (_) {}
+
+  // 4. Scan memberships
+  try {
+    const memberships = loadCollection('memberships');
+    memberships.forEach((m) => {
+      const matchId = (m.id && idsToPurge.has(String(m.id))) || (m.studentId && idsToPurge.has(String(m.studentId)));
+      const matchEmail = m.email && emailsToPurge.has(String(m.email).trim().toLowerCase());
+      if (matchId || matchEmail) {
+        if (m.id) idsToPurge.add(String(m.id));
+        if (m.studentId) idsToPurge.add(String(m.studentId));
+        if (m.email) emailsToPurge.add(String(m.email).trim().toLowerCase());
+      }
+    });
+  } catch (_) {}
+
+  // Perform permanent cleanups across collections:
+  // students
+  try {
+    const students = loadCollection('students');
+    const filtered = students.filter(s => {
+      if (s.id && idsToPurge.has(String(s.id))) return false;
+      if (s.uid && idsToPurge.has(String(s.uid))) return false;
+      if (s.rollNumber && idsToPurge.has(String(s.rollNumber))) return false;
+      if (s.email && emailsToPurge.has(String(s.email).trim().toLowerCase())) return false;
+      return true;
+    });
+    cache['students'] = filtered;
+    saveCollection('students');
+  } catch (_) {}
+
+  // users
+  try {
+    const users = loadCollection('users');
+    const filtered = users.filter(u => {
+      if (u.id && idsToPurge.has(String(u.id))) return false;
+      if (u.uid && idsToPurge.has(String(u.uid))) return false;
+      if (u.email && emailsToPurge.has(String(u.email).trim().toLowerCase())) return false;
+      return true;
+    });
+    cache['users'] = filtered;
+    saveCollection('users');
+  } catch (_) {}
+
+  // leads
+  try {
+    const leads = loadCollection('leads');
+    const filtered = leads.filter(l => {
+      if (l.id && idsToPurge.has(String(l.id))) return false;
+      if (l.studentId && idsToPurge.has(String(l.studentId))) return false;
+      if (l.email && emailsToPurge.has(String(l.email).trim().toLowerCase())) return false;
+      return true;
+    });
+    cache['leads'] = filtered;
+    saveCollection('leads');
+  } catch (_) {}
+
+  // memberships
+  try {
+    const memberships = loadCollection('memberships');
+    const filtered = memberships.filter(m => {
+      if (m.id && idsToPurge.has(String(m.id))) return false;
+      if (m.studentId && idsToPurge.has(String(m.studentId))) return false;
+      if (m.email && emailsToPurge.has(String(m.email).trim().toLowerCase())) return false;
+      return true;
+    });
+    cache['memberships'] = filtered;
+    saveCollection('memberships');
+  } catch (_) {}
+
+  // store_credits
+  try {
+    const credits = loadCollection('store_credits');
+    const filtered = credits.filter(c => {
+      if (c.email && emailsToPurge.has(String(c.email).trim().toLowerCase())) return false;
+      return true;
+    });
+    cache['store_credits'] = filtered;
+    saveCollection('store_credits');
+  } catch (_) {}
+
+  // deletedUsers
+  try {
+    const deleted = loadCollection('deletedUsers');
+    const filtered = deleted.filter(d => {
+      if (d.uid && idsToPurge.has(String(d.uid))) return false;
+      if (d.email && emailsToPurge.has(String(d.email).trim().toLowerCase())) return false;
+      return true;
+    });
+    cache['deletedUsers'] = filtered;
+    saveCollection('deletedUsers');
+  } catch (_) {}
+
+  // batches - remove from student_ids list
+  try {
+    const batches = loadCollection('batches');
+    let batchesChanged = false;
+    batches.forEach(b => {
+      if (Array.isArray(b.student_ids)) {
+        const origLen = b.student_ids.length;
+        b.student_ids = b.student_ids.filter(sid => !idsToPurge.has(String(sid)));
+        if (b.student_ids.length !== origLen) batchesChanged = true;
+      }
+    });
+    if (batchesChanged) {
+      cache['batches'] = batches;
+      saveCollection('batches');
+    }
+  } catch (_) {}
+
+  // Revoke sessions
+  for (const email of emailsToPurge) {
+    revokeUserSessions(null, email);
+  }
+  for (const id of idsToPurge) {
+    revokeUserSessions(id, null);
+  }
+
+  return {
+    purgedEmails: Array.from(emailsToPurge),
+    purgedIds: Array.from(idsToPurge)
+  };
+}
+
 ensureSuperAdmin();
 
 module.exports = {
@@ -297,6 +491,7 @@ module.exports = {
   setDocument,
   updateDocument,
   deleteDocument,
+  purgeUserCompletely,
   hashPassword,
   verifyPassword,
   ensureSuperAdmin,
