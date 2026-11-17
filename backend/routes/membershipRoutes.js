@@ -130,10 +130,10 @@ router.get('/check-email', (req, res) => {
 
     if (isUser || isStudent) {
       return res.json({
-        available: false,
-        registered: true,
+        available: true,
+        registered: false,
         isExistingPortalUser: true,
-        message: 'This email is already registered. Please sign in to your account.'
+        message: 'Welcome back! Existing account found. You can proceed to explore Academy courses.'
       });
     }
 
@@ -157,20 +157,12 @@ router.post('/register-lead', (req, res) => {
 
   const normEmail = email.toLowerCase().trim();
 
-  // Dynamic check: Do NOT allow registration if email is already an active student/user
   const users = localDb.loadCollection('users');
   const students = localDb.loadCollection('students');
   let leads = localDb.loadCollection('leads');
 
   const isUser = users.some(u => u.email?.toLowerCase() === normEmail);
   const isStudent = students.some(s => s.email?.toLowerCase() === normEmail);
-
-  if (isUser || isStudent) {
-    return res.status(409).json({
-      error: 'This email is already registered. Please sign in to your account.',
-      alreadyRegistered: true
-    });
-  }
 
   let matchedLead = leads.find(l => l.email?.toLowerCase() === normEmail);
   if (matchedLead) {
@@ -187,8 +179,8 @@ router.post('/register-lead', (req, res) => {
       phone: phone.trim(),
       userType: userType || 'student',
       password: password ? String(password).trim() : null,
-      status: 'registered_lead',
-      portalAccessGranted: false, // Access explicitly DENIED until verified payment
+      status: (isUser || isStudent) ? 'existing_member' : 'registered_lead',
+      portalAccessGranted: Boolean(isUser || isStudent),
       createdAt: new Date().toISOString()
     };
     leads.push(matchedLead);
@@ -201,6 +193,7 @@ router.post('/register-lead', (req, res) => {
   res.json({
     success: true,
     message: 'Lead registered successfully.',
+    isExistingPortalUser: Boolean(isUser || isStudent),
     lead: {
       id: matchedLead.id,
       name: matchedLead.name,

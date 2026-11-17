@@ -22,17 +22,18 @@ export default function RegisterSignup() {
     checking: false,
     checked: false,
     registered: null,
+    isExisting: false,
     message: ''
   });
 
   const isValidEmail = (email) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email || '').trim());
   };
 
   const checkEmailAvailability = async (emailToCheck) => {
     const cleanEmail = (emailToCheck || '').trim().toLowerCase();
     if (!cleanEmail || !isValidEmail(cleanEmail)) {
-      setEmailStatus({ checking: false, checked: false, registered: null, message: '' });
+      setEmailStatus({ checking: false, checked: false, registered: null, isExisting: false, message: '' });
       return null;
     }
 
@@ -40,19 +41,21 @@ export default function RegisterSignup() {
     try {
       const res = await fetch(`/api/membership/check-email?email=${encodeURIComponent(cleanEmail)}`);
       const data = await res.json();
-      if (data.registered) {
+      if (data.isExistingPortalUser) {
         setEmailStatus({
           checking: false,
           checked: true,
-          registered: true,
-          message: data.message || 'This email is already registered. Please sign in to your account.'
+          registered: false,
+          isExisting: true,
+          message: data.message || 'Welcome back! Existing account found.'
         });
-        return false;
+        return true;
       } else {
         setEmailStatus({
           checking: false,
           checked: true,
           registered: false,
+          isExisting: false,
           message: 'Email is available'
         });
         return true;
@@ -62,6 +65,7 @@ export default function RegisterSignup() {
         checking: false,
         checked: false,
         registered: null,
+        isExisting: false,
         message: ''
       });
       return null;
@@ -72,7 +76,7 @@ export default function RegisterSignup() {
   useEffect(() => {
     const clean = formData.email.trim();
     if (!clean || !isValidEmail(clean)) {
-      setEmailStatus({ checking: false, checked: false, registered: null, message: '' });
+      setEmailStatus({ checking: false, checked: false, registered: null, isExisting: false, message: '' });
       return;
     }
 
@@ -87,12 +91,16 @@ export default function RegisterSignup() {
     e.preventDefault();
     setError('');
 
-    if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim()) {
+    const cleanName = (formData.name || '').trim();
+    const cleanEmail = (formData.email || '').trim().toLowerCase();
+    const cleanPhone = (formData.phone || '').trim();
+
+    if (!cleanName || !cleanEmail || !cleanPhone) {
       setError('Please provide your Full Name, Email Address, and Mobile Number.');
       return;
     }
 
-    if (!isValidEmail(formData.email)) {
+    if (!isValidEmail(cleanEmail)) {
       setError('Please enter a valid email address.');
       return;
     }
@@ -107,53 +115,30 @@ export default function RegisterSignup() {
       return;
     }
 
-    // Dynamic verification check: block moving to the next step if already registered
-    if (emailStatus.registered === true) {
-      setError('This email is already registered. Please sign in to your account.');
-      return;
-    }
-
     setLoading(true);
     try {
-      // Dynamic verification on submit before advancing
-      const isAvailable = await checkEmailAvailability(formData.email);
-      if (isAvailable === false) {
-        setError('This email is already registered. Please sign in to your account.');
-        setLoading(false);
-        return;
-      }
-
       // 1. Submit lead details to backend - stores in leads.json
       const res = await fetch('/api/membership/register-lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: formData.name.trim(),
-          email: formData.email.toLowerCase().trim(),
-          phone: formData.phone.trim(),
+          name: cleanName,
+          email: cleanEmail,
+          phone: cleanPhone,
           userType: formData.userType,
           password: formData.password
         })
       });
       const data = await res.json();
       if (!res.ok) {
-        if (data.alreadyRegistered || res.status === 409) {
-          setEmailStatus({
-            checking: false,
-            checked: true,
-            registered: true,
-            message: data.error || 'This email is already registered. Please sign in to your account.'
-          });
-          throw new Error('This email is already registered. Please sign in to your account.');
-        }
         throw new Error(data.error || 'Failed to submit registration');
       }
 
       // 2. Save lead context locally for showcase page
       const leadPayload = {
-        name: formData.name.trim(),
-        email: formData.email.toLowerCase().trim(),
-        phone: formData.phone.trim(),
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
         userType: formData.userType,
         password: formData.password,
         credits: data.credits?.balance || 3600
@@ -528,43 +513,43 @@ export default function RegisterSignup() {
                       }}
                       className="register-input"
                       style={{
-                        borderColor: emailStatus.registered === true
-                          ? '#EF4444'
+                        borderColor: emailStatus.isExisting
+                          ? '#3B82F6'
                           : emailStatus.registered === false
                           ? '#10B981'
                           : undefined,
-                        background: emailStatus.registered === true
-                          ? '#FEF2F2'
+                        background: emailStatus.isExisting
+                          ? '#EFF6FF'
                           : undefined
                       }}
                     />
                   </div>
 
-                  {/* Registered Error Warning Banner with Login Shortcut */}
-                  {emailStatus.registered === true && (
+                  {/* Existing Account Notice Banner with Login Shortcut */}
+                  {emailStatus.isExisting && (
                     <div style={{
                       marginTop: 8,
                       padding: '10px 12px',
-                      background: '#FEF2F2',
-                      border: '1px solid #FECACA',
+                      background: '#EFF6FF',
+                      border: '1px solid #BFDBFE',
                       borderRadius: 10,
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 6
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#B91C1C', fontSize: 12, fontWeight: 700 }}>
-                        <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                        <span>This email is already registered!</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#1D4ED8', fontSize: 12, fontWeight: 700 }}>
+                        <CheckCircle size={15} style={{ flexShrink: 0 }} />
+                        <span>Welcome back! Existing account found.</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, paddingTop: 2 }}>
-                        <span style={{ fontSize: 11, color: '#7F1D1D' }}>
-                          Already have an account? Sign in instead.
+                        <span style={{ fontSize: 11, color: '#1E40AF' }}>
+                          You can continue to explore Academy courses or sign in.
                         </span>
                         <button
                           type="button"
                           onClick={() => navigate('/login')}
                           style={{
-                            background: '#DC2626',
+                            background: '#2563EB',
                             color: '#FFFFFF',
                             border: 'none',
                             borderRadius: 6,
@@ -584,7 +569,7 @@ export default function RegisterSignup() {
                   )}
 
                   {/* Available Confirmation */}
-                  {emailStatus.registered === false && (
+                  {emailStatus.registered === false && !emailStatus.isExisting && (
                     <div style={{
                       marginTop: 6,
                       display: 'flex',
@@ -756,32 +741,28 @@ export default function RegisterSignup() {
 
                 <button
                   type="submit"
-                  disabled={loading || emailStatus.checking || emailStatus.registered === true}
+                  disabled={loading || emailStatus.checking}
                   style={{
                     width: '100%',
                     minHeight: 48,
                     padding: '14px 22px',
                     borderRadius: 12,
-                    background: emailStatus.registered === true
-                      ? '#94A3B8'
-                      : 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                    background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
                     color: '#FFF',
                     fontSize: 15,
                     fontWeight: 700,
                     border: 'none',
-                    cursor: (loading || emailStatus.checking || emailStatus.registered === true) ? 'not-allowed' : 'pointer',
+                    cursor: (loading || emailStatus.checking) ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 8,
-                    boxShadow: emailStatus.registered === true ? 'none' : '0 6px 20px rgba(37, 99, 235, 0.35)',
+                    boxShadow: '0 6px 20px rgba(37, 99, 235, 0.35)',
                     transition: 'all 0.15s ease'
                   }}
                 >
                   {emailStatus.checking
                     ? 'Verifying Email...'
-                    : emailStatus.registered === true
-                    ? 'Email Already Registered'
                     : loading
                     ? 'Submitting...'
                     : 'Explore Levlox Academy →'}
