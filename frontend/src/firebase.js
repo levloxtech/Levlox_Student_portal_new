@@ -65,9 +65,12 @@ if (USE_EMULATOR) {
 
 // Keep the session across reloads/tabs. Fire-and-forget: onAuthStateChanged
 // still resolves correctly if this rejects (e.g. storage blocked in private mode).
-setPersistence(auth, browserLocalPersistence).catch((err) => {
-  console.warn("[Firebase] Could not set local auth persistence:", err?.code || err);
-});
+const isDummyKey = !firebaseConfig.apiKey || firebaseConfig.apiKey.includes('DummyKey');
+if (!isDummyKey) {
+  setPersistence(auth, browserLocalPersistence).catch((err) => {
+    console.warn("[Firebase] Could not set local auth persistence:", err?.code || err);
+  });
+}
 
 /**
  * Create a user without disturbing the currently signed-in session.

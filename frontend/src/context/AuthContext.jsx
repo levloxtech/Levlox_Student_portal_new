@@ -126,7 +126,15 @@ export const AuthProvider = ({ children }) => {
     const handleNavigationSecurity = () => {
       const token = localStorage.getItem(TOKEN_KEY);
       const pathname = window.location.pathname;
-      const isPublic = pathname === '/login' || pathname === '/reset-password' || pathname === '/verify-email';
+      const lower = (pathname || '').toLowerCase().replace(/\/+$/, '') || '/';
+      const isPublic =
+        lower === '/login' ||
+        lower === '/register' ||
+        lower.startsWith('/register/') ||
+        lower === '/academy' ||
+        lower.startsWith('/academy/') ||
+        lower === '/reset-password' ||
+        lower === '/verify-email';
       if (!token && !isPublic) {
         window.location.replace('/login');
       }
