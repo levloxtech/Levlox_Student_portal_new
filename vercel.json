@@ -2,15 +2,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://election-rick-again-concerts.trycloudflare.com/api/:path*"
+      "destination": "https://near-pharmacology-rarely-spirit.trycloudflare.com/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://election-rick-again-concerts.trycloudflare.com/health"
+      "destination": "https://near-pharmacology-rarely-spirit.trycloudflare.com/health"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://election-rick-again-concerts.trycloudflare.com/uploads/:path*"
+      "destination": "https://near-pharmacology-rarely-spirit.trycloudflare.com/uploads/:path*"
     },
     {
       "source": "/(.*)",
