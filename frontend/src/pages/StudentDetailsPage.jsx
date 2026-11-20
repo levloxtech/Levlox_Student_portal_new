@@ -16,6 +16,7 @@ import {
   getDocuments,
   getBatches,
   assignStudentsToBatch,
+  transferStudentBatch,
   classifyFirestoreError,
   formatCurrency,
   getStudentFeeDetails,
@@ -73,6 +74,33 @@ const StudentDetailsPage = () => {
     queryFn: getBatches,
     staleTime: 1000 * 30,
   });
+
+  const [isChangingBatch, setIsChangingBatch] = useState(false);
+  const [showChangeBatchModal, setShowChangeBatchModal] = useState(false);
+  const [selectedNewBatchId, setSelectedNewBatchId] = useState('');
+
+  const handleDirectBatchChange = async (newBatchId) => {
+    if (!studentId || isChangingBatch) return;
+    try {
+      setIsChangingBatch(true);
+      const res = await transferStudentBatch(studentId, newBatchId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['adminStudentDetails', studentId] }),
+        queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] }),
+        queryClient.invalidateQueries({ queryKey: ['adminBatches'] }),
+      ]);
+      await refetchStudent();
+      setShowChangeBatchModal(false);
+      setSaveSuccessMessage(res?.batchName ? `Student successfully transferred to batch "${res.batchName}"!` : 'Student removed from batch.');
+      setTimeout(() => setSaveSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('[StudentDetails] Transfer batch error:', err);
+      setSaveErrorMessage(err.message || 'Failed to update student batch.');
+      setTimeout(() => setSaveErrorMessage(null), 4000);
+    } finally {
+      setIsChangingBatch(false);
+    }
+  };
 
   // Fetch Student document
   const {
@@ -429,6 +457,34 @@ const StudentDetailsPage = () => {
             <Pencil size={15} /> Edit Student
           </button>
 
+          {/* Change Batch Button */}
+          <button
+            onClick={() => {
+              const curId = student.batch_id || student.batchId || (batches.find(b => b.name === (student.batch_name || student.batch))?.id) || '';
+              setSelectedNewBatchId(curId);
+              setShowChangeBatchModal(true);
+            }}
+            style={{
+              background: '#F5F3FF',
+              border: '1.5px solid #DDD6FE',
+              color: '#6C3CF0',
+              padding: '8px 16px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 7,
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.background = '#EDE9FE'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = '#F5F3FF'; }}
+            title="Change this student to another batch"
+          >
+            <Users size={15} /> Change Batch
+          </button>
+
           {/* Send Email Link */}
           {student.email && (
             <a
@@ -605,7 +661,36 @@ const StudentDetailsPage = () => {
                 <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>•</span>
                 <span style={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>{course}</span>
                 <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>•</span>
-                <span style={{ fontSize: 13, color: '#6C3CF0', fontWeight: 700 }}>{batchName}</span>
+                {/* Interactive Batch Selector */}
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <select
+                    value={student.batch_id || student.batchId || (batches.find(b => b.name === (student.batch_name || student.batch))?.id) || ''}
+                    onChange={(e) => handleDirectBatchChange(e.target.value)}
+                    disabled={isChangingBatch}
+                    title="Change this student's batch"
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: 800,
+                      color: '#6C3CF0',
+                      background: '#F5F3FF',
+                      border: '1.5px solid #DDD6FE',
+                      padding: '3px 8px',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      outline: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      boxShadow: '0 1px 3px rgba(108, 60, 240, 0.08)'
+                    }}
+                  >
+                    <option value="">-- No Batch --</option>
+                    {batches.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.code || b.course_name || 'Batch'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Contact Chips */}
@@ -871,9 +956,31 @@ const StudentDetailsPage = () => {
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', display: 'block' }}>Enrolled Course</span>
                 <span style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginTop: 4, display: 'block' }}>{course}</span>
               </div>
-              <div style={{ background: '#F8FAFC', padding: '14px 16px', borderRadius: 14, border: '1px solid #E2E8F0' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', display: 'block' }}>Assigned Batch</span>
-                <span style={{ fontSize: 14, fontWeight: 800, color: '#6C3CF0', marginTop: 4, display: 'block' }}>{batchName}</span>
+              <div style={{ background: '#F8FAFC', padding: '14px 16px', borderRadius: 14, border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', display: 'block' }}>Assigned Batch</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: '#6C3CF0', marginTop: 4, display: 'block' }}>{batchName}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const curId = student.batch_id || student.batchId || (batches.find(b => b.name === (student.batch_name || student.batch))?.id) || '';
+                    setSelectedNewBatchId(curId);
+                    setShowChangeBatchModal(true);
+                  }}
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #DDD6FE',
+                    color: '#6C3CF0',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    padding: '4px 8px',
+                    borderRadius: 8,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Change
+                </button>
               </div>
               <div style={{ background: '#F8FAFC', padding: '14px 16px', borderRadius: 14, border: '1px solid #E2E8F0' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', display: 'block' }}>Student ID / Roll Number</span>
@@ -1670,6 +1777,127 @@ const StudentDetailsPage = () => {
                   <>
                     <Trash2 size={15} /> Confirm Delete
                   </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Batch Modal */}
+      {showChangeBatchModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: 20
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: 20,
+            maxWidth: 480,
+            width: '100%',
+            padding: '28px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #E2E8F0',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#EDE9FE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6C3CF0' }}>
+                <Users size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0F172A' }}>Change Student Batch</h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: 13, color: '#64748B' }}>
+                  Assign <strong style={{ color: '#0F172A' }}>{student.name || 'this student'}</strong> to a different batch.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ margin: '20px 0' }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                Select New Batch
+              </label>
+              <select
+                value={selectedNewBatchId}
+                onChange={(e) => setSelectedNewBatchId(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  border: '1.5px solid #CBD5E1',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#0F172A',
+                  outline: 'none',
+                  background: '#F8FAFC',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="">-- Remove from Batch (No Batch) --</option>
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.code || b.course_name || 'Batch'})
+                  </option>
+                ))}
+              </select>
+              <p style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>
+                Moving the student will automatically unenroll them from their previous batch and enroll them into the selected one.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 24 }}>
+              <button
+                type="button"
+                onClick={() => setShowChangeBatchModal(false)}
+                disabled={isChangingBatch}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: 12,
+                  border: '1.5px solid #E2E8F0',
+                  background: '#FFFFFF',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDirectBatchChange(selectedNewBatchId)}
+                disabled={isChangingBatch}
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: 12,
+                  border: 'none',
+                  background: '#6C3CF0',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: isChangingBatch ? 'not-allowed' : 'pointer',
+                  opacity: isChangingBatch ? 0.7 : 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  boxShadow: '0 4px 14px rgba(108, 60, 240, 0.35)'
+                }}
+              >
+                {isChangingBatch ? (
+                  <>
+                    <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Transferring...
+                  </>
+                ) : (
+                  'Confirm Batch Change'
                 )}
               </button>
             </div>
