@@ -81,6 +81,7 @@ import {
   updateBatch,
   deleteBatch as deleteBatchDoc,
   assignStudentsToBatch,
+  transferStudentBatch,
   getStudentsByBatch,
   getActivityLogs,
   awardActivityScore,
@@ -601,19 +602,43 @@ const AdminDashboard = () => {
     [courses, batches, recordedClasses]
   );
 
-  const availableAccessCourses = React.useMemo(() => {
-    const defaults = [
-      'Python',
-      'Machine Learning (ML)',
-      'SQL',
-      'Data Science & AI',
-      'Fullstack Engineering',
-      'Web Development',
-      'Java Programming',
-      'UI/UX Design',
-    ];
-    return Array.from(new Set([...defaults, ...courseTitles])).filter(Boolean);
-  }, [courseTitles]);
+  // Only real recording classes & playlists from database (no dummy hardcoded presets)
+  const availableAccessRecordings = React.useMemo(() => {
+    const list = [];
+    const seen = new Set();
+
+    // 1. Playlists from database (e.g. Python, Machine Learning, SQL)
+    (customPlaylists || []).forEach(pl => {
+      const name = (pl.name || pl.title || '').trim();
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        list.push({
+          id: pl.id || name,
+          name: name,
+          courseName: pl.course_name || '',
+          count: (recordedClasses || []).filter(r => (r.playlist_id && r.playlist_id === pl.id) || (r.playlist_name && r.playlist_name.toLowerCase() === name.toLowerCase())).length,
+          type: 'playlist'
+        });
+      }
+    });
+
+    // 2. Standalone recorded classes from database
+    (recordedClasses || []).forEach(rc => {
+      const cTitle = (rc.course_title || rc.playlist_name || '').trim();
+      if (cTitle && !seen.has(cTitle.toLowerCase())) {
+        seen.add(cTitle.toLowerCase());
+        list.push({
+          id: cTitle,
+          name: cTitle,
+          courseName: '',
+          count: (recordedClasses || []).filter(r => r.course_title === cTitle).length,
+          type: 'recording'
+        });
+      }
+    });
+
+    return list;
+  }, [customPlaylists, recordedClasses]);
 
   /** Client-side search + filters over the already-loaded roster. */
   const students = React.useMemo(() => {
@@ -3073,10 +3098,35 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleQuickBatchChange = async (studentId, newBatchId) => {
+    try {
+      const res = await transferStudentBatch(studentId, newBatchId);
+      await Promise.all([
+        refetchAdminBatches(),
+        refetchAdminData(),
+        queryClient.invalidateQueries({ queryKey: ['adminBatches'] }),
+        queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] }),
+      ]);
+      fetchBatches();
+      fetchStudents();
+      fetchStats();
+      showModal(
+        'Batch Updated',
+        res?.batchName
+          ? `Student successfully transferred to batch "${res.batchName}"!`
+          : 'Student removed from batch.',
+        'success'
+      );
+    } catch (err) {
+      console.error('[Admin] Transfer student batch failed:', err);
+      showModal('Error Transferring Batch', classifyFirestoreError(err).message, 'error');
+    }
+  };
+
   const startAssignStudents = (batch) => {
     setAssigningBatch(batch);
     const fromBatch = Array.isArray(batch.student_ids) ? batch.student_ids : [];
-    const fromStudents = allStudents.filter(s => s.batch_id === batch.id).map(s => s.id);
+    const fromStudents = allStudents.filter(s => s.batch_id === batch.id || s.batchId === batch.id || (s.batch_name && s.batch_name === batch.name)).map(s => s.id);
     const combinedInitial = Array.from(new Set([...fromBatch, ...fromStudents]));
     setSelectedStudentIds(combinedInitial);
     fetchAllStudentsForAssign();
@@ -3104,10 +3154,16 @@ const AdminDashboard = () => {
       await assignStudentsToBatch(assigningBatch.id, selectedStudentIds);
       setAssigningBatch(null);
       setSelectedStudentIds([]);
-      showModal('Success', `Student assignments for batch "${assigningBatch.name}" updated successfully!`, 'success');
+      await Promise.all([
+        refetchAdminBatches(),
+        refetchAdminData(),
+        queryClient.invalidateQueries({ queryKey: ['adminBatches'] }),
+        queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] }),
+      ]);
       fetchBatches();
       fetchStudents();
       fetchStats();
+      showModal('Success', `Student assignments for batch "${assigningBatch.name}" updated successfully!`, 'success');
     } catch (error) {
       console.error('[Admin] saveStudentAssignments failed:', error);
       showModal('Error', classifyFirestoreError(error).message, 'error');
@@ -5188,6 +5244,17 @@ const AdminDashboard = () => {
                                   >
                                     <Eye size={14} /> Batch Details
                                   </button>
+
+                                  {/* Assign / Change Students */}
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    style={{ padding: '8px 12px', fontSize: '12px', height: '36px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}
+                                    onClick={() => startAssignStudents(batch)}
+                                    title="Assign, transfer, or remove students for this batch"
+                                  >
+                                    <Users size={14} /> Assign Students
+                                  </button>
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -5359,10 +5426,36 @@ const AdminDashboard = () => {
                               {student.course}
                             </div>
                           </td>
-                          <td className="col-batch">
-                            <div className="col-limit-batch" title={student.batch_name || 'Not Assigned'}>
-                              {student.batch_name || 'Not Assigned'}
-                            </div>
+                          <td className="col-batch" onClick={(e) => e.stopPropagation()}>
+                            <select
+                              className="form-select batch-quick-dropdown"
+                              value={student.batch_id || (batches.find(b => b.name === (student.batch_name || student.batch))?.id) || ''}
+                              onChange={async (e) => {
+                                const newBatchId = e.target.value;
+                                await handleQuickBatchChange(student.id, newBatchId);
+                              }}
+                              title="Click to change student to another batch"
+                              style={{
+                                fontSize: '12px',
+                                padding: '4px 8px',
+                                borderRadius: '8px',
+                                border: '1.5px solid var(--border-color)',
+                                background: student.batch_name ? 'var(--primary-light)' : '#F8FAFC',
+                                color: student.batch_name ? 'var(--primary-color)' : '#64748B',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                maxWidth: '180px',
+                                textOverflow: 'ellipsis',
+                                outline: 'none'
+                              }}
+                            >
+                              <option value="">-- No Batch --</option>
+                              {batches.map(b => (
+                                <option key={b.id} value={b.id}>
+                                  {b.name} ({b.code || 'Batch'})
+                                </option>
+                              ))}
+                            </select>
                           </td>
                           <td className="col-fee">
                             <span className={`badge-status-fixed ${student.feesStatus === 'Paid' ? 'paid' : 'unpaid'}`} onClick={(e) => { e.stopPropagation(); toggleFees(student.id); }} style={{ cursor: 'pointer' }}>
@@ -9922,87 +10015,80 @@ const AdminDashboard = () => {
                     </div>
                   </div>
 
-                  {/* Multi-select Course Chips */}
+                  {/* Multi-select Recorded Classes & Playlists from Database */}
                   {batchCourseAccessType === 'selected' && (
-                    <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '8px', background: '#FFFFFF', padding: '12px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                      <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#475569' }}>
-                        Choose permitted courses for this cohort:
-                      </span>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {availableAccessCourses.map((course) => {
-                          const isSelected = batchAccessibleCourses.some(c => c.toLowerCase() === course.toLowerCase());
-                          return (
-                            <button
-                              key={course}
-                              type="button"
-                              onClick={() => {
-                                if (isSelected) {
-                                  setBatchAccessibleCourses(prev => prev.filter(c => c.toLowerCase() !== course.toLowerCase()));
-                                } else {
-                                  setBatchAccessibleCourses(prev => [...prev.filter(c => c !== 'all'), course]);
-                                }
-                              }}
-                              style={{
-                                fontSize: '11.5px',
-                                fontWeight: 600,
-                                padding: '5px 10px',
-                                borderRadius: '8px',
-                                border: isSelected ? '1.5px solid var(--primary-color, #6C3CF0)' : '1px solid #CBD5E1',
-                                background: isSelected ? 'var(--primary-color, #6C3CF0)' : '#F8FAFC',
-                                color: isSelected ? '#FFFFFF' : '#334155',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              {isSelected ? <Check size={12} /> : null}
-                              {course}
-                            </button>
-                          );
-                        })}
+                    <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '10px', background: '#FFFFFF', padding: '14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <PlayCircle size={15} color="var(--primary-color)" />
+                          Recorded Classes / Playlists in Database:
+                        </span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                          Click to allow access for this batch
+                        </span>
                       </div>
 
-                      {/* Add Custom Course Pill Input */}
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="Type other course (e.g. Deep Learning) & click Add..."
-                          value={customAccessCourseInput}
-                          onChange={(e) => setCustomAccessCourseInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const val = customAccessCourseInput.trim();
-                              if (val && !batchAccessibleCourses.some(c => c.toLowerCase() === val.toLowerCase())) {
-                                setBatchAccessibleCourses(prev => [...prev.filter(c => c !== 'all'), val]);
-                                setCustomAccessCourseInput('');
-                              }
-                            }
-                          }}
-                          style={{ fontSize: '12px', padding: '6px 10px' }}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={() => {
-                            const val = customAccessCourseInput.trim();
-                            if (val && !batchAccessibleCourses.some(c => c.toLowerCase() === val.toLowerCase())) {
-                              setBatchAccessibleCourses(prev => [...prev.filter(c => c !== 'all'), val]);
-                              setCustomAccessCourseInput('');
-                            }
-                          }}
-                          style={{ fontSize: '12px', padding: '6px 12px', whiteSpace: 'nowrap' }}
-                        >
-                          + Add
-                        </button>
-                      </div>
+                      {availableAccessRecordings.length === 0 ? (
+                        <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>
+                          No recorded classes or playlists found in the database.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          {availableAccessRecordings.map((item) => {
+                            const isSelected = batchAccessibleCourses.some(
+                              c => c.toLowerCase() === item.name.toLowerCase() ||
+                                   (item.courseName && c.toLowerCase() === item.courseName.toLowerCase())
+                            );
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setBatchAccessibleCourses(prev =>
+                                      prev.filter(c =>
+                                        c.toLowerCase() !== item.name.toLowerCase() &&
+                                        (!item.courseName || c.toLowerCase() !== item.courseName.toLowerCase())
+                                      )
+                                    );
+                                  } else {
+                                    setBatchAccessibleCourses(prev => [
+                                      ...prev.filter(c => c !== 'all'),
+                                      item.name
+                                    ]);
+                                  }
+                                }}
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  padding: '8px 12px',
+                                  borderRadius: '8px',
+                                  border: isSelected ? '1.5px solid var(--primary-color, #6C3CF0)' : '1px solid #CBD5E1',
+                                  background: isSelected ? 'var(--primary-color, #6C3CF0)' : '#F8FAFC',
+                                  color: isSelected ? '#FFFFFF' : '#334155',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                {isSelected ? <Check size={14} /> : <Video size={14} style={{ opacity: 0.7 }} />}
+                                <span>{item.name}</span>
+                                {item.courseName && item.courseName.toLowerCase() !== item.name.toLowerCase() && (
+                                  <span style={{ fontSize: '10.5px', opacity: 0.85, fontWeight: 500 }}>
+                                    ({item.courseName})
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
 
                       {batchAccessibleCourses.length === 0 && (
                         <span style={{ fontSize: '11px', color: '#DC2626', fontWeight: 600 }}>
-                          ⚠️ Please select at least one course for this batch.
+                          ⚠️ Please select at least one recorded class for this batch.
                         </span>
                       )}
                     </div>

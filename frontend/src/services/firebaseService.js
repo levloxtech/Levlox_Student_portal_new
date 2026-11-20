@@ -887,6 +887,21 @@ export const assignStudentsToBatch = async (batchId, studentIds = []) => {
     updatedAt: new Date().toISOString(),
   });
 
+  // Remove newly assigned students from any other batches to prevent duplicates
+  const allBatches = await getDocuments("batches").catch(() => []);
+  const otherBatches = allBatches.filter(b => b.id !== batchId && Array.isArray(b.student_ids));
+  for (const otherBatch of otherBatches) {
+    const overlapping = otherBatch.student_ids.filter(id => studentIds.includes(id));
+    if (overlapping.length > 0) {
+      const remainingIds = otherBatch.student_ids.filter(id => !studentIds.includes(id));
+      await updateDocumentFields("batches", otherBatch.id, {
+        student_ids: remainingIds,
+        students_count: remainingIds.length,
+        updatedAt: new Date().toISOString()
+      }).catch(e => console.warn(`[LocalDB] Clean student from batch ${otherBatch.id} failed:`, e));
+    }
+  }
+
   // Link newly assigned students
   await Promise.all(studentIds.map(sid =>
     updateDocumentFields("students", sid, {
@@ -912,6 +927,51 @@ export const assignStudentsToBatch = async (batchId, studentIds = []) => {
   ));
 
   return { batchId, studentIds };
+};
+
+/** Transfer a student from their current batch to another batch cleanly */
+export const transferStudentBatch = async (studentId, newBatchId) => {
+  if (!studentId) return;
+  const allBatches = await getDocuments("batches").catch(() => []);
+  const targetBatch = allBatches.find(b => b.id === newBatchId);
+
+  // 1. Unlink from any batch currently holding this student
+  for (const b of allBatches) {
+    if (Array.isArray(b.student_ids) && b.student_ids.includes(studentId) && b.id !== newBatchId) {
+      const remaining = b.student_ids.filter(id => id !== studentId);
+      await updateDocumentFields("batches", b.id, {
+        student_ids: remaining,
+        students_count: remaining.length,
+        updatedAt: new Date().toISOString()
+      }).catch(e => console.warn(`[LocalDB] Unlink student from batch ${b.id}:`, e));
+    }
+  }
+
+  // 2. Link to new target batch (if selected)
+  if (targetBatch) {
+    const current = Array.isArray(targetBatch.student_ids) ? targetBatch.student_ids : [];
+    if (!current.includes(studentId)) {
+      const updated = [...current, studentId];
+      await updateDocumentFields("batches", targetBatch.id, {
+        student_ids: updated,
+        students_count: updated.length,
+        updatedAt: new Date().toISOString()
+      }).catch(e => console.warn(`[LocalDB] Link student to batch ${targetBatch.id}:`, e));
+    }
+  }
+
+  // 3. Update student document and sync credentials
+  await updateDocumentFields("students", studentId, {
+    batch_id: targetBatch ? targetBatch.id : "",
+    batchId: targetBatch ? targetBatch.id : "",
+    batch_name: targetBatch ? targetBatch.name : "",
+    batchName: targetBatch ? targetBatch.name : "",
+    batch_code: targetBatch ? (targetBatch.code || targetBatch.batchId || "") : "",
+    batch: targetBatch ? targetBatch.name : "",
+    updatedAt: new Date().toISOString()
+  });
+
+  return { studentId, batchId: newBatchId, batchName: targetBatch?.name || "" };
 };
 
 /** Unassign a single student from a batch */
