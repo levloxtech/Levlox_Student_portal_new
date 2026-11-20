@@ -114,6 +114,72 @@ const StudentDetailsPage = () => {
     enabled: !!studentId,
   });
 
+  // Portal Validity Calculations
+  const rawAccessExpiresAt = student?.accessExpiresAt || student?.validUntil || student?.portalExpiresAt || student?.membership?.expiresAt;
+  const hasExpiryDate = Boolean(rawAccessExpiresAt);
+  const expiryDate = hasExpiryDate ? new Date(rawAccessExpiresAt) : null;
+  const isPortalExpired = hasExpiryDate ? expiryDate.getTime() < Date.now() : Boolean(student?.isDeactivated);
+  const portalDaysRemaining = hasExpiryDate
+    ? Math.max(0, Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : (student?.accessDays || student?.validityDays || 90);
+  const totalAccessDays = student?.accessDays || student?.validityDays || 90;
+  const isExpiringSoon = !isPortalExpired && hasExpiryDate && portalDaysRemaining <= 7;
+
+  const [showValidityModal, setShowValidityModal] = useState(false);
+  const [validityExtensionDays, setValidityExtensionDays] = useState(90);
+  const [customExpiryDate, setCustomExpiryDate] = useState('');
+  const [isUpdatingValidity, setIsUpdatingValidity] = useState(false);
+
+  const handleUpdatePortalValidity = async (additionalDays = null, newDateString = null) => {
+    if (!studentId || isUpdatingValidity) return;
+    try {
+      setIsUpdatingValidity(true);
+      let calculatedExpiresAt;
+      let daysCount = totalAccessDays;
+
+      if (newDateString) {
+        calculatedExpiresAt = new Date(newDateString).toISOString();
+        const diffMs = new Date(newDateString).getTime() - Date.now();
+        daysCount = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+      } else if (additionalDays) {
+        const baseTime = (rawAccessExpiresAt && new Date(rawAccessExpiresAt).getTime() > Date.now())
+          ? new Date(rawAccessExpiresAt).getTime()
+          : Date.now();
+        calculatedExpiresAt = new Date(baseTime + additionalDays * 24 * 60 * 60 * 1000).toISOString();
+        daysCount = (Number(student?.accessDays) || 0) + additionalDays;
+      } else {
+        const days = Math.max(1, Number(validityExtensionDays) || 90);
+        calculatedExpiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+        daysCount = days;
+      }
+
+      await updateStudent(studentId, {
+        accessExpiresAt: calculatedExpiresAt,
+        validUntil: calculatedExpiresAt,
+        accessDays: daysCount,
+        validityDays: daysCount,
+        isDeactivated: false,
+        status: 'active'
+      });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['adminStudentDetails', studentId] }),
+        queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] }),
+      ]);
+      await refetchStudent();
+
+      setShowValidityModal(false);
+      setSaveSuccessMessage(`Portal validity updated! Active until ${new Date(calculatedExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}.`);
+      setTimeout(() => setSaveSuccessMessage(null), 3500);
+    } catch (err) {
+      console.error('[StudentDetails] Update validity error:', err);
+      setSaveErrorMessage(err.message || 'Failed to update portal validity.');
+      setTimeout(() => setSaveErrorMessage(null), 4000);
+    } finally {
+      setIsUpdatingValidity(false);
+    }
+  };
+
   // Fetch Attendance records for student
   const { data: attendanceRecords = [] } = useQuery({
     queryKey: ['studentAttendance', studentId],
@@ -485,6 +551,30 @@ const StudentDetailsPage = () => {
             <Users size={15} /> Change Batch
           </button>
 
+          {/* Extend Validity Button */}
+          <button
+            onClick={() => setShowValidityModal(true)}
+            style={{
+              background: '#F0FDF4',
+              border: '1.5px solid #BBF7D0',
+              color: '#15803D',
+              padding: '8px 16px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 7,
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.background = '#DCFCE7'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = '#F0FDF4'; }}
+            title="View or extend student portal access validity"
+          >
+            <Clock size={15} /> Extend Validity
+          </button>
+
           {/* Send Email Link */}
           {student.email && (
             <a
@@ -691,6 +781,28 @@ const StudentDetailsPage = () => {
                     ))}
                   </select>
                 </div>
+                <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>•</span>
+                <span
+                  onClick={() => setShowValidityModal(true)}
+                  title="Click to view/extend portal validity"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 750,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '3px 9px',
+                    borderRadius: 8,
+                    background: isPortalExpired ? '#FEE2E2' : (isExpiringSoon ? '#FEF3C7' : '#ECFDF5'),
+                    color: isPortalExpired ? '#DC2626' : (isExpiringSoon ? '#D97706' : '#059669'),
+                    border: `1.5px solid ${isPortalExpired ? '#FCA5A5' : (isExpiringSoon ? '#FCD34D' : '#A7F3D0')}`,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                  }}
+                >
+                  <Clock size={12} />
+                  {isPortalExpired ? 'Portal Expired' : `${portalDaysRemaining} Days Validity`}
+                </span>
               </div>
 
               {/* Contact Chips */}
@@ -931,6 +1043,77 @@ const StudentDetailsPage = () => {
           </div>
         </div>
 
+        {/* Portal Validity Card */}
+        <div style={{
+          background: '#FFFFFF',
+          border: '1.5px solid #E2E8F0',
+          borderRadius: 18,
+          padding: '20px 22px',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Portal Validity</span>
+              <div style={{
+                width: 34, height: 34, borderRadius: 10,
+                background: isPortalExpired ? '#FEE2E2' : (isExpiringSoon ? '#FEF3C7' : '#ECFDF5'),
+                color: isPortalExpired ? '#DC2626' : (isExpiringSoon ? '#D97706' : '#059669'),
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Clock size={18} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+              <span style={{
+                fontSize: 22,
+                fontWeight: 900,
+                color: isPortalExpired ? '#DC2626' : (isExpiringSoon ? '#D97706' : '#059669')
+              }}>
+                {isPortalExpired ? 'Expired' : `${portalDaysRemaining} Days`}
+              </span>
+              {!isPortalExpired && (
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#64748B' }}>remaining</span>
+              )}
+            </div>
+
+            <span style={{ fontSize: 12, color: '#64748B', display: 'block' }}>
+              {hasExpiryDate
+                ? `Valid until ${expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                : `${totalAccessDays} Days Standard Plan`}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowValidityModal(true)}
+            style={{
+              marginTop: 14,
+              width: '100%',
+              padding: '7px 12px',
+              borderRadius: 10,
+              border: '1px solid #DDD6FE',
+              background: '#F5F3FF',
+              color: '#6C3CF0',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              transition: 'all 0.15s ease'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.background = '#EDE9FE'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = '#F5F3FF'; }}
+          >
+            <Clock size={13} /> Extend / Edit Validity
+          </button>
+        </div>
+
       </div>
 
       {/* ── TWO COLUMN MAIN DETAILS GRID ── */}
@@ -990,6 +1173,37 @@ const StudentDetailsPage = () => {
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', display: 'block' }}>Registration Date</span>
                 <span style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A', marginTop: 4, display: 'block' }}>
                   {student.createdAt && typeof student.createdAt === 'string' ? student.createdAt.split('T')[0] : (student.join_date || 'Standard Entry')}
+                </span>
+              </div>
+              <div style={{ background: '#F8FAFC', padding: '14px 16px', borderRadius: 14, border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', display: 'block' }}>Portal Validity & Expiry</span>
+                  <span style={{ fontSize: 13.5, fontWeight: 800, color: isPortalExpired ? '#DC2626' : '#059669', marginTop: 4, display: 'block' }}>
+                    {isPortalExpired ? 'Access Expired' : `${portalDaysRemaining} Days Left`}
+                    {hasExpiryDate && ` (${expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })})`}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowValidityModal(true)}
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #DDD6FE',
+                    color: '#6C3CF0',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    padding: '4px 8px',
+                    borderRadius: 8,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Manage
+                </button>
+              </div>
+              <div style={{ background: '#F8FAFC', padding: '14px 16px', borderRadius: 14, border: '1px solid #E2E8F0' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', display: 'block' }}>Account State</span>
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: isPortalExpired ? '#DC2626' : '#16A34A', marginTop: 4, display: 'block' }}>
+                  {isPortalExpired ? 'Deactivated (Expired)' : (student.status || 'Active')}
                 </span>
               </div>
             </div>
@@ -1593,6 +1807,28 @@ const StudentDetailsPage = () => {
                     ))}
                   </select>
                 </div>
+                <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>•</span>
+                <span
+                  onClick={() => setShowValidityModal(true)}
+                  title="Click to view/extend portal validity"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 750,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '3px 9px',
+                    borderRadius: 8,
+                    background: isPortalExpired ? '#FEE2E2' : (isExpiringSoon ? '#FEF3C7' : '#ECFDF5'),
+                    color: isPortalExpired ? '#DC2626' : (isExpiringSoon ? '#D97706' : '#059669'),
+                    border: `1.5px solid ${isPortalExpired ? '#FCA5A5' : (isExpiringSoon ? '#FCD34D' : '#A7F3D0')}`,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                  }}
+                >
+                  <Clock size={12} />
+                  {isPortalExpired ? 'Portal Expired' : `${portalDaysRemaining} Days Validity`}
+                </span>
               </div>
 
               {/* Account Status */}
@@ -1899,6 +2135,223 @@ const StudentDetailsPage = () => {
                 ) : (
                   'Confirm Batch Change'
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Extend / Manage Portal Validity Modal */}
+      {showValidityModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: 20
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: 20,
+            maxWidth: 500,
+            width: '100%',
+            padding: '28px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #E2E8F0',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
+                <Clock size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0F172A' }}>Manage Portal Validity</h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: 13, color: '#64748B' }}>
+                  Adjust access duration and expiration date for <strong style={{ color: '#0F172A' }}>{student.name || 'this student'}</strong>.
+                </p>
+              </div>
+            </div>
+
+            {/* Current Status Banner */}
+            <div style={{
+              background: isPortalExpired ? '#FEF2F2' : '#F0FDF4',
+              border: `1.5px solid ${isPortalExpired ? '#FCA5A5' : '#BBF7D0'}`,
+              borderRadius: 14,
+              padding: '12px 16px',
+              marginBottom: 20,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Current Access</span>
+                <strong style={{ fontSize: 14, display: 'block', color: isPortalExpired ? '#DC2626' : '#15803D', marginTop: 2 }}>
+                  {isPortalExpired ? 'Portal Access Expired' : `${portalDaysRemaining} Days Remaining`}
+                </strong>
+                <span style={{ fontSize: 11.5, color: '#64748B' }}>
+                  {hasExpiryDate ? `Expires: ${expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Standard default access'}
+                </span>
+              </div>
+              <span style={{
+                fontSize: 11.5,
+                fontWeight: 800,
+                padding: '4px 10px',
+                borderRadius: 999,
+                background: isPortalExpired ? '#DC2626' : '#16A34A',
+                color: '#FFFFFF'
+              }}>
+                {isPortalExpired ? 'Expired' : 'Active'}
+              </span>
+            </div>
+
+            {/* Quick Extension Presets */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                Quick Extend Access (+Days)
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
+                {[30, 60, 90, 180, 365].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => handleUpdatePortalValidity(d)}
+                    disabled={isUpdatingValidity}
+                    style={{
+                      padding: '8px 4px',
+                      borderRadius: 10,
+                      border: '1.5px solid #DDD6FE',
+                      background: '#F5F3FF',
+                      color: '#6C3CF0',
+                      fontSize: 12,
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseOver={(e) => { e.currentTarget.style.background = '#6C3CF0'; e.currentTarget.style.color = '#FFFFFF'; }}
+                    onMouseOut={(e) => { e.currentTarget.style.background = '#F5F3FF'; e.currentTarget.style.color = '#6C3CF0'; }}
+                  >
+                    +{d}d
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Set Specific Number of Days from Today */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                Or Set Active Days from Today
+              </label>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <input
+                  type="number"
+                  min="1"
+                  max="3650"
+                  value={validityExtensionDays}
+                  onChange={(e) => setValidityExtensionDays(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    borderRadius: 12,
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: '#0F172A',
+                    outline: 'none',
+                    background: '#F8FAFC'
+                  }}
+                />
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Days</span>
+                <button
+                  type="button"
+                  onClick={() => handleUpdatePortalValidity(null, null)}
+                  disabled={isUpdatingValidity}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: 12,
+                    border: 'none',
+                    background: '#6C3CF0',
+                    color: '#FFFFFF',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Set Days
+                </button>
+              </div>
+            </div>
+
+            {/* Set Specific Calendar Expiry Date */}
+            <div style={{ marginBottom: 22 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                Or Pick Exact Expiration Date
+              </label>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <input
+                  type="date"
+                  value={customExpiryDate}
+                  onChange={(e) => setCustomExpiryDate(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    borderRadius: 12,
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: '#0F172A',
+                    outline: 'none',
+                    background: '#F8FAFC'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (customExpiryDate) handleUpdatePortalValidity(null, customExpiryDate);
+                  }}
+                  disabled={isUpdatingValidity || !customExpiryDate}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: 12,
+                    border: 'none',
+                    background: customExpiryDate ? '#10B981' : '#E2E8F0',
+                    color: '#FFFFFF',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: customExpiryDate ? 'pointer' : 'not-allowed',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Set Date
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid #E2E8F0', paddingTop: 16 }}>
+              <button
+                type="button"
+                onClick={() => setShowValidityModal(false)}
+                disabled={isUpdatingValidity}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: 12,
+                  border: '1.5px solid #E2E8F0',
+                  background: '#FFFFFF',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer'
+                }}
+              >
+                Close
               </button>
             </div>
           </div>

@@ -252,6 +252,16 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
   const trainer = profileData?.trainer || 'Levlox Trainer';
   const admissionDate = profileData?.join_date || dashboardData?.student?.enrollmentDate || 'July 08, 2026';
   
+  // Portal Validity Calculations
+  const rawAccessExpiresAt = profileData?.accessExpiresAt || profileData?.validUntil || profileData?.portalExpiresAt || dashboardData?.student?.accessExpiresAt || dashboardData?.student?.validUntil || user?.accessExpiresAt;
+  const hasExpiryDate = Boolean(rawAccessExpiresAt);
+  const expiryDate = hasExpiryDate ? new Date(rawAccessExpiresAt) : null;
+  const isPortalExpired = hasExpiryDate ? expiryDate.getTime() < Date.now() : Boolean(profileData?.isDeactivated);
+  const portalDaysRemaining = hasExpiryDate
+    ? Math.max(0, Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : (profileData?.accessDays || profileData?.validityDays || 90);
+  const totalAccessDays = profileData?.accessDays || profileData?.validityDays || 90;
+
   // Calculate completion % from enrolledCourses or fallback
   const courseCompletionPct = enrolledCourses.length > 0
     ? Math.round(enrolledCourses.reduce((acc, c) => acc + (c.progress || 0), 0) / enrolledCourses.length)
@@ -634,6 +644,60 @@ const StudentProfile = ({ dashboardData, enrolledCourses = [], onProfileUpdate }
 
         {/* RIGHT COLUMN - STACKED CARDS */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+          {/* PORTAL ACCESS & VALIDITY CARD */}
+          <div className="clickable-card-hover" style={{
+            background: '#FFF',
+            border: `1.5px solid ${isPortalExpired ? '#FCA5A5' : 'var(--border-color)'}`,
+            borderRadius: 20,
+            padding: 24,
+            boxShadow: 'var(--shadow-card)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <h3 style={{ fontSize: 14.5, fontWeight: 750, margin: 0, display: 'flex', alignItems: 'center', gap: 8, color: '#121118' }}>
+                <Clock size={16} color={isPortalExpired ? '#DC2626' : 'var(--primary-color)'} /> Portal Access & Validity
+              </h3>
+              <span style={{
+                fontSize: 11.5,
+                fontWeight: 800,
+                padding: '3px 10px',
+                borderRadius: 999,
+                background: isPortalExpired ? '#FEE2E2' : '#DCFCE7',
+                color: isPortalExpired ? '#DC2626' : '#15803D'
+              }}>
+                {isPortalExpired ? 'Expired' : 'Active'}
+              </span>
+            </div>
+
+            <div style={{
+              background: isPortalExpired ? '#FEF2F2' : '#F0FDF4',
+              borderRadius: 14,
+              padding: '14px 16px',
+              border: `1px solid ${isPortalExpired ? '#FCA5A5' : '#BBF7D0'}`,
+              marginBottom: 14
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Time Remaining</span>
+              <strong style={{ fontSize: 22, fontWeight: 900, color: isPortalExpired ? '#DC2626' : '#15803D', display: 'block', marginTop: 2 }}>
+                {isPortalExpired ? 'Access Expired' : `${portalDaysRemaining} Days Left`}
+              </strong>
+              <span style={{ fontSize: 12, color: '#64748B', display: 'block', marginTop: 4 }}>
+                {hasExpiryDate ? `Valid until ${expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : `${totalAccessDays} Days Standard Plan`}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12.5 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                <span>Access Plan:</span>
+                <strong style={{ color: '#0F172A' }}>{totalAccessDays} Days Plan</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                <span>Status:</span>
+                <strong style={{ color: isPortalExpired ? '#DC2626' : '#16A34A' }}>{isPortalExpired ? 'Deactivated (Expired)' : 'Active Access'}</strong>
+              </div>
+            </div>
+          </div>
           
           {/* ACADEMIC INFORMATION CARD */}
           <div className="clickable-card-hover" style={{

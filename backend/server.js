@@ -481,7 +481,7 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   if (profile && user.role === 'student') {
-    const expiresAt = profile.accessExpiresAt || profile.portalExpiresAt || profile.membership?.expiresAt;
+    const expiresAt = profile.accessExpiresAt || profile.validUntil || profile.portalExpiresAt || profile.membership?.expiresAt;
     const isExpired = Boolean(expiresAt && new Date(expiresAt).getTime() < Date.now());
     profile.isMembershipExpired = isExpired;
     profile.accessExpiresAt = expiresAt;
@@ -518,13 +518,13 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
   } else {
     profile = localDb.getDocument('students', userId) || user;
     if (profile) {
-      const isManuallyDisabled = ['disabled'].includes(String(profile.status || '').toLowerCase()) || (profile.isDeactivated === true && !profile.accessExpiresAt && !profile.portalExpiresAt);
+      const isManuallyDisabled = ['disabled'].includes(String(profile.status || '').toLowerCase()) || (profile.isDeactivated === true && !profile.accessExpiresAt && !profile.validUntil && !profile.portalExpiresAt);
       if (isManuallyDisabled) {
         return res.status(403).json({
           error: 'Your account is disabled by administrator. Please contact admin at sales@levlox.in.'
         });
       }
-      const expiresAt = profile.accessExpiresAt || profile.portalExpiresAt || profile.membership?.expiresAt;
+      const expiresAt = profile.accessExpiresAt || profile.validUntil || profile.portalExpiresAt || profile.membership?.expiresAt;
       const isExpired = Boolean(expiresAt && new Date(expiresAt).getTime() < Date.now());
       profile.isMembershipExpired = isExpired;
       profile.accessExpiresAt = expiresAt;

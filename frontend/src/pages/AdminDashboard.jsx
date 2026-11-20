@@ -26,6 +26,7 @@ import MasterDataPage from './MasterDataPage';
 import AcademyTestimonialsManager from '../components/AcademyTestimonialsManager';
 import PortalStudentsManager from '../components/PortalStudentsManager';
 import CouponsManager from '../components/CouponsManager';
+import CoursesManager from '../components/CoursesManager';
 import DesktopOnlyGate from '../components/DesktopOnlyGate';
 import { isMobileDevice } from '../utils/device';
 import { useAuth } from '../context/AuthContext';
@@ -593,13 +594,13 @@ const AdminDashboard = () => {
   const courseTitles = React.useMemo(
     () => {
       const dbTitles = courses.map(c => (typeof c === 'string' ? c : c?.title || c?.name || c?.course_name)).filter(Boolean);
+      if (dbTitles.length > 0) return Array.from(new Set(dbTitles));
       const batchCourses = batches.map(b => b.course_name).filter(Boolean);
-      const recordedCourses = recordedClasses.map(r => r.course_title || r.course_name).filter(Boolean);
-      const combined = Array.from(new Set([...dbTitles, ...batchCourses, ...recordedCourses]));
+      const combined = Array.from(new Set([...batchCourses]));
       if (combined.length > 0) return combined;
-      return ['Fullstack Engineering', 'Python-FSD', 'Java-FSD', 'Data Science & AI', 'UI/UX Design', 'MERN Stack'];
+      return ['Machine Learning (ML)', 'Python Basic to Advance', 'The All-in-One SQL Blueprint', 'Gen-AI', 'Levlox Academy Membership'];
     },
-    [courses, batches, recordedClasses]
+    [courses, batches]
   );
 
   // Only real recording classes & playlists from database (no dummy hardcoded presets)
@@ -4499,6 +4500,16 @@ const AdminDashboard = () => {
             <span className="sidebar-link-text">Batch Management</span>
           </button>
 
+          <button className={`sidebar-link ${activeTab === 'courses' ? 'active' : ''}`} onClick={() => handleNavTabClick('courses')}>
+            <BookOpen size={18} />
+            <span className="sidebar-link-text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              Courses
+              <span style={{ fontSize: 10, fontWeight: 700, background: '#6C3CF0', color: '#FFF', padding: '2px 7px', borderRadius: 10 }}>
+                {courses.length}
+              </span>
+            </span>
+          </button>
+
           <button className={`sidebar-link ${activeTab === 'portal-students' ? 'active' : ''}`} onClick={() => handleNavTabClick('portal-students', () => setCurrentPage(1))}>
             <BookOpen size={18} />
             <span className="sidebar-link-text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -4864,6 +4875,18 @@ const AdminDashboard = () => {
 
             </div>
           </div>
+        )}
+
+        {/* Courses Management Tab */}
+        {activeTab === 'courses' && (
+          <CoursesManager
+            courses={courses}
+            allStudents={allStudents}
+            batches={batches}
+            onCourseCreated={() => {
+              refetchAdminData();
+            }}
+          />
         )}
 
         {/* Batches Management Tab */}
@@ -5463,24 +5486,39 @@ const AdminDashboard = () => {
                             </span>
                           </td>
                           <td className="col-status">
-                            <span
-                              className="badge-status-fixed"
-                              onClick={(e) => { e.stopPropagation(); toggleStatus(student.id); }}
-                              title="Click to toggle account activation"
-                              style={{
-                                cursor: 'pointer',
-                                padding: '4px 10px',
-                                borderRadius: 12,
-                                fontSize: 11.5,
-                                fontWeight: 700,
-                                background: isPendingVerification ? '#FEF3C7' : (isActive ? '#D1FAE5' : (isExpired ? '#FEE2E2' : '#F3F4F6')),
-                                color: isPendingVerification ? '#D97706' : (isActive ? '#059669' : (isExpired ? '#DC2626' : '#4B5563')),
-                                border: '1px solid currentColor',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              {isPendingVerification ? 'Pending Email Verification' : (isActive ? `Active (${student.accessDays || student.validityDays || 90}d)` : (isExpired ? 'Deactivated (Expired)' : 'Deactivated'))}
-                            </span>
+                            {(() => {
+                              const rawExp = student.accessExpiresAt || student.validUntil || student.portalExpiresAt;
+                              let daysLeft = null;
+                              if (rawExp) {
+                                daysLeft = Math.ceil((new Date(rawExp).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+                              }
+                              const isActuallyExpired = isExpired || (daysLeft !== null && daysLeft <= 0);
+                              return (
+                                <span
+                                  className="badge-status-fixed"
+                                  onClick={(e) => { e.stopPropagation(); toggleStatus(student.id); }}
+                                  title={rawExp ? `Portal validity expires on: ${new Date(rawExp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} • Click to toggle activation` : 'Click to toggle activation'}
+                                  style={{
+                                    cursor: 'pointer',
+                                    padding: '4px 10px',
+                                    borderRadius: 12,
+                                    fontSize: 11.5,
+                                    fontWeight: 700,
+                                    background: isPendingVerification ? '#FEF3C7' : (isActive && !isActuallyExpired ? '#D1FAE5' : '#FEE2E2'),
+                                    color: isPendingVerification ? '#D97706' : (isActive && !isActuallyExpired ? '#059669' : '#DC2626'),
+                                    border: '1px solid currentColor',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  {isPendingVerification
+                                    ? 'Pending Email Verification'
+                                    : (isActive && !isActuallyExpired
+                                        ? `Active (${daysLeft !== null ? `${daysLeft}d left` : `${student.accessDays || student.validityDays || 90}d`})`
+                                        : 'Deactivated (Expired)')
+                                  }
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="col-delivery">
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11.5px' }}>

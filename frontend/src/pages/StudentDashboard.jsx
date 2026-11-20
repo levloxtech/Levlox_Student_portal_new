@@ -592,8 +592,11 @@ const StudentDashboard = () => {
   const dynamicFeesPaid = Number(studentDoc?.feesPaidAmount ?? user?.feesPaidAmount ?? userProfile?.feesPaidAmount ?? 0);
   const dynamicFeesRemaining = Number(studentDoc?.feesRemainingAmount ?? Math.max(0, dynamicFeesTotal - dynamicFeesPaid));
   const dynamicFeesStatus = studentDoc?.feesStatus || user?.feesStatus || userProfile?.feesStatus || (dynamicFeesRemaining === 0 ? 'Paid' : (dynamicFeesPaid > 0 ? 'Partially Paid' : 'Pending Payment'));
-  const rawAccessExpiresAt = studentDoc?.accessExpiresAt || user?.accessExpiresAt || user?.portalExpiresAt || userProfile?.accessExpiresAt || userProfile?.membership?.expiresAt;
+  const rawAccessExpiresAt = studentDoc?.accessExpiresAt || studentDoc?.validUntil || user?.accessExpiresAt || user?.validUntil || user?.portalExpiresAt || userProfile?.accessExpiresAt || userProfile?.validUntil || userProfile?.membership?.expiresAt;
   const isMembershipExpired = Boolean(user?.isMembershipExpired || userProfile?.isMembershipExpired || (rawAccessExpiresAt && new Date(rawAccessExpiresAt).getTime() < Date.now()));
+  const studentDaysRemaining = rawAccessExpiresAt
+    ? Math.max(0, Math.ceil((new Date(rawAccessExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : (studentDoc?.accessDays || studentDoc?.validityDays || 90);
   const isPaid = dynamicFeesStatus === 'Paid' && !isMembershipExpired;
   const isPartial = dynamicFeesStatus === 'Partially Paid';
   const [showRenewalModal, setShowRenewalModal] = useState(false);
@@ -1472,9 +1475,36 @@ const StudentDashboard = () => {
             <div className="levlox-welcome-banner">
               {/* Left Column: Greeting, Meta & Action Buttons */}
               <div className="levlox-banner-left">
-                <div className="levlox-banner-badge">
-                  <GraduationCap size={14} color="#2563EB" strokeWidth={2.4} />
-                  <span>Welcome Back</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                  <div className="levlox-banner-badge" style={{ margin: 0 }}>
+                    <GraduationCap size={14} color="#2563EB" strokeWidth={2.4} />
+                    <span>Welcome Back</span>
+                  </div>
+
+                  {/* Live Portal Validity Pill */}
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: isMembershipExpired ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                    border: `1.5px solid ${isMembershipExpired ? '#EF4444' : '#10B981'}`,
+                    padding: '3px 12px',
+                    borderRadius: 999,
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: isMembershipExpired ? '#DC2626' : '#047857'
+                  }}>
+                    <span style={{
+                      width: 7, height: 7, borderRadius: '50%',
+                      background: isMembershipExpired ? '#DC2626' : '#10B981',
+                      boxShadow: `0 0 6px ${isMembershipExpired ? '#DC2626' : '#10B981'}`
+                    }} />
+                    <span>
+                      {isMembershipExpired
+                        ? 'Portal Access Expired'
+                        : `Portal Validity: ${studentDaysRemaining} Days Left`}
+                    </span>
+                  </div>
                 </div>
 
                 <h1 className="levlox-banner-title">
@@ -1486,7 +1516,7 @@ const StudentDashboard = () => {
                   Keep learning. Keep growing. Your future is built here.
                 </p>
 
-                {/* 2-Column Meta Stats */}
+                {/* 3-Column Meta Stats */}
                 <div className="levlox-banner-meta-grid">
                   <div className="levlox-banner-meta-item">
                     <div className="levlox-banner-meta-icon">
@@ -1510,6 +1540,22 @@ const StudentDashboard = () => {
                         {upcomingLiveList.length > 0
                           ? `${upcomingLiveList[0].date || 'Today'}, ${upcomingLiveList[0].time || '10:00 AM'}`
                           : 'Today, 10:00 AM'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="levlox-banner-meta-divider" />
+
+                  <div className="levlox-banner-meta-item">
+                    <div className="levlox-banner-meta-icon" style={{ background: isMembershipExpired ? '#FEE2E2' : '#ECFDF5', color: isMembershipExpired ? '#DC2626' : '#059669' }}>
+                      <Clock size={18} strokeWidth={2.2} />
+                    </div>
+                    <div>
+                      <div className="levlox-meta-main" style={{ color: isMembershipExpired ? '#DC2626' : '#0F172A' }}>
+                        {isMembershipExpired ? 'Access Expired' : `${studentDaysRemaining} Days Access`}
+                      </div>
+                      <div className="levlox-meta-tag">
+                        {rawAccessExpiresAt ? `Valid till ${new Date(rawAccessExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Active Portal Access'}
                       </div>
                     </div>
                   </div>
