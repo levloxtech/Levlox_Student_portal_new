@@ -534,6 +534,11 @@ const AdminDashboard = () => {
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [allStudentsForAssign, setAllStudentsForAssign] = useState([]);
 
+  // Batch course & recorded classes access states
+  const [batchCourseAccessType, setBatchCourseAccessType] = useState('all'); // 'all' | 'selected'
+  const [batchAccessibleCourses, setBatchAccessibleCourses] = useState(['all']);
+  const [customAccessCourseInput, setCustomAccessCourseInput] = useState('');
+
   // Pagination & Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -594,6 +599,20 @@ const AdminDashboard = () => {
     },
     [courses, batches, recordedClasses]
   );
+
+  const availableAccessCourses = React.useMemo(() => {
+    const defaults = [
+      'Python',
+      'Machine Learning (ML)',
+      'SQL',
+      'Data Science & AI',
+      'Fullstack Engineering',
+      'Web Development',
+      'Java Programming',
+      'UI/UX Design',
+    ];
+    return Array.from(new Set([...defaults, ...courseTitles])).filter(Boolean);
+  }, [courseTitles]);
 
   /** Client-side search + filters over the already-loaded roster. */
   const students = React.useMemo(() => {
@@ -2662,6 +2681,9 @@ const AdminDashboard = () => {
     setBatchTiming('10:00 AM - 12:00 PM');
     setBatchStatus('Active');
     setBatchMaxStudents(30);
+    setBatchCourseAccessType('all');
+    setBatchAccessibleCourses(['all']);
+    setCustomAccessCourseInput('');
   };
 
   const batchPayload = () => {
@@ -2680,6 +2702,10 @@ const AdminDashboard = () => {
       timing: batchTiming.trim() || '10:00 AM - 12:00 PM',
       status: batchStatus,
       max_students: Number(batchMaxStudents) || 30,
+      course_access_type: batchCourseAccessType,
+      accessible_courses: batchCourseAccessType === 'all'
+        ? ['all']
+        : (batchAccessibleCourses.length > 0 ? batchAccessibleCourses : [resolvedCourse || 'all']),
     };
   };
 
@@ -2944,6 +2970,10 @@ const AdminDashboard = () => {
     setBatchTiming(batch.timing || '10:00 AM - 12:00 PM');
     setBatchStatus(batch.status || 'Active');
     setBatchMaxStudents(batch.max_students || 30);
+    const accessType = batch.course_access_type || (Array.isArray(batch.accessible_courses) && batch.accessible_courses.length > 0 && !batch.accessible_courses.includes('all') ? 'selected' : 'all');
+    setBatchCourseAccessType(accessType);
+    setBatchAccessibleCourses(Array.isArray(batch.accessible_courses) && batch.accessible_courses.length > 0 ? batch.accessible_courses : ['all']);
+    setCustomAccessCourseInput('');
     setShowBatchModal(true);
   };
 
@@ -3491,7 +3521,9 @@ const AdminDashboard = () => {
     setEditCourse(student.course || 'Fullstack Engineering');
     setIsCustomEditCourse(false);
     setCustomEditCourseName('');
-    setEditBatchId(student.batch_id || '');
+    const existingBatchId = student.batch_id || student.batchId ||
+      (batches.find(b => b.name === (student.batch_name || student.batch) || b.code === (student.batch_code || student.batch))?.id) || '';
+    setEditBatchId(existingBatchId);
     setEditCollege(student.college || 'Levlox Technical Institute');
     setEditProfilePic(student.profile_pic || '');
     setEditLocation(student.current_location || '');
@@ -3530,8 +3562,11 @@ const AdminDashboard = () => {
         rollNumber: editRollNumber,
         phone: editPhone,
         course: finalCourse,
-        batch_id: editBatchId,
+        batch_id: editBatchId || '',
+        batchId: editBatchId || '',
         batch_name: selectedBatch?.name || '',
+        batch: selectedBatch?.name || '',
+        batch_code: selectedBatch?.code || selectedBatch?.batchId || '',
         college: editCollege,
         profile_pic: editProfilePic,
         current_location: editLocation,
@@ -3545,23 +3580,26 @@ const AdminDashboard = () => {
         validUntil: newExpiresAt,
         feesStatus: editFeesStatus,
       };
-      const oldBatchId = editingStudent?.batch_id;
+      const oldBatchId = editingStudent?.batch_id || editingStudent?.batchId ||
+        (batches.find(b => b.name === (editingStudent?.batch_name || editingStudent?.batch) || b.code === (editingStudent?.batch_code || editingStudent?.batch))?.id) || '';
       const newBatchId = editBatchId;
       await updateStudent(editingStudent.id, payload);
 
       if (oldBatchId !== newBatchId) {
         if (oldBatchId) {
           const oldBatch = batches.find(b => b.id === oldBatchId);
-          if (oldBatch && Array.isArray(oldBatch.student_ids)) {
-            const updatedIds = oldBatch.student_ids.filter(id => id !== editingStudent.id);
+          if (oldBatch) {
+            const currentOldIds = Array.isArray(oldBatch.student_ids) ? oldBatch.student_ids : [];
+            const updatedIds = currentOldIds.filter(id => id !== editingStudent.id && id !== editingStudent.uid);
             await assignStudentsToBatch(oldBatchId, updatedIds).catch(err => console.warn('[Admin] Unlink old batch failed:', err));
           }
         }
         if (newBatchId) {
           const newBatch = batches.find(b => b.id === newBatchId);
-          const currentIds = newBatch && Array.isArray(newBatch.student_ids) ? newBatch.student_ids : [];
-          if (!currentIds.includes(editingStudent.id)) {
-            const updatedIds = [...currentIds, editingStudent.id];
+          const currentNewIds = newBatch && Array.isArray(newBatch.student_ids) ? newBatch.student_ids : [];
+          const sId = editingStudent.id || editingStudent.uid;
+          if (!currentNewIds.includes(sId)) {
+            const updatedIds = [...currentNewIds, sId];
             await assignStudentsToBatch(newBatchId, updatedIds).catch(err => console.warn('[Admin] Link new batch failed:', err));
           }
         }
@@ -3571,8 +3609,11 @@ const AdminDashboard = () => {
       setCustomEditCourseName('');
       setEditingStudent(null);
       fetchStudents();
+      fetchBatches();
       fetchStats();
-      showModal('Success', 'Student profile updated successfully!', 'success');
+      await refetchAdminBatches();
+      await refetchAdminData();
+      showModal('Success', 'Student profile & batch assignment updated successfully!', 'success');
     } catch (error) {
       console.error(error);
       showModal('Error', classifyFirestoreError(error).message, 'error');
@@ -5015,6 +5056,17 @@ const AdminDashboard = () => {
                                     <BookOpen size={11} color="var(--primary-color)" />
                                     {batch.course_name}
                                   </span>
+                                  {batch.course_access_type === 'selected' && Array.isArray(batch.accessible_courses) && batch.accessible_courses.length > 0 && !batch.accessible_courses.includes('all') ? (
+                                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#0369A1', background: '#E0F2FE', padding: '3px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }} title={`Accessible courses: ${batch.accessible_courses.join(', ')}`}>
+                                      <Video size={11} color="#0284C7" />
+                                      Access: {batch.accessible_courses.slice(0, 2).join(', ')}{batch.accessible_courses.length > 2 ? ` +${batch.accessible_courses.length - 2}` : ''}
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#15803D', background: '#DCFCE7', padding: '3px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                      <Video size={11} color="#16A34A" />
+                                      Access: All Classes
+                                    </span>
+                                  )}
                                 </div>
 
                                 {/* Dynamic Status Pill with live indicator */}
@@ -9758,6 +9810,202 @@ const AdminDashboard = () => {
                     <label className="form-label" htmlFor="batchMaxStudents">Maximum Seats</label>
                     <input id="batchMaxStudents" type="number" className="form-input" value={batchMaxStudents} onChange={(e) => setBatchMaxStudents(e.target.value)} required />
                   </div>
+                </div>
+
+                {/* Course & Recorded Classes Access Section */}
+                <div style={{
+                  background: '#F8FAFC',
+                  border: '1.5px solid #E2E8F0',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                      <Video size={16} color="var(--primary-color, #6C3CF0)" />
+                      Recorded Classes & Courses Access for Students
+                    </label>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: batchCourseAccessType === 'all' ? '#16A34A' : '#2563EB', background: batchCourseAccessType === 'all' ? '#DCFCE7' : '#DBEAFE', padding: '2px 8px', borderRadius: '6px' }}>
+                      {batchCourseAccessType === 'all' ? 'All Classes Visible' : `${batchAccessibleCourses.length} Course${batchAccessibleCourses.length === 1 ? '' : 's'} Permitted`}
+                    </span>
+                  </div>
+
+                  <p style={{ margin: 0, fontSize: '12px', color: '#64748B', lineHeight: '1.4' }}>
+                    Select whether students in this batch can watch all recorded classes across the portal or only classes for specific courses (e.g., Python, ML, SQL).
+                  </p>
+
+                  {/* Access Mode Option Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div
+                      onClick={() => {
+                        setBatchCourseAccessType('all');
+                        setBatchAccessibleCourses(['all']);
+                      }}
+                      style={{
+                        border: batchCourseAccessType === 'all' ? '2px solid var(--primary-color, #6C3CF0)' : '1.5px solid #E2E8F0',
+                        background: batchCourseAccessType === 'all' ? '#F5F3FF' : '#FFFFFF',
+                        borderRadius: '10px',
+                        padding: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="radio"
+                          id="accessAll"
+                          name="batchCourseAccessType"
+                          checked={batchCourseAccessType === 'all'}
+                          onChange={() => {
+                            setBatchCourseAccessType('all');
+                            setBatchAccessibleCourses(['all']);
+                          }}
+                          style={{ accentColor: 'var(--primary-color, #6C3CF0)', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="accessAll" style={{ fontSize: '12.5px', fontWeight: 700, color: '#1E293B', cursor: 'pointer', margin: 0 }}>
+                          All Recorded Classes
+                        </label>
+                      </div>
+                      <span style={{ fontSize: '11px', color: '#64748B', paddingLeft: '22px' }}>
+                        Students can view all recorded classes & courses
+                      </span>
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setBatchCourseAccessType('selected');
+                        if (batchAccessibleCourses.length === 0 || (batchAccessibleCourses.length === 1 && batchAccessibleCourses[0] === 'all')) {
+                          const fallbackCourse = (isCustomBatchCourse ? customBatchCourseName : batchCourseName).trim() || 'Python';
+                          setBatchAccessibleCourses([fallbackCourse]);
+                        }
+                      }}
+                      style={{
+                        border: batchCourseAccessType === 'selected' ? '2px solid var(--primary-color, #6C3CF0)' : '1.5px solid #E2E8F0',
+                        background: batchCourseAccessType === 'selected' ? '#F5F3FF' : '#FFFFFF',
+                        borderRadius: '10px',
+                        padding: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="radio"
+                          id="accessSelected"
+                          name="batchCourseAccessType"
+                          checked={batchCourseAccessType === 'selected'}
+                          onChange={() => {
+                            setBatchCourseAccessType('selected');
+                            if (batchAccessibleCourses.length === 0 || (batchAccessibleCourses.length === 1 && batchAccessibleCourses[0] === 'all')) {
+                              const fallbackCourse = (isCustomBatchCourse ? customBatchCourseName : batchCourseName).trim() || 'Python';
+                              setBatchAccessibleCourses([fallbackCourse]);
+                            }
+                          }}
+                          style={{ accentColor: 'var(--primary-color, #6C3CF0)', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="accessSelected" style={{ fontSize: '12.5px', fontWeight: 700, color: '#1E293B', cursor: 'pointer', margin: 0 }}>
+                          Selected Courses Only
+                        </label>
+                      </div>
+                      <span style={{ fontSize: '11px', color: '#64748B', paddingLeft: '22px' }}>
+                        Select ML, SQL, Python, or specific courses
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Multi-select Course Chips */}
+                  {batchCourseAccessType === 'selected' && (
+                    <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '8px', background: '#FFFFFF', padding: '12px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                      <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#475569' }}>
+                        Choose permitted courses for this cohort:
+                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {availableAccessCourses.map((course) => {
+                          const isSelected = batchAccessibleCourses.some(c => c.toLowerCase() === course.toLowerCase());
+                          return (
+                            <button
+                              key={course}
+                              type="button"
+                              onClick={() => {
+                                if (isSelected) {
+                                  setBatchAccessibleCourses(prev => prev.filter(c => c.toLowerCase() !== course.toLowerCase()));
+                                } else {
+                                  setBatchAccessibleCourses(prev => [...prev.filter(c => c !== 'all'), course]);
+                                }
+                              }}
+                              style={{
+                                fontSize: '11.5px',
+                                fontWeight: 600,
+                                padding: '5px 10px',
+                                borderRadius: '8px',
+                                border: isSelected ? '1.5px solid var(--primary-color, #6C3CF0)' : '1px solid #CBD5E1',
+                                background: isSelected ? 'var(--primary-color, #6C3CF0)' : '#F8FAFC',
+                                color: isSelected ? '#FFFFFF' : '#334155',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {isSelected ? <Check size={12} /> : null}
+                              {course}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Add Custom Course Pill Input */}
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="Type other course (e.g. Deep Learning) & click Add..."
+                          value={customAccessCourseInput}
+                          onChange={(e) => setCustomAccessCourseInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const val = customAccessCourseInput.trim();
+                              if (val && !batchAccessibleCourses.some(c => c.toLowerCase() === val.toLowerCase())) {
+                                setBatchAccessibleCourses(prev => [...prev.filter(c => c !== 'all'), val]);
+                                setCustomAccessCourseInput('');
+                              }
+                            }
+                          }}
+                          style={{ fontSize: '12px', padding: '6px 10px' }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => {
+                            const val = customAccessCourseInput.trim();
+                            if (val && !batchAccessibleCourses.some(c => c.toLowerCase() === val.toLowerCase())) {
+                              setBatchAccessibleCourses(prev => [...prev.filter(c => c !== 'all'), val]);
+                              setCustomAccessCourseInput('');
+                            }
+                          }}
+                          style={{ fontSize: '12px', padding: '6px 12px', whiteSpace: 'nowrap' }}
+                        >
+                          + Add
+                        </button>
+                      </div>
+
+                      {batchAccessibleCourses.length === 0 && (
+                        <span style={{ fontSize: '11px', color: '#DC2626', fontWeight: 600 }}>
+                          ⚠️ Please select at least one course for this batch.
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Duration Summary Pill */}

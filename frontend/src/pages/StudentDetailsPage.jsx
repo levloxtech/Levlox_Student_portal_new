@@ -14,6 +14,8 @@ import {
   getAttendanceForStudent,
   getPaymentsForStudent,
   getDocuments,
+  getBatches,
+  assignStudentsToBatch,
   classifyFirestoreError,
   formatCurrency,
   getStudentFeeDetails,
@@ -53,6 +55,7 @@ const StudentDetailsPage = () => {
     email: '',
     password: '',
     course: '',
+    batch_id: '',
     batch_name: '',
     status: 'active',
     dob: '',
@@ -62,6 +65,13 @@ const StudentDetailsPage = () => {
     guardian_name: '',
     guardian_phone: '',
     guardian_relation: 'Guardian',
+  });
+
+  // Fetch Batches for assignment & transfer
+  const { data: batches = [] } = useQuery({
+    queryKey: ['adminBatches'],
+    queryFn: getBatches,
+    staleTime: 1000 * 30,
   });
 
   // Fetch Student document
@@ -102,13 +112,15 @@ const StudentDetailsPage = () => {
   // Populate edit form when student data loads
   useEffect(() => {
     if (student && !isDirtyRef.current) {
+      const matchedBatch = (batches || []).find(b => b.id === (student.batch_id || student.batchId) || b.name === (student.batch_name || student.batch));
       setEditForm({
         name: student.name || '',
         phone: student.phone || student.mobile || '',
         email: student.email || '',
         password: '',
         course: student.course || 'Fullstack Engineering',
-        batch_name: student.batch_name || student.batch || '',
+        batch_id: student.batch_id || student.batchId || matchedBatch?.id || '',
+        batch_name: student.batch_name || student.batch || matchedBatch?.name || '',
         status: student.status || 'active',
         dob: student.dob || student.date_of_birth || student.dateOfBirth || '',
         gender: student.gender || '',
@@ -121,7 +133,7 @@ const StudentDetailsPage = () => {
       setAvatarPreview(student.profilePhotoUrl || student.profile_pic || '');
       setPendingAvatar(null);
     }
-  }, [student]);
+  }, [student, batches]);
 
   // Calculate attendance summary
   const attendanceStats = React.useMemo(() => {
@@ -180,12 +192,21 @@ const StudentDetailsPage = () => {
     setSaveSuccessMessage(null);
 
     try {
+      const selectedBatch = (batches || []).find(b => b.id === editForm.batch_id);
+      const finalBatchName = selectedBatch?.name || editForm.batch_name.trim();
+      const oldBatchId = student?.batch_id || student?.batchId || (batches || []).find(b => b.name === (student?.batch_name || student?.batch))?.id || '';
+      const newBatchId = editForm.batch_id;
+
       const patch = {
         name: editForm.name.trim(),
         phone: editForm.phone.trim(),
         email: editForm.email.trim().toLowerCase(),
         course: editForm.course.trim(),
-        batch_name: editForm.batch_name.trim(),
+        batch_id: newBatchId || '',
+        batchId: newBatchId || '',
+        batch_name: finalBatchName || '',
+        batch: finalBatchName || '',
+        batch_code: selectedBatch?.code || selectedBatch?.batchId || '',
         status: editForm.status,
         dob: editForm.dob.trim(),
         gender: editForm.gender,
@@ -211,6 +232,26 @@ const StudentDetailsPage = () => {
       // Update student document in database (server.js automatically syncs credentials to users.json)
       await updateStudent(studentId, patch);
 
+      // If batch assignment changed, transfer student between batches
+      if (oldBatchId !== newBatchId) {
+        if (oldBatchId) {
+          const oldBatch = (batches || []).find(b => b.id === oldBatchId);
+          if (oldBatch) {
+            const currentOldIds = Array.isArray(oldBatch.student_ids) ? oldBatch.student_ids : [];
+            const updatedIds = currentOldIds.filter(id => id !== studentId);
+            await assignStudentsToBatch(oldBatchId, updatedIds).catch(err => console.warn('[StudentDetails] Unlink old batch failed:', err));
+          }
+        }
+        if (newBatchId) {
+          const newBatch = (batches || []).find(b => b.id === newBatchId);
+          const currentNewIds = newBatch && Array.isArray(newBatch.student_ids) ? newBatch.student_ids : [];
+          if (!currentNewIds.includes(studentId)) {
+            const updatedIds = [...currentNewIds, studentId];
+            await assignStudentsToBatch(newBatchId, updatedIds).catch(err => console.warn('[StudentDetails] Link new batch failed:', err));
+          }
+        }
+      }
+
       // Automatically dispatch update email to the student's email address
       const studentPayload = { ...student, ...patch, id: studentId, uid: studentId };
       await sendStudentProfileUpdatedEmail(
@@ -221,6 +262,7 @@ const StudentDetailsPage = () => {
       // Invalidate React Query caches
       await queryClient.invalidateQueries({ queryKey: ['adminStudentDetails', studentId] });
       await queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
+      await queryClient.invalidateQueries({ queryKey: ['adminBatches'] });
       isDirtyRef.current = false;
       refetchStudent();
 
@@ -1412,22 +1454,37 @@ const StudentDetailsPage = () => {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                    Batch Name
+                    Assigned Cohort / Batch
                   </label>
-                  <input
-                    type="text"
-                    value={editForm.batch_name}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, batch_name: e.target.value }))}
-                    placeholder="Batch name"
+                  <select
+                    value={editForm.batch_id}
+                    onChange={(e) => {
+                      const selId = e.target.value;
+                      const sel = (batches || []).find(b => b.id === selId);
+                      setEditForm(prev => ({
+                        ...prev,
+                        batch_id: selId,
+                        batch_name: sel?.name || ''
+                      }));
+                    }}
                     style={{
                       width: '100%',
                       padding: '10px 12px',
                       borderRadius: 10,
                       border: '1.5px solid #CBD5E1',
                       fontSize: 13.5,
-                      boxSizing: 'border-box'
+                      boxSizing: 'border-box',
+                      background: '#FFFFFF',
+                      color: '#1E293B'
                     }}
-                  />
+                  >
+                    <option value="">-- No Batch Assigned --</option>
+                    {batches.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.code || b.course_name || 'Batch'})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

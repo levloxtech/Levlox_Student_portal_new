@@ -8,7 +8,7 @@ import {
   CheckCircle, PlayCircle, Eye, Share2, BookmarkCheck, ChevronRight,
   GraduationCap, Flame, PlaySquare
 } from 'lucide-react';
-import { getRecordedClasses, getPlaylists, getCourses, classifyFirestoreError } from '../services/firebaseService';
+import { getRecordedClasses, getPlaylists, getCourses, getBatches, classifyFirestoreError } from '../services/firebaseService';
 import { useAuth } from '../context/AuthContext';
 import SecureVideoPlayer from '../components/SecureVideoPlayer';
 import AcademiaCourseViewer from '../components/AcademiaCourseViewer';
@@ -76,6 +76,7 @@ const RecordedClassesPage = ({
   const [coursesList, setCoursesList] = useState([]);
   const [recordingsList, setRecordingsList] = useState(recordedClasses || []);
   const [playlistsList, setPlaylistsList] = useState(customPlaylists || []);
+  const [batchesList, setBatchesList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Active category filter tab: 'all' | 'in-progress' | 'completed' | 'not-started'
@@ -96,19 +97,21 @@ const RecordedClassesPage = ({
     setWatchProgressMap(getAllWatchProgress(studentId));
   };
 
-  // Fetch all real courses, recordings & playlists from localDb/backend
+  // Fetch all real courses, recordings, playlists & batches from localDb/backend
   const loadData = async () => {
     setLoading(true);
     try {
-      const [fetchedCourses, fetchedRecs, fetchedPlaylists] = await Promise.all([
+      const [fetchedCourses, fetchedRecs, fetchedPlaylists, fetchedBatches] = await Promise.all([
         getCourses().catch(() => []),
         getRecordedClasses().catch(() => []),
-        getPlaylists().catch(() => [])
+        getPlaylists().catch(() => []),
+        getBatches().catch(() => [])
       ]);
 
       setCoursesList(Array.isArray(fetchedCourses) ? fetchedCourses : []);
       setRecordingsList(Array.isArray(fetchedRecs) ? fetchedRecs : []);
       setPlaylistsList(Array.isArray(fetchedPlaylists) ? fetchedPlaylists : []);
+      setBatchesList(Array.isArray(fetchedBatches) ? fetchedBatches : []);
     } catch (err) {
       console.error('Error fetching courses:', err);
       setCoursesList([]);
@@ -175,7 +178,45 @@ const RecordedClassesPage = ({
     const normalizedBatchId = String(studentBatchId || '').trim().toLowerCase();
     const normalizedBatchName = String(studentBatchName || '').trim().toLowerCase();
 
-    // 1. Process custom Playlists
+    // 1. Determine student batch permissions
+    const studentBatch = (batchesList || []).find((b) => {
+      const bId = String(b.id || b.uid || '').trim().toLowerCase();
+      const bCode = String(b.code || b.batchId || '').trim().toLowerCase();
+      const bName = String(b.name || '').trim().toLowerCase();
+      return (normalizedBatchId && (bId === normalizedBatchId || bCode === normalizedBatchId)) ||
+             (normalizedBatchName && (bName === normalizedBatchName || bCode === normalizedBatchName));
+    });
+
+    const accessType = studentBatch?.course_access_type || 'all'; // 'all' | 'selected'
+    const allowedCourses = Array.isArray(studentBatch?.accessible_courses) ? studentBatch.accessible_courses : [];
+    const isAllAccess = !studentBatch || accessType === 'all' || allowedCourses.includes('all');
+
+    // Helper to check if a course / category / topic matches permitted batch courses
+    const isPermittedForBatch = (title = '', cat = '', batchId = '') => {
+      if (isAllAccess) return true;
+      if (batchId && normalizedBatchId && String(batchId).trim().toLowerCase() === normalizedBatchId) return true;
+
+      const full = `${title || ''} ${cat || ''}`.toLowerCase();
+      return allowedCourses.some((c) => {
+        const item = String(c || '').trim().toLowerCase();
+        if (!item || item === 'all') return true;
+        if (full.includes(item) || item.includes(full)) return true;
+
+        // Acronym & alias checking (e.g. ML, SQL, Python, DS, FSD)
+        if ((item === 'ml' || item.includes('ml')) && (full.includes('machine learning') || full.includes('ml'))) return true;
+        if (item.includes('machine learning') && (full.includes('ml') || full.includes('machine learning'))) return true;
+        if (item === 'sql' && (full.includes('sql') || full.includes('database') || full.includes('mysql') || full.includes('postgres') || full.includes('dbms'))) return true;
+        if (item.includes('python') && full.includes('python')) return true;
+        if (item.includes('java') && full.includes('java')) return true;
+        if ((item.includes('data science') || item === 'ds') && (full.includes('data science') || full.includes('ds') || full.includes('ai'))) return true;
+        if ((item.includes('fullstack') || item === 'fsd') && (full.includes('fullstack') || full.includes('fsd') || full.includes('web'))) return true;
+        return false;
+      });
+    };
+
+    const includedRecordingIds = new Set();
+
+    // 2. Process custom Playlists
     (playlistsList || []).forEach((pl) => {
       if (!pl || !pl.name) return;
       const plId = String(pl.id || pl.uid);
@@ -191,6 +232,11 @@ const RecordedClassesPage = ({
         if (!matchesBatch) return; // Hide from this student!
       }
 
+      // Check course permission configured for this batch
+      if (!isPermittedForBatch(pl.name, pl.course_name || pl.category, pl.batch_id)) {
+        return; // Batch not permitted to view this course!
+      }
+
       // Find all lessons for this playlist sorted in ascending order
       const relatedVideos = (recordingsList || []).filter((r) => {
         const rPlId = String(r.playlist_id || r.playlistId || '');
@@ -202,6 +248,11 @@ const RecordedClassesPage = ({
         const orderB = b.sort_order ?? b.order ?? 999;
         if (orderA !== orderB) return Number(orderA) - Number(orderB);
         return (a.title || '').localeCompare(b.title || '');
+      });
+
+      relatedVideos.forEach((v) => {
+        const id = v.id || v.uid;
+        if (id) includedRecordingIds.add(String(id));
       });
 
       // Calculate real dynamic progress for this playlist
@@ -244,8 +295,72 @@ const RecordedClassesPage = ({
       });
     });
 
+    // 3. Process standalone recordings (recordings not in any playlist) grouped by course_title
+    const standaloneByCourse = {};
+    (recordingsList || []).forEach((r) => {
+      const rId = String(r.id || r.uid);
+      if (includedRecordingIds.has(rId)) return; // already in a playlist
+
+      // Batch check on individual recording if batch restricted
+      const rBatchId = String(r.batch_id || r.batchId || '').trim().toLowerCase();
+      const rBatchName = String(r.batch_name || r.batchName || '').trim().toLowerCase();
+      if (rBatchId && rBatchId !== 'all') {
+        const matches = (normalizedBatchId && rBatchId === normalizedBatchId) ||
+                        (normalizedBatchName && rBatchName === normalizedBatchName);
+        if (!matches) return;
+      }
+
+      const cTitle = (r.course_title || r.course_name || r.category || 'Recorded Classes').trim();
+      if (!isPermittedForBatch(cTitle, r.category, r.batch_id)) return;
+
+      if (!standaloneByCourse[cTitle]) {
+        standaloneByCourse[cTitle] = [];
+      }
+      standaloneByCourse[cTitle].push(r);
+    });
+
+    Object.entries(standaloneByCourse).forEach(([courseTitle, recs]) => {
+      const sortedRecs = recs.sort((a, b) => {
+        const orderA = a.sort_order ?? a.order ?? 999;
+        const orderB = b.sort_order ?? b.order ?? 999;
+        if (orderA !== orderB) return Number(orderA) - Number(orderB);
+        return (a.title || '').localeCompare(b.title || '');
+      });
+
+      let completedCount = 0;
+      sortedRecs.forEach((v) => {
+        const vId = v.id || v.uid;
+        const prog = watchProgressMap[vId];
+        if (prog?.completed || (prog?.progress && prog.progress >= 90)) completedCount++;
+      });
+      const totalLessons = sortedRecs.length;
+      const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+      const status = progressPercent === 100 ? 'Completed' : (progressPercent > 0 ? 'In Progress' : 'Not Started');
+
+      list.push({
+        id: `standalone-${courseTitle.replace(/\s+/g, '-').toLowerCase()}`,
+        courseId: `standalone-${courseTitle.replace(/\s+/g, '-').toLowerCase()}`,
+        title: courseTitle,
+        name: courseTitle,
+        category: 'Class Recordings',
+        description: `Lecture series and class recordings for ${courseTitle}.`,
+        thumbnail: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80',
+        trainer_name: recs[0]?.trainer_name || 'Faculty Trainer',
+        trainer_avatar: null,
+        lessons: sortedRecs,
+        lessons_count: totalLessons,
+        completed_lessons: completedCount,
+        progress: progressPercent,
+        status: status,
+        duration: `${totalLessons * 45} mins`,
+        is_playlist: false,
+        batch_name: 'Recorded Lectures',
+        updatedAt: recs[0]?.updatedAt || recs[0]?.createdAt || null
+      });
+    });
+
     return list;
-  }, [playlistsList, recordingsList, watchProgressMap, studentBatchId, studentBatchName]);
+  }, [playlistsList, recordingsList, batchesList, watchProgressMap, studentBatchId, studentBatchName]);
 
   // Dynamic Currently Learning Course:
   // Pick the course the student is actively progressing in, or the one with lessons, or null

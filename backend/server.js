@@ -1329,6 +1329,25 @@ function syncUserCredentials(collection, id, data) {
     profilePhotoUrl: data.profilePic || data.profile_pic || data.profilePhotoUrl || data.photoURL || current?.profilePic || current?.profile_pic || current?.profilePhotoUrl || existingUser?.profilePhotoUrl || '',
   };
 
+  if (data.batch_id !== undefined || data.batchId !== undefined || current?.batch_id || existingUser?.batch_id) {
+    const bId = data.batch_id !== undefined ? data.batch_id : (data.batchId !== undefined ? data.batchId : (current?.batch_id || existingUser?.batch_id || ''));
+    patch.batch_id = bId;
+    patch.batchId = bId;
+  }
+  if (data.batch_name !== undefined || data.batch !== undefined || current?.batch_name || existingUser?.batch_name) {
+    const bName = data.batch_name !== undefined ? data.batch_name : (data.batch !== undefined ? data.batch : (current?.batch_name || existingUser?.batch_name || ''));
+    patch.batch_name = bName;
+    patch.batch = bName;
+  }
+  if (data.batch_code !== undefined || current?.batch_code || existingUser?.batch_code) {
+    patch.batch_code = data.batch_code || current?.batch_code || existingUser?.batch_code || '';
+  }
+  if (data.course !== undefined || data.course_name !== undefined || current?.course || existingUser?.course) {
+    const cName = data.course || data.course_name || current?.course || existingUser?.course || '';
+    patch.course = cName;
+    patch.course_name = cName;
+  }
+
   if (data.mustChangePassword !== undefined) {
     patch.mustChangePassword = data.mustChangePassword;
   }

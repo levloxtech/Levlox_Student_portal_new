@@ -867,7 +867,7 @@ export const assignStudentsToBatch = async (batchId, studentIds = []) => {
     throw new Error("Batch document not found.");
   }
 
-  // Find all students currently linked to this batch in Firestore
+  // Find all students currently linked to this batch
   const [allCurrentInBatch1, allCurrentInBatch2] = await Promise.all([
     getDocuments("students", [where("batch_id", "==", batchId)]).catch(() => []),
     getDocuments("students", [where("batchId", "==", batchId)]).catch(() => [])
@@ -880,34 +880,37 @@ export const assignStudentsToBatch = async (batchId, studentIds = []) => {
 
   const removedIds = allPreviousIds.filter((id) => !studentIds.includes(id));
 
-  const batch = writeBatch(db);
-  batch.set(doc(db, "batches", batchId), {
+  // Update batch document with student IDs
+  await updateDocumentFields("batches", batchId, {
     student_ids: studentIds,
     students_count: studentIds.length,
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+    updatedAt: new Date().toISOString(),
+  });
 
-  studentIds.forEach((sid) => {
-    batch.set(doc(db, "students", sid), {
+  // Link newly assigned students
+  await Promise.all(studentIds.map(sid =>
+    updateDocumentFields("students", sid, {
       batch_id: batchId,
       batchId: batchId,
       batch_name: existing?.name || "",
       batchName: existing?.name || "",
-      updatedAt: serverTimestamp(),
-    }, { merge: true });
-  });
+      batch_code: existing?.code || existing?.batchId || "",
+      updatedAt: new Date().toISOString(),
+    }).catch(e => console.warn(`[LocalDB] Assign student ${sid} failed:`, e))
+  ));
 
-  removedIds.forEach((sid) => {
-    batch.set(doc(db, "students", sid), {
+  // Unlink removed students
+  await Promise.all(removedIds.map(sid =>
+    updateDocumentFields("students", sid, {
       batch_id: "",
       batchId: "",
       batch_name: "",
       batchName: "",
-      updatedAt: serverTimestamp(),
-    }, { merge: true });
-  });
+      batch_code: "",
+      updatedAt: new Date().toISOString(),
+    }).catch(e => console.warn(`[LocalDB] Unassign student ${sid} failed:`, e))
+  ));
 
-  await batch.commit();
   return { batchId, studentIds };
 };
 
@@ -920,20 +923,21 @@ export const unassignStudentFromBatch = async (batchId, studentId) => {
   const currentIds = existing.student_ids || [];
   const updatedIds = currentIds.filter(id => id !== studentId);
 
-  const batch = writeBatch(db);
-  batch.set(doc(db, "batches", batchId), {
+  await updateDocumentFields("batches", batchId, {
     student_ids: updatedIds,
     students_count: updatedIds.length,
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+    updatedAt: new Date().toISOString(),
+  });
 
-  batch.set(doc(db, "students", studentId), {
+  await updateDocumentFields("students", studentId, {
     batch_id: "",
+    batchId: "",
     batch_name: "",
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+    batchName: "",
+    batch_code: "",
+    updatedAt: new Date().toISOString(),
+  }).catch(e => console.warn(`[LocalDB] Unlink student ${studentId} failed:`, e));
 
-  await batch.commit();
   return { batchId, studentId };
 };
 
