@@ -945,7 +945,14 @@ app.get('/api/data/:collection/count', (req, res) => {
 app.get('/api/data/:collection/:id', (req, res) => {
   try {
     let item = localDb.getDocument(req.params.collection, req.params.id);
-    if (!item) return res.status(404).json({ error: 'Document not found.' });
+    if (!item) {
+      if (req.params.collection === 'settings') {
+        const defaultSettings = { id: req.params.id, updatedAt: new Date().toISOString() };
+        localDb.setDocument('settings', req.params.id, defaultSettings);
+        return res.json(defaultSettings);
+      }
+      return res.status(404).json({ error: 'Document not found.' });
+    }
 
     if (req.params.collection === 'students') {
       const users = localDb.loadCollection('users');
