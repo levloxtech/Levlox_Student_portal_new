@@ -80,8 +80,11 @@ function App() {
               <Routes>
                 {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/login/*" element={<Login />} />
                 <Route path="/register" element={<RegisterSignup />} />
+                <Route path="/register/*" element={<RegisterSignup />} />
                 <Route path="/academy" element={<AcademyShowcase />} />
+                <Route path="/academy/*" element={<AcademyShowcase />} />
                 <Route path="/register/showcase" element={<AcademyShowcase />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />

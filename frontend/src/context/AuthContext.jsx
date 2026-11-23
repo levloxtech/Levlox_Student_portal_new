@@ -111,7 +111,15 @@ export const AuthProvider = ({ children }) => {
           setCurrentUser(null);
           setUserProfile(null);
           setUserRole(null);
-          window.location.href = '/login?reason=session_revoked';
+          const currentPath = (window.location.pathname || '').toLowerCase();
+          const isPublicPage = currentPath === '/login' ||
+            currentPath.startsWith('/register') ||
+            currentPath.startsWith('/academy') ||
+            currentPath.startsWith('/reset-password') ||
+            currentPath.startsWith('/verify-email');
+          if (!isPublicPage) {
+            window.location.href = '/login?reason=session_revoked';
+          }
         }
       } catch (err) {
         // Transient network error, ignore
