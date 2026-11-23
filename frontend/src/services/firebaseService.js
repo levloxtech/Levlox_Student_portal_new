@@ -380,6 +380,15 @@ export const updateCourse = (id, data) => updateDocumentFields("courses", id, da
 export const deleteCourse = (id) => deleteDocument("courses", id);
 
 // ─────────────────────────────────────────────────────────────────────────────
+// INDUSTRIAL PROJECTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getIndustrialProjects = () => getDocuments("industrial_projects");
+export const updateIndustrialProject = (id, data) => updateDocumentFields("industrial_projects", id, data);
+export const addIndustrialProject = (data) => addDocument("industrial_projects", data);
+export const deleteIndustrialProject = (id) => deleteDocument("industrial_projects", id);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // LIVE CLASSES
 // ─────────────────────────────────────────────────────────────────────────────
 

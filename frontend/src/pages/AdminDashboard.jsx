@@ -12,7 +12,7 @@ import {
   User, Mail, Phone, Lock, EyeOff, Camera, Save, Shield, Menu,
   Calendar, Timer, Sparkles, FastForward, CheckCheck, History, ArrowUpRight, UserCheck,
   Globe, ArrowLeft, ArrowRight, Upload, Image as ImageIcon, UploadCloud, MessageSquare, Tag, Ticket, Laptop,
-  Check
+  Check, FolderGit2
 } from 'lucide-react';
 import CustomModal from '../components/Modal';
 import FilterBar from '../components/FilterBar';
@@ -27,6 +27,7 @@ import AcademyTestimonialsManager from '../components/AcademyTestimonialsManager
 import PortalStudentsManager from '../components/PortalStudentsManager';
 import CouponsManager from '../components/CouponsManager';
 import CoursesManager from '../components/CoursesManager';
+import IndustrialProjectsManager from '../components/IndustrialProjectsManager';
 import DesktopOnlyGate from '../components/DesktopOnlyGate';
 import { isMobileDevice } from '../utils/device';
 import { useAuth } from '../context/AuthContext';
@@ -4609,6 +4610,11 @@ const AdminDashboard = () => {
             <span className="sidebar-link-text">Academy Testimonials</span>
           </button>
 
+          <button className={`sidebar-link ${activeTab === 'industrial-projects' ? 'active' : ''}`} onClick={() => handleNavTabClick('industrial-projects')}>
+            <FolderGit2 size={18} />
+            <span className="sidebar-link-text">Industrial Projects</span>
+          </button>
+
         </nav>
 
         <div className="sidebar-footer">
@@ -8318,6 +8324,11 @@ const AdminDashboard = () => {
         {/* Promotional Coupons & Date Validation Tab */}
         {activeTab === 'coupons' && (
           <CouponsManager />
+        )}
+
+        {/* Industrial Projects & Media Management Tab */}
+        {activeTab === 'industrial-projects' && (
+          <IndustrialProjectsManager />
         )}
       </main>
 

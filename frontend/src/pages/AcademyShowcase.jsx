@@ -437,6 +437,33 @@ export default function AcademyShowcase() {
       .catch(err => console.error('Failed to load testimonials:', err));
   }, []);
 
+  // Industrial Projects from Database with fallback to DEFAULT_PROJECTS
+  const [industrialProjectsList, setIndustrialProjectsList] = useState([]);
+  const [selectedProjectVideoModal, setSelectedProjectVideoModal] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/data/industrial_projects')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setIndustrialProjectsList(data);
+        }
+      })
+      .catch(err => console.error('Failed to load industrial projects:', err));
+  }, []);
+
+  const pythonProjectsData = industrialProjectsList.filter(p => p.category === 'python').length > 0
+    ? industrialProjectsList.filter(p => p.category === 'python')
+    : PYTHON_PROJECTS;
+
+  const mlProjectsData = industrialProjectsList.filter(p => p.category === 'ml').length > 0
+    ? industrialProjectsList.filter(p => p.category === 'ml')
+    : ML_PROJECTS;
+
+  const sqlProjectsData = industrialProjectsList.filter(p => p.category === 'sql').length > 0
+    ? industrialProjectsList.filter(p => p.category === 'sql')
+    : SQL_PROJECTS;
+
   const getEmbedUrl = (url) => {
     if (!url) return '';
     const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
@@ -1555,13 +1582,64 @@ export default function AcademyShowcase() {
             box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
             transition: all 0.2s ease;
           }
           .industrial-project-card:hover {
             border-color: #CBD5E1;
             box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
             transform: translateY(-2px);
+          }
+          .project-media-slot {
+            position: relative;
+            width: 100%;
+            height: 120px;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #F1F5F9;
+            border: 1px solid #E2E8F0;
+            transition: all 0.2s ease;
+          }
+          .project-media-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+          }
+          .industrial-project-card:hover .project-media-img {
+            transform: scale(1.04);
+          }
+          .project-video-badge {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 23, 42, 0.38);
+            transition: background 0.2s ease;
+          }
+          .project-video-badge:hover {
+            background: rgba(15, 23, 42, 0.55);
+          }
+          .project-play-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: rgba(255, 255, 255, 0.95);
+            color: #0F172A;
+            font-size: 11.5px;
+            font-weight: 700;
+            border-radius: 20px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(4px);
+            transition: transform 0.18s ease;
+          }
+          .project-video-badge:hover .project-play-pill {
+            transform: scale(1.05);
           }
           @media (max-width: 980px) {
             .industrial-projects-grid {
@@ -1634,8 +1712,8 @@ export default function AcademyShowcase() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flexGrow: 1 }}>
-                {PYTHON_PROJECTS.map((p, i) => (
-                  <div key={i} className="industrial-project-card" style={{ borderLeft: '3.5px solid #2563EB' }}>
+                {pythonProjectsData.map((p, i) => (
+                  <div key={p.id || i} className="industrial-project-card" style={{ borderLeft: '3.5px solid #2563EB' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', lineHeight: 1.35 }}>
                         {i + 1}. {p.name}
@@ -1656,7 +1734,7 @@ export default function AcademyShowcase() {
                     </div>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                      {p.tags.map((tag, tIdx) => (
+                      {(p.tags || []).map((tag, tIdx) => (
                         <span key={tIdx} style={{
                           fontSize: 10,
                           fontWeight: 600,
@@ -1669,6 +1747,88 @@ export default function AcademyShowcase() {
                         </span>
                       ))}
                     </div>
+
+                    {/* Media Slot (Thumbnail / Video Preview) */}
+                    {(p.thumbnailUrl || p.videoUrl) ? (
+                      <div
+                        className="project-media-slot"
+                        onClick={() => {
+                          if (p.videoUrl) {
+                            setSelectedProjectVideoModal({
+                              name: p.name,
+                              videoUrl: p.videoUrl,
+                              thumbnailUrl: p.thumbnailUrl,
+                              worth: p.worth,
+                              categoryLabel: 'Python Projects',
+                              outcome: p.outcome
+                            });
+                          }
+                        }}
+                        style={{ cursor: p.videoUrl ? 'pointer' : 'default' }}
+                      >
+                        {p.thumbnailUrl ? (
+                          <img src={p.thumbnailUrl} alt={p.name} className="project-media-img" />
+                        ) : (
+                          <div style={{
+                            width: '100%',
+                            height: '100%',
+                            background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexDirection: 'column',
+                            gap: 6
+                          }}>
+                            <PythonBrandIcon size={26} />
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#2563EB' }}>
+                              Python Project Walkthrough
+                            </span>
+                          </div>
+                        )}
+                        {p.videoUrl && (
+                          <div className="project-video-badge">
+                            <div className="project-play-pill">
+                              <Play size={13} fill="#0F172A" />
+                              <span>Watch Demo Video</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div
+                        className="project-media-slot"
+                        style={{
+                          background: 'linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)',
+                          border: '1px dashed #BFDBFE',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          padding: '8px 12px'
+                        }}
+                      >
+                        <div style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 6,
+                          background: '#EFF6FF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <PythonBrandIcon size={18} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#1E40AF', lineHeight: 1.2 }}>
+                            Production Architecture & RBAC
+                          </span>
+                          <span style={{ fontSize: 10, color: '#64748B', fontWeight: 500 }}>
+                            Full-stack Python implementation
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
                       {p.outcome}
@@ -1727,8 +1887,8 @@ export default function AcademyShowcase() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flexGrow: 1 }}>
-                {ML_PROJECTS.map((p, i) => (
-                  <div key={i} className="industrial-project-card" style={{ borderLeft: '3.5px solid #7C3AED' }}>
+                {mlProjectsData.map((p, i) => (
+                  <div key={p.id || i} className="industrial-project-card" style={{ borderLeft: '3.5px solid #7C3AED' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', lineHeight: 1.35 }}>
                         {i + 1}. {p.name}
@@ -1749,7 +1909,7 @@ export default function AcademyShowcase() {
                     </div>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                      {p.tags.map((tag, tIdx) => (
+                      {(p.tags || []).map((tag, tIdx) => (
                         <span key={tIdx} style={{
                           fontSize: 10,
                           fontWeight: 600,
@@ -1762,6 +1922,88 @@ export default function AcademyShowcase() {
                         </span>
                       ))}
                     </div>
+
+                    {/* Media Slot (Thumbnail / Video Preview) */}
+                    {(p.thumbnailUrl || p.videoUrl) ? (
+                      <div
+                        className="project-media-slot"
+                        onClick={() => {
+                          if (p.videoUrl) {
+                            setSelectedProjectVideoModal({
+                              name: p.name,
+                              videoUrl: p.videoUrl,
+                              thumbnailUrl: p.thumbnailUrl,
+                              worth: p.worth,
+                              categoryLabel: 'Machine Learning',
+                              outcome: p.outcome
+                            });
+                          }
+                        }}
+                        style={{ cursor: p.videoUrl ? 'pointer' : 'default' }}
+                      >
+                        {p.thumbnailUrl ? (
+                          <img src={p.thumbnailUrl} alt={p.name} className="project-media-img" />
+                        ) : (
+                          <div style={{
+                            width: '100%',
+                            height: '100%',
+                            background: 'linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexDirection: 'column',
+                            gap: 6
+                          }}>
+                            <MLBrandIcon size={26} />
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#7C3AED' }}>
+                              ML Model Walkthrough
+                            </span>
+                          </div>
+                        )}
+                        {p.videoUrl && (
+                          <div className="project-video-badge">
+                            <div className="project-play-pill">
+                              <Play size={13} fill="#0F172A" />
+                              <span>Watch Demo Video</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div
+                        className="project-media-slot"
+                        style={{
+                          background: 'linear-gradient(135deg, #F8FAFC 0%, #F5F3FF 100%)',
+                          border: '1px dashed #DDD6FE',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          padding: '8px 12px'
+                        }}
+                      >
+                        <div style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 6,
+                          background: '#F5F3FF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <MLBrandIcon size={18} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#6D28D9', lineHeight: 1.2 }}>
+                            Predictive Pipeline & API
+                          </span>
+                          <span style={{ fontSize: 10, color: '#64748B', fontWeight: 500 }}>
+                            Feature engineering & model weights
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
                       {p.outcome}
@@ -1820,8 +2062,8 @@ export default function AcademyShowcase() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flexGrow: 1 }}>
-                {SQL_PROJECTS.map((p, i) => (
-                  <div key={i} className="industrial-project-card" style={{ borderLeft: '3.5px solid #059669' }}>
+                {sqlProjectsData.map((p, i) => (
+                  <div key={p.id || i} className="industrial-project-card" style={{ borderLeft: '3.5px solid #059669' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', lineHeight: 1.35 }}>
                         {i + 1}. {p.name}
@@ -1842,7 +2084,7 @@ export default function AcademyShowcase() {
                     </div>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                      {p.tags.map((tag, tIdx) => (
+                      {(p.tags || []).map((tag, tIdx) => (
                         <span key={tIdx} style={{
                           fontSize: 10,
                           fontWeight: 600,
@@ -1855,6 +2097,88 @@ export default function AcademyShowcase() {
                         </span>
                       ))}
                     </div>
+
+                    {/* Media Slot (Thumbnail / Video Preview) */}
+                    {(p.thumbnailUrl || p.videoUrl) ? (
+                      <div
+                        className="project-media-slot"
+                        onClick={() => {
+                          if (p.videoUrl) {
+                            setSelectedProjectVideoModal({
+                              name: p.name,
+                              videoUrl: p.videoUrl,
+                              thumbnailUrl: p.thumbnailUrl,
+                              worth: p.worth,
+                              categoryLabel: 'SQL Projects',
+                              outcome: p.outcome
+                            });
+                          }
+                        }}
+                        style={{ cursor: p.videoUrl ? 'pointer' : 'default' }}
+                      >
+                        {p.thumbnailUrl ? (
+                          <img src={p.thumbnailUrl} alt={p.name} className="project-media-img" />
+                        ) : (
+                          <div style={{
+                            width: '100%',
+                            height: '100%',
+                            background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexDirection: 'column',
+                            gap: 6
+                          }}>
+                            <SQLBrandIcon size={26} />
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#059669' }}>
+                              SQL Database Walkthrough
+                            </span>
+                          </div>
+                        )}
+                        {p.videoUrl && (
+                          <div className="project-video-badge">
+                            <div className="project-play-pill">
+                              <Play size={13} fill="#0F172A" />
+                              <span>Watch Demo Video</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div
+                        className="project-media-slot"
+                        style={{
+                          background: 'linear-gradient(135deg, #F8FAFC 0%, #ECFDF5 100%)',
+                          border: '1px dashed #A7F3D0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          padding: '8px 12px'
+                        }}
+                      >
+                        <div style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 6,
+                          background: '#ECFDF5',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <SQLBrandIcon size={18} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#065F46', lineHeight: 1.2 }}>
+                            Enterprise Schema & Warehousing
+                          </span>
+                          <span style={{ fontSize: 10, color: '#64748B', fontWeight: 500 }}>
+                            Windowing queries & CTE pipelines
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
                       {p.outcome}
@@ -3653,6 +3977,156 @@ export default function AcademyShowcase() {
               }}>
                 <span style={{ fontSize: 20, lineHeight: 1, color: '#4568F5', fontWeight: 800, flexShrink: 0 }}>“</span>
                 <span style={{ flex: 1 }}>{activeVideoModal.feedback}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* INDUSTRIAL PROJECT VIDEO MODAL */}
+      {selectedProjectVideoModal && (
+        <div
+          onClick={() => setSelectedProjectVideoModal(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 130,
+            background: 'rgba(15, 23, 42, 0.88)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 14
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 18,
+              maxWidth: 720,
+              width: '100%',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.45)',
+              position: 'relative'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 20px',
+              borderBottom: '1px solid #E2E8F0',
+              background: '#FFFFFF',
+              flexShrink: 0,
+              gap: 12
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    color: '#2563EB',
+                    background: '#EFF6FF',
+                    padding: '2px 8px',
+                    borderRadius: 4
+                  }}>
+                    {selectedProjectVideoModal.categoryLabel || 'Industrial Project'}
+                  </span>
+                  {selectedProjectVideoModal.worth && (
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#047857',
+                      background: '#ECFDF5',
+                      padding: '2px 8px',
+                      borderRadius: 4
+                    }}>
+                      Worth {selectedProjectVideoModal.worth}
+                    </span>
+                  )}
+                </div>
+                <h3 style={{
+                  fontSize: 16.5,
+                  fontWeight: 800,
+                  color: '#0F172A',
+                  margin: 0,
+                  letterSpacing: '-0.3px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {selectedProjectVideoModal.name}
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedProjectVideoModal(null)}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: '50%',
+                  background: '#F1F5F9',
+                  border: '1px solid #E2E8F0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  color: '#475569'
+                }}
+                aria-label="Close modal"
+              >
+                <X size={17} strokeWidth={2.4} />
+              </button>
+            </div>
+
+            {/* Video Player */}
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              paddingBottom: '56.25%',
+              background: '#0F172A',
+              flexShrink: 0
+            }}>
+              {getEmbedUrl(selectedProjectVideoModal.videoUrl).includes('youtube.com/embed') ||
+              getEmbedUrl(selectedProjectVideoModal.videoUrl).includes('drive.google.com') ? (
+                <iframe
+                  src={getEmbedUrl(selectedProjectVideoModal.videoUrl)}
+                  title={selectedProjectVideoModal.name}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                />
+              ) : (
+                <video
+                  src={selectedProjectVideoModal.videoUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                />
+              )}
+            </div>
+
+            {/* Project Outcome Footer */}
+            {selectedProjectVideoModal.outcome && (
+              <div style={{
+                padding: '14px 20px',
+                background: '#F8FAFC',
+                borderTop: '1px solid #E2E8F0',
+                fontSize: 12.5,
+                color: '#334155',
+                lineHeight: 1.5
+              }}>
+                <strong style={{ color: '#0F172A' }}>Industry Deliverable: </strong>
+                {selectedProjectVideoModal.outcome}
               </div>
             )}
           </div>
