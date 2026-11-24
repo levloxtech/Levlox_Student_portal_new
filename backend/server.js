@@ -256,6 +256,10 @@ app.get('/health', (req, res) => {
 // ── Membership & Registration Routes ─────────────────────────────────────────
 app.use('/api/membership', require('./routes/membershipRoutes'));
 
+// ── Internship Qualifying Exam & Yearly Member Vault Routes ───────────────────
+app.use('/api/internship-exam', require('./routes/examAndVaultRoutes'));
+app.use('/api/yearly-vault', require('./routes/examAndVaultRoutes'));
+
 // ════════════════════════════════════════════════════════════════════════════
 // SELF-HOSTED AUTHENTICATION API (Local Server Database)
 // ════════════════════════════════════════════════════════════════════════════
@@ -502,6 +506,8 @@ app.post('/api/auth/login', (req, res) => {
       status: user.status || 'active',
       isMembershipExpired: user.isMembershipExpired,
       accessExpiresAt: user.accessExpiresAt,
+      internshipHubAccess: Boolean(profile?.internshipHubAccess ?? user.internshipHubAccess),
+      hasInternshipHubAccess: Boolean(profile?.hasInternshipHubAccess ?? user.hasInternshipHubAccess),
     },
     profile,
   });
@@ -992,6 +998,8 @@ app.post('/api/data/:collection', (req, res) => {
         status: data.status || 'active',
         salt,
         passwordHash: hash,
+        internshipHubAccess: Boolean(data.internshipHubAccess || data.hasInternshipHubAccess),
+        hasInternshipHubAccess: Boolean(data.internshipHubAccess || data.hasInternshipHubAccess),
       }, true);
     }
 
@@ -1360,6 +1368,11 @@ function syncUserCredentials(collection, id, data) {
   }
   if (data.profileCompleted !== undefined) {
     patch.profileCompleted = data.profileCompleted;
+  }
+  if (data.internshipHubAccess !== undefined || data.hasInternshipHubAccess !== undefined) {
+    const hubAccess = Boolean(data.internshipHubAccess || data.hasInternshipHubAccess);
+    patch.internshipHubAccess = hubAccess;
+    patch.hasInternshipHubAccess = hubAccess;
   }
 
   if (data.password && String(data.password).trim()) {

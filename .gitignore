@@ -51,6 +51,7 @@ storage/backups/
 storage/data/
 storage/uploads/
 storage/profiles/
+storage/exam_proctoring/
 
 # Root temporary design screenshots
 frontend/*.png

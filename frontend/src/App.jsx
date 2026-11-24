@@ -50,8 +50,8 @@ const StudentDetailsPage = lazy(() => import('./pages/StudentDetailsPage'));
 const BatchDetailsPage = lazy(() => import('./pages/BatchDetailsPage'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
-const RegisterSignup = lazy(() => import('./pages/RegisterSignup'));
 const AcademyShowcase = lazy(() => import('./pages/AcademyShowcase'));
+const InternshipExamPage = lazy(() => import('./pages/InternshipExamPage'));
 
 /**
  * Root redirect — uses Firebase Auth state to send users to the right place.
@@ -81,13 +81,14 @@ function App() {
                 {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/login/*" element={<Login />} />
-                <Route path="/register" element={<RegisterSignup />} />
-                <Route path="/register/*" element={<RegisterSignup />} />
+                <Route path="/register" element={<Navigate to="/academy" replace />} />
+                <Route path="/register/*" element={<Navigate to="/academy" replace />} />
                 <Route path="/academy" element={<AcademyShowcase />} />
                 <Route path="/academy/*" element={<AcademyShowcase />} />
-                <Route path="/register/showcase" element={<AcademyShowcase />} />
+                <Route path="/register/showcase" element={<Navigate to="/academy" replace />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/internship-exam" element={<InternshipExamPage />} />
 
 
                 {/* Protected Student Routes */}

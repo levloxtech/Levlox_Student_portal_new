@@ -1,4 +1,3 @@
-import BatchChatPage from './BatchChatPage';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,7 +11,7 @@ import {
   User, Mail, Phone, Lock, EyeOff, Camera, Save, Shield, Menu,
   Calendar, Timer, Sparkles, FastForward, CheckCheck, History, ArrowUpRight, UserCheck,
   Globe, ArrowLeft, ArrowRight, Upload, Image as ImageIcon, UploadCloud, MessageSquare, Tag, Ticket, Laptop,
-  Check, FolderGit2
+  Check, FolderGit2, Briefcase
 } from 'lucide-react';
 import CustomModal from '../components/Modal';
 import FilterBar from '../components/FilterBar';
@@ -28,6 +27,9 @@ import PortalStudentsManager from '../components/PortalStudentsManager';
 import CouponsManager from '../components/CouponsManager';
 import CoursesManager from '../components/CoursesManager';
 import IndustrialProjectsManager from '../components/IndustrialProjectsManager';
+import HeroBannerVideoManager from '../components/HeroBannerVideoManager';
+import InternshipExamManager from '../components/InternshipExamManager';
+import YearlyMembersVaultManager from '../components/YearlyMembersVaultManager';
 import DesktopOnlyGate from '../components/DesktopOnlyGate';
 import { isMobileDevice } from '../utils/device';
 import { useAuth } from '../context/AuthContext';
@@ -767,6 +769,7 @@ const AdminDashboard = () => {
   const [createCity, setCreateCity] = useState('');
   const [createGuardianName, setCreateGuardianName] = useState('');
   const [createGuardianPhone, setCreateGuardianPhone] = useState('');
+  const [createEnableInternshipHub, setCreateEnableInternshipHub] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState(null);
 
   const generateRandomPassword = () => {
@@ -2048,6 +2051,7 @@ const AdminDashboard = () => {
   const [editPaid, setEditPaid] = useState(0);
   const [editStatus, setEditStatus] = useState('Pending Payment');
   const [editPayDate, setEditPayDate] = useState('');
+  const [editEnableInternshipHub, setEditEnableInternshipHub] = useState(false);
 
   // Extra form states for creations
   const [createProfilePic, setCreateProfilePic] = useState('');
@@ -3483,6 +3487,8 @@ const AdminDashboard = () => {
         current_location: createLocation || '',
         guardian_name: createGuardianName || '',
         guardian_phone: createGuardianPhone || '',
+        internshipHubAccess: Boolean(createEnableInternshipHub),
+        hasInternshipHubAccess: Boolean(createEnableInternshipHub),
       };
 
       await createStudent(targetUid, studentPayload);
@@ -3516,6 +3522,7 @@ const AdminDashboard = () => {
       setCreateTempPassword('');
       setCreateDob(''); setCreateGender(''); setCreateCity('');
       setCreateLocation(''); setCreateGuardianName(''); setCreateGuardianPhone('');
+      setCreateEnableInternshipHub(false);
       setCreateTotalFee(20000); setCreatePaidAmount(0); setCreateActiveDays(90);
       setShowCreateModal(false);
       fetchStudents(); fetchStats();
@@ -3591,6 +3598,7 @@ const AdminDashboard = () => {
     setEditAccountStatus(student.status || 'active');
     setEditActiveDays(student.accessDays || student.validityDays || 90);
     setEditFeesStatus(student.feesStatus || 'Pending Payment');
+    setEditEnableInternshipHub(Boolean(student.internshipHubAccess || student.hasInternshipHubAccess || student.isYearlyMember || student.isYearly));
   };
 
   const saveStudentEdit = async (e) => {
@@ -3638,6 +3646,8 @@ const AdminDashboard = () => {
         accessExpiresAt: newExpiresAt,
         validUntil: newExpiresAt,
         feesStatus: editFeesStatus,
+        internshipHubAccess: Boolean(editEnableInternshipHub),
+        hasInternshipHubAccess: Boolean(editEnableInternshipHub),
       };
       const oldBatchId = editingStudent?.batch_id || editingStudent?.batchId ||
         (batches.find(b => b.name === (editingStudent?.batch_name || editingStudent?.batch) || b.code === (editingStudent?.batch_code || editingStudent?.batch))?.id) || '';
@@ -4570,11 +4580,6 @@ const AdminDashboard = () => {
             <span className="sidebar-link-text">Assignments</span>
           </button>
 
-          <button className={`sidebar-link ${activeTab === 'chat' || activeTab === 'batch-chat' ? 'active' : ''}`} onClick={() => handleNavTabClick('chat')}>
-            <MessageSquare size={18} />
-            <span className="sidebar-link-text">Batch Chat</span>
-          </button>
-
           <button className={`sidebar-link ${activeTab === 'fees-management' ? 'active' : ''}`} onClick={() => handleNavTabClick('fees-management', () => setCurrentPage(1))}>
             <Wallet size={18} />
             <span className="sidebar-link-text">Fees Management</span>
@@ -4610,9 +4615,24 @@ const AdminDashboard = () => {
             <span className="sidebar-link-text">Academy Testimonials</span>
           </button>
 
-          <button className={`sidebar-link ${activeTab === 'industrial-projects' ? 'active' : ''}`} onClick={() => handleNavTabClick('industrial-projects')}>
+          <button className={`sidebar-link ${activeTab === 'academy-projects' ? 'active' : ''}`} onClick={() => handleNavTabClick('academy-projects')}>
             <FolderGit2 size={18} />
-            <span className="sidebar-link-text">Industrial Projects</span>
+            <span className="sidebar-link-text">Academy Projects</span>
+          </button>
+
+          <button className={`sidebar-link ${activeTab === 'hero-banner' ? 'active' : ''}`} onClick={() => handleNavTabClick('hero-banner')}>
+            <PlayCircle size={18} />
+            <span className="sidebar-link-text">Hero Banner Video</span>
+          </button>
+
+          <button className={`sidebar-link ${activeTab === 'internship-exam' ? 'active' : ''}`} onClick={() => handleNavTabClick('internship-exam')}>
+            <Award size={18} />
+            <span className="sidebar-link-text">Internship Exam</span>
+          </button>
+
+          <button className={`sidebar-link ${activeTab === 'yearly-vault' ? 'active' : ''}`} onClick={() => handleNavTabClick('yearly-vault')}>
+            <Award size={18} />
+            <span className="sidebar-link-text">Internship Hub</span>
           </button>
 
         </nav>
@@ -7514,13 +7534,6 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Batch Chat Tab */}
-        {(activeTab === 'chat' || activeTab === 'batch-chat') && (
-          <div className="animate-fade-in" style={{ height: 'calc(100vh - 120px)', minHeight: 650, width: '100%' }}>
-            <BatchChatPage user={currentUser} userProfile={userProfile} batches={batches} />
-          </div>
-        )}
-
         {/* Assignments Management Tab */}
         {activeTab === 'assignments' && (
           <div style={{ width: '100%' }}>
@@ -8326,9 +8339,24 @@ const AdminDashboard = () => {
           <CouponsManager />
         )}
 
-        {/* Industrial Projects & Media Management Tab */}
-        {activeTab === 'industrial-projects' && (
-          <IndustrialProjectsManager />
+        {/* Academy Projects (Industrial Experience & Portfolio Projects) Tab */}
+        {(activeTab === 'academy-projects' || activeTab === 'industrial-projects' || activeTab === 'portfolio-projects') && (
+          <IndustrialProjectsManager initialSection="industrial" />
+        )}
+
+        {/* Hero Banner Company Video Tab */}
+        {activeTab === 'hero-banner' && (
+          <HeroBannerVideoManager />
+        )}
+
+        {/* Internship Qualifying Exam Manager Tab */}
+        {activeTab === 'internship-exam' && (
+          <InternshipExamManager />
+        )}
+
+        {/* 1-Year Machine Learning Member Vault Manager Tab */}
+        {activeTab === 'yearly-vault' && (
+          <YearlyMembersVaultManager />
         )}
       </main>
 
@@ -8889,6 +8917,48 @@ const AdminDashboard = () => {
                       <option value="deactivated">Deactivated (Access Blocked)</option>
                     </select>
                   </div>
+                  <div className="form-group grid-col-span-2" style={{ marginTop: '4px' }}>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      background: editEnableInternshipHub ? '#F5F3FF' : '#F8FAFC',
+                      border: editEnableInternshipHub ? '1.5px solid #8B5CF6' : '1px solid #CBD5E1',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '10px',
+                          background: editEnableInternshipHub ? '#EDE9FE' : '#F1F5F9',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '18px'
+                        }}>
+                          💎
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#1E293B' }}>
+                            Enable Internship Hub Access
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748B' }}>
+                            Unlock full Projects Vault (Python, SQL, ML, Industrial) & Interview Kit
+                          </div>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={editEnableInternshipHub}
+                        onChange={(e) => setEditEnableInternshipHub(e.target.checked)}
+                        style={{ width: '20px', height: '20px', accentColor: '#7C3AED', cursor: 'pointer' }}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
               <div className="modal-footer">
@@ -9333,6 +9403,48 @@ const AdminDashboard = () => {
                   <div className="form-group">
                     <label className="form-label" htmlFor="createGuardianPhone">Guardian Contact Phone</label>
                     <input id="createGuardianPhone" type="tel" className="form-input" placeholder="e.g. 9876543210" value={createGuardianPhone} onChange={(e) => setCreateGuardianPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} maxLength={10} />
+                  </div>
+                  <div className="form-group grid-col-span-2" style={{ marginTop: '8px' }}>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      background: createEnableInternshipHub ? '#F5F3FF' : '#F8FAFC',
+                      border: createEnableInternshipHub ? '1.5px solid #8B5CF6' : '1px solid #CBD5E1',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '10px',
+                          background: createEnableInternshipHub ? '#EDE9FE' : '#F1F5F9',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '18px'
+                        }}>
+                          💎
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#1E293B' }}>
+                            Enable Internship Hub Access
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748B' }}>
+                            Grants instant access to Python, SQL, ML, Industrial Projects & Interview Kits for this student
+                          </div>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={createEnableInternshipHub}
+                        onChange={(e) => setCreateEnableInternshipHub(e.target.checked)}
+                        style={{ width: '20px', height: '20px', accentColor: '#7C3AED', cursor: 'pointer' }}
+                      />
+                    </label>
                   </div>
                 </div>
               </div>

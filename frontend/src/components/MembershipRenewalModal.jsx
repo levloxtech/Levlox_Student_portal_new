@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Lock, CheckCircle2, AlertTriangle, Sparkles, Shield,
-  CreditCard, Calendar, Clock, ArrowRight, X, Loader2, Tag
+  CreditCard, Calendar, Clock, ArrowRight, X, Loader2, Tag, Mail, ExternalLink, Award
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,10 +11,11 @@ export default function MembershipRenewalModal({
   onClose,
   onSuccess
 }) {
+  const navigate = useNavigate();
   const { userProfile, currentUser, refreshProfile } = useAuth();
   const student = userProfile || currentUser || {};
 
-  const [selectedPlan, setSelectedPlan] = useState('monthly');
+  const [selectedPlan, setSelectedPlan] = useState('weekly');
   const [couponCode, setCouponCode] = useState('');
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponMessage, setCouponMessage] = useState('');
@@ -21,48 +23,92 @@ export default function MembershipRenewalModal({
   const [loading, setLoading] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(null);
 
+  // Internship Exam State
+  const [examStatus, setExamStatus] = useState(null);
+  const [examConfig, setExamConfig] = useState(null);
+  const [examLinkSending, setExamLinkSending] = useState(false);
+  const [examLinkSentMsg, setExamLinkSentMsg] = useState('');
+
+  // Fetch live exam configuration (dynamic duration, pass score, question count, course name)
+  useEffect(() => {
+    fetch('/api/internship-exam/config')
+      .then(r => r.json())
+      .then(d => { if (d.success) setExamConfig(d); })
+      .catch(() => {});
+  }, [isOpen]);
+
+  // Format exam duration (e.g. 120s -> "2-minute", 180s -> "3-minute")
+  const formatExamDurationDisplay = (secs) => {
+    const s = Number(secs) || 120;
+    const mins = Math.floor(s / 60);
+    const rem = s % 60;
+    if (mins > 0 && rem === 0) return `${mins}-minute`;
+    if (mins > 0) return `${mins}m ${rem}s`;
+    return `${s}-second`;
+  };
+
+  // Fetch student exam qualification status
+  useEffect(() => {
+    if (student?.email) {
+      fetch(`/api/internship-exam/status/${encodeURIComponent(student.email)}`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.success) setExamStatus(d);
+        })
+        .catch(() => {});
+    }
+  }, [student?.email, isOpen]);
+
+  const hasPassedExam = Boolean(student?.hasPassedInternshipExam || examStatus?.hasPassed);
+
+  // Action: Attend Exam Immediately directly on portal (no email link required)
+  const handleGoToExam = () => {
+    if (!student?.email) {
+      window.location.href = '/internship-exam';
+      return;
+    }
+    window.location.href = `/internship-exam?email=${encodeURIComponent(student.email)}`;
+  };
+
   if (!isOpen) return null;
 
-  const previousPlanName = student.membership?.planName || student.course || 'Academy Monthly Membership';
+  const previousPlanName = student.membership?.planName || student.course || 'Weekly Learning Cycle';
   const rawExpiry = student.accessExpiresAt || student.portalExpiresAt || student.membership?.expiresAt;
   const expiredDateFormatted = rawExpiry
     ? new Date(rawExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-    : 'Recently Expired';
+    : '23 Nov 2026';
 
   // Plans config
   const plans = {
-    monthly: {
-      id: 'monthly',
-      name: 'Monthly Academy Access',
-      validity: '30 Days Access',
-      originalPrice: 2999,
-      offerPrice: 999,
-      storeCreditDeduction: 300,
-      couponEligible: 400,
-      finalPayable: Math.max(0, 999 - 300 - (couponDiscount || 0)),
+    weekly: {
+      id: 'weekly',
+      name: 'Weekly Sprint Renewal',
+      validity: '7 Days Access',
+      originalPrice: 749,
+      offerPrice: 299,
+      finalPayable: Math.max(0, 299 - (couponDiscount || 0)),
       features: [
-        '30 Days Unlocked Portal Access',
+        'Continue learning for the internship exam',
+        '7 Days Unlocked Portal Access',
         'Python, Machine Learning & SQL Modules',
-        '5 Industry-Grade Capstone Projects',
-        'Recorded Lesson Streaming in HD'
+        'Recorded Lesson Streaming in HD',
+        '5+ Industry-Level & Portfolio Projects'
       ]
     },
     annual: {
       id: 'annual',
-      name: 'Annual Academy Pass (12 Months)',
+      name: `${examConfig?.courseName || 'Machine Learning Engineer Internship'} (365 Days • 1 Full Year)`,
       validity: '365 Days (1 Full Year)',
-      originalPrice: 17999,
-      offerPrice: 17999,
-      storeCreditDeduction: 6600, // 3600 credit + 3000 offer
-      couponEligible: 1400,
-      finalPayable: Math.max(0, 17999 - 6600 - (couponDiscount || 0)),
-      badge: 'RECOMMENDED &bull; 6 MONTHS FREE',
+      originalPrice: 35999,
+      offerPrice: 9999,
+      finalPayable: Math.max(0, 9999 - (couponDiscount || 0)),
+      badge: 'SAVE OVER ₹26,000 • 1 FULL YEAR',
       features: [
-        '365 Days Uninterrupted All-Access',
-        'All Core & Advanced Recorded Modules',
-        '24 IT Interview Resources & Questions',
-        'Live Doubt Clarifications & Career Mentorship',
-        'Verified Industry Completion Certificate'
+        `Attend exam to enroll ${examConfig?.courseName || 'Machine Learning Internship'} with certification`,
+        '365 Days uninterrupted access',
+        'All 9+ industry level projects',
+        '4+ portfolio projects & verified certificate',
+        'Live Doubt Support & MLOps Project Vault'
       ]
     }
   };
@@ -92,94 +138,133 @@ export default function MembershipRenewalModal({
     }
   };
 
-  // Payment checkout handler
+  // Payment checkout handler for Weekly Sprint (Continue Learning) or Qualified 1-Year Pass via Real Razorpay Gateway
   const handleRenewalPayment = async () => {
     setLoading(true);
     try {
       const email = student.email;
-      const name = student.name || student.email?.split('@')[0];
-      const phone = student.phone || '';
+      const name = student.name || student.displayName || (student.email ? student.email.split('@')[0] : 'Student');
+      const phone = (student.phone || '9876543210').replace(/\D/g, '').slice(-10) || '9876543210';
 
-      const creditsToDeduct = selectedPlan === 'annual' ? 6600 : 300;
+      const effectivePlanId = selectedPlan === 'monthly' ? 'weekly' : selectedPlan;
+      const creditsToApply = selectedPlan === 'annual' ? 20000 : 0;
+      const effectiveCoupon = selectedPlan === 'annual' ? (couponCode.trim() || 'ENROLL6000') : (couponDiscount > 0 ? couponCode : undefined);
 
-      // 1. Create Order
+      // 1. Create Razorpay order on backend
       const orderRes = await fetch('/api/membership/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          planId: selectedPlan,
+          planId: effectivePlanId,
           email,
           name,
           phone,
-          couponCode: couponDiscount > 0 ? couponCode : undefined,
-          applyCredits: creditsToDeduct,
+          couponCode: effectiveCoupon,
+          applyCredits: creditsToApply,
           isRenewal: true
         })
       });
       const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create renewal order');
+      if (!orderRes.ok || !orderData.success) {
+        throw new Error(orderData.error || 'Failed to create payment order');
+      }
 
-      // 2. Open Razorpay Checkout or Zero-Order Verification
-      if (orderData.isZeroPayment) {
-        await finalizeVerification({
-          razorpay_order_id: orderData.orderId,
-          razorpay_payment_id: `free_pay_${Date.now()}`,
-          razorpay_signature: 'free_signature',
-          planId: selectedPlan,
-          email,
-          name,
-          phone,
-          couponCode: couponDiscount > 0 ? couponCode : undefined,
-          applyCredits: creditsToDeduct
+      // 2. Load Razorpay script if not already present
+      const loadRazorpayScript = () => {
+        return new Promise((resolve) => {
+          if (window.Razorpay) return resolve(true);
+          const script = document.createElement('script');
+          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+          script.onload = () => resolve(true);
+          script.onerror = () => resolve(false);
+          document.body.appendChild(script);
         });
-        return;
+      };
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded || !window.Razorpay) {
+        throw new Error('Razorpay payment gateway script could not be loaded. Please check your internet connection.');
       }
 
-      if (typeof window.Razorpay === 'undefined') {
-        const script = document.createElement('script');
-        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-        script.async = true;
-        document.body.appendChild(script);
-        await new Promise((resolve) => { script.onload = resolve; });
-      }
-
+      // 3. Open Razorpay live payment gateway modal (UPI, Cards, NetBanking, Wallets)
       const options = {
-        key: orderData.keyId || 'rzp_test_U05ceIQKOouNJu',
+        key: orderData.key || orderData.keyId,
         amount: orderData.amount,
         currency: orderData.currency || 'INR',
         name: 'Levlox Academy',
-        description: `${activePlan.name} Renewal`,
+        description: selectedPlan === 'annual'
+          ? 'Machine Learning Engineer Internship (365 Days • 1 Full Year)'
+          : 'Weekly Sprint Renewal (7 Days Validity)',
         order_id: orderData.orderId,
         prefill: {
           name,
           email,
           contact: phone
         },
-        theme: { color: '#4568F5' },
+        theme: { color: '#2563EB' },
         handler: async function (response) {
-          await finalizeVerification({
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature,
-            planId: selectedPlan,
-            email,
-            name,
-            phone,
-            couponCode: couponDiscount > 0 ? couponCode : undefined,
-            applyCredits: creditsToDeduct
-          });
+          try {
+            await finalizeVerification({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              planId: effectivePlanId,
+              email,
+              name,
+              phone,
+              couponCode: effectiveCoupon,
+              applyCredits: creditsToApply,
+              isRenewal: true
+            });
+          } catch (verr) {
+            alert('Verification issue: ' + verr.message);
+            setLoading(false);
+          }
         },
         modal: {
-          ondismiss: () => {
+          ondismiss: function () {
             setLoading(false);
           }
         }
       };
 
       const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', function (resp) {
+        alert('Payment failed: ' + (resp.error?.description || 'Transaction was cancelled or declined.'));
+        setLoading(false);
+      });
       rzp.open();
     } catch (err) {
-      alert('Renewal failed: ' + err.message);
+      alert('Payment initialization failed: ' + err.message);
+      setLoading(false);
+    }
+  };
+
+  const handleSimulatedRenewal = async () => {
+    setLoading(true);
+    try {
+      const email = student.email;
+      const name = student.name || student.email?.split('@')[0];
+      const phone = student.phone || '';
+      const effectivePlanId = selectedPlan === 'monthly' ? 'weekly' : selectedPlan;
+      const creditsToDeduct = selectedPlan === 'annual' ? 20000 : 0;
+      const effectiveCoupon = selectedPlan === 'annual' ? (couponCode.trim() || 'ENROLL6000') : (couponDiscount > 0 ? couponCode : undefined);
+
+      await finalizeVerification({
+        razorpay_order_id: `sim_ord_${Date.now()}`,
+        razorpay_payment_id: `sim_pay_${Date.now()}`,
+        razorpay_signature: 'simulated_valid_signature',
+        planId: effectivePlanId,
+        email,
+        name,
+        phone,
+        couponCode: effectiveCoupon,
+        applyCredits: creditsToDeduct,
+        isSimulatedTest: true,
+        isRenewal: true
+      });
+    } catch (err) {
+      alert('Simulated renewal failed: ' + err.message);
       setLoading(false);
     }
   };
@@ -214,8 +299,8 @@ export default function MembershipRenewalModal({
       position: 'fixed',
       inset: 0,
       zIndex: 999999,
-      background: 'rgba(10, 16, 30, 0.75)',
-      backdropFilter: 'blur(8px)',
+      background: 'rgba(15, 23, 42, 0.65)',
+      backdropFilter: 'blur(6px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -224,10 +309,10 @@ export default function MembershipRenewalModal({
     }}>
       <div style={{
         background: '#FFFFFF',
-        borderRadius: 22,
-        maxWidth: 640,
+        borderRadius: 20,
+        maxWidth: 600,
         width: '100%',
-        boxShadow: '0 25px 60px rgba(0, 0, 0, 0.25)',
+        boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
         border: '1px solid #E2E8F0',
         overflow: 'hidden',
         position: 'relative',
@@ -239,10 +324,10 @@ export default function MembershipRenewalModal({
           onClick={onClose}
           style={{
             position: 'absolute',
-            top: 18,
-            right: 18,
-            width: 34,
-            height: 34,
+            top: 16,
+            right: 16,
+            width: 32,
+            height: 32,
             borderRadius: '50%',
             background: '#F1F5F9',
             border: 'none',
@@ -255,7 +340,7 @@ export default function MembershipRenewalModal({
           }}
           title="Close dialog"
         >
-          <X size={18} />
+          <X size={16} />
         </button>
 
         {paymentSuccess ? (
@@ -324,45 +409,46 @@ export default function MembershipRenewalModal({
             </button>
           </div>
         ) : (
-          /* RENEWAL OFFER SELECTION */
+          /* RENEWAL OFFER SELECTION (CLEAN PORTAL LIGHT THEME) */
           <div>
             {/* Header Banner */}
             <div style={{
-              background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
-              padding: '28px 28px 22px',
-              color: '#FFFFFF'
+              background: '#FFFFFF',
+              borderBottom: '1px solid #F1F5F9',
+              padding: '24px 26px 16px',
+              position: 'relative'
             }}>
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                background: 'rgba(239, 68, 68, 0.2)',
-                border: '1px solid rgba(239, 68, 68, 0.4)',
+                background: '#FFE4E6',
+                border: '1px solid #FECDD3',
                 borderRadius: 20,
-                padding: '4px 12px',
-                color: '#FCA5A5',
+                padding: '3px 10px',
+                color: '#BE123C',
                 fontSize: 11,
                 fontWeight: 800,
                 letterSpacing: 0.5,
-                marginBottom: 10
+                marginBottom: 8
               }}>
                 <Lock size={12} /> SUBSCRIPTION CYCLE LAPSED
               </div>
 
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 6px', color: '#FFFFFF' }}>
+              <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 4px', color: '#0F172A', letterSpacing: '-0.3px' }}>
                 Renew Your Academy Membership
               </h2>
-              <p style={{ fontSize: 13, color: '#94A3B8', margin: 0, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 13, color: '#64748B', margin: 0, lineHeight: 1.5 }}>
                 Your learning validity period has expired. Course recorded lessons, code sandboxes, and cohort materials are currently locked. Select a renewal package to unlock access.
               </p>
             </div>
 
             {/* Expired Status Card */}
             <div style={{
-              margin: '18px 24px 14px',
-              padding: '12px 16px',
-              background: '#FEF2F2',
-              border: '1px solid #FECACA',
+              margin: '14px 24px 10px',
+              padding: '11px 16px',
+              background: '#FFF5F5',
+              border: '1px solid #FED7D7',
               borderRadius: 12,
               display: 'flex',
               alignItems: 'center',
@@ -377,7 +463,7 @@ export default function MembershipRenewalModal({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 5,
-                background: '#EF4444',
+                background: '#E11D48',
                 color: '#FFFFFF',
                 borderRadius: 6,
                 padding: '3px 8px',
@@ -390,12 +476,12 @@ export default function MembershipRenewalModal({
 
             {/* Plan Selector Grid */}
             <div style={{ padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {/* Monthly Plan */}
+              {/* Option 1: Weekly Sprint Renewal (Continue Learning - Payment Option) */}
               <div
-                onClick={() => setSelectedPlan('monthly')}
+                onClick={() => setSelectedPlan('weekly')}
                 style={{
-                  border: selectedPlan === 'monthly' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
-                  background: selectedPlan === 'monthly' ? '#F0F7FF' : '#FFFFFF',
+                  border: selectedPlan === 'weekly' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
+                  background: selectedPlan === 'weekly' ? '#F0F7FF' : '#FFFFFF',
                   borderRadius: 14,
                   padding: '14px 18px',
                   cursor: 'pointer',
@@ -403,34 +489,34 @@ export default function MembershipRenewalModal({
                   position: 'relative'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 5 }}>
                   <div>
                     <strong style={{ fontSize: 14, color: '#0F172A', display: 'block' }}>
-                      Monthly Renewal (30 Days Validity)
+                      Weekly Sprint Renewal (7 Days Validity)
                     </strong>
-                    <span style={{ fontSize: 12, color: '#64748B' }}>
-                      Regular ₹2,999 &bull; Offer ₹999 &minus; ₹300 Store Credit
+                    <span style={{ fontSize: 12, color: '#2563EB', fontWeight: 600 }}>
+                      Continue learning for the internship exam • ₹299 / week
                     </span>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: '#2563EB' }}>
-                      ₹{plans.monthly.finalPayable}
+                    <div style={{ fontSize: 19, fontWeight: 800, color: '#2563EB' }}>
+                      ₹{plans.weekly.finalPayable}
                     </div>
-                    <span style={{ fontSize: 11, color: '#64748B' }}>/ month</span>
+                    <span style={{ fontSize: 11, color: '#64748B' }}>/ 7 days</span>
                   </div>
                 </div>
 
                 <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <CheckCircle2 size={13} color="#10B981" /> Full access to Python, ML, SQL &amp; capstone projects
+                  <CheckCircle2 size={13} color="#10B981" /> Continue learning to prepare for the qualifying exam • All Python, ML, SQL &amp; 5+ projects
                 </div>
               </div>
 
-              {/* Annual Plan */}
+              {/* Option 2: Machine Learning Engineer Internship (Attend Exam Option) */}
               <div
                 onClick={() => setSelectedPlan('annual')}
                 style={{
-                  border: selectedPlan === 'annual' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
-                  background: selectedPlan === 'annual' ? '#F0F7FF' : '#FFFFFF',
+                  border: selectedPlan === 'annual' ? '2px solid #7C3AED' : '1.5px solid #E2E8F0',
+                  background: selectedPlan === 'annual' ? '#FAF5FF' : '#FFFFFF',
                   borderRadius: 14,
                   padding: '14px 18px',
                   cursor: 'pointer',
@@ -440,33 +526,162 @@ export default function MembershipRenewalModal({
               >
                 <div style={{
                   position: 'absolute', top: -10, right: 14,
-                  background: 'linear-gradient(135deg, #10B981, #059669)',
+                  background: hasPassedExam ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #8B5CF6, #6366F1)',
                   color: '#FFFFFF', fontSize: 10, fontWeight: 800,
-                  padding: '2px 8px', borderRadius: 999, letterSpacing: 0.5
+                  padding: '2px 9px', borderRadius: 999, letterSpacing: 0.5
                 }}>
-                  BEST VALUE &bull; SAVE ₹8,000
+                  {hasPassedExam ? 'QUALIFIED ✓ SAVE ₹26,000' : 'SAVE OVER ₹26,000 • 1 FULL YEAR'}
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 5 }}>
                   <div>
                     <strong style={{ fontSize: 14, color: '#0F172A', display: 'block' }}>
-                      Annual Renewal (365 Days &bull; 1 Year Pass)
+                      {examConfig?.courseName || 'Machine Learning Engineer Internship'} (365 Days • 1 Full Year)
                     </strong>
-                    <span style={{ fontSize: 12, color: '#64748B' }}>
-                      Buy 6 Months Get 6 Months Free + 3,600 Store Credits
+                    <span style={{ fontSize: 12, color: '#7C3AED', fontWeight: 600 }}>
+                      Attend exam to enroll {examConfig?.courseName || 'Machine Learning Internship'} with certification
                     </span>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: '#059669' }}>
+                    <div style={{ fontSize: 19, fontWeight: 800, color: '#7C3AED' }}>
                       ₹{plans.annual.finalPayable}
                     </div>
-                    <span style={{ fontSize: 11, color: '#64748B' }}>/ year</span>
+                    <span style={{ fontSize: 11, color: '#64748B' }}>/ 365 days</span>
                   </div>
                 </div>
 
-                <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <CheckCircle2 size={13} color="#10B981" /> 12 Months full access, 24 interview kits, live support &amp; certificate
+                <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 6, marginBottom: selectedPlan === 'annual' ? 8 : 0 }}>
+                  <CheckCircle2 size={13} color="#10B981" /> 365 Days uninterrupted access, all 9+ projects, 4+ portfolios &amp; certificate
                 </div>
+
+                {/* Exam Requirement Callout when Annual Plan is selected */}
+                {selectedPlan === 'annual' && (
+                  <div style={{
+                    marginTop: 10,
+                    padding: '14px 16px',
+                    borderRadius: 12,
+                    background: '#F5F3FF',
+                    border: '1.5px solid #DDD6FE'
+                  }}>
+                    <div style={{ fontSize: 13, color: '#5B21B6', fontWeight: 800, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Sparkles size={16} color="#7C3AED" />
+                      Attend Exam to Enroll in 1-Year {examConfig?.courseName || 'ML Internship'}
+                    </div>
+                    <p style={{ margin: '0 0 12px', fontSize: 12, color: '#6D28D9', lineHeight: 1.5 }}>
+                      To enroll in the 1-Year {examConfig?.courseName || 'Machine Learning Engineer Internship'} with verified certification, candidates must score <strong>{examConfig?.passPercentage || 80}% or higher</strong> on the {formatExamDurationDisplay(examConfig?.durationSeconds || 120)} technical exam ({examConfig?.totalQuestions || examConfig?.questions?.length || 15} MCQs).
+                    </p>
+
+                    {hasPassedExam && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: '#ECFDF5',
+                        border: '1px solid #A7F3D0',
+                        borderRadius: 8,
+                        padding: '8px 12px',
+                        marginBottom: 12,
+                        fontSize: 12,
+                        color: '#065F46'
+                      }}>
+                        <span style={{ fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                          <CheckCircle2 size={15} color="#059669" /> Qualified on previous exam ({student.internshipExamScore || examStatus?.latestAttempt?.scorePercent || '100'}%)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRenewalPayment();
+                          }}
+                          style={{
+                            background: '#059669',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            padding: '4px 10px',
+                            borderRadius: 6,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Activate Pass (₹9,999) →
+                        </button>
+                      </div>
+                    )}
+
+                    {examStatus?.cooldownActive ? (
+                      <div>
+                        <div style={{
+                          background: '#FFFBEB',
+                          border: '1.5px solid #FDE68A',
+                          borderRadius: 10,
+                          padding: '10px 14px',
+                          fontSize: 12,
+                          color: '#92400E',
+                          lineHeight: 1.45,
+                          marginBottom: 10
+                        }}>
+                          <div style={{ fontWeight: 800, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <Clock size={14} color="#D97706" /> 7-Day Academic Preparation Interval Active
+                          </div>
+                          <div>
+                            Next qualifying attempt unlocks on <strong>{examStatus.nextAttemptDate ? new Date(examStatus.nextAttemptDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '7 days'}</strong>. Renew your Weekly Sprint to continue studying course lectures and prepare for your next attempt.
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedPlan('weekly');
+                          }}
+                          style={{
+                            background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            padding: '9px 18px',
+                            borderRadius: 8,
+                            fontSize: 12.5,
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
+                          }}
+                        >
+                          <Sparkles size={14} /> Renew Weekly Sprint (₹299) to Prepare →
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleGoToExam();
+                          }}
+                          style={{
+                            background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            padding: '10px 22px',
+                            borderRadius: 8,
+                            fontSize: 13,
+                            fontWeight: 850,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 7,
+                            boxShadow: '0 4px 14px rgba(124, 58, 237, 0.3)'
+                          }}
+                        >
+                          <Sparkles size={15} /> Attend Internship Exam Now 🏆 →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -520,47 +735,129 @@ export default function MembershipRenewalModal({
 
             {/* Bottom Actions */}
             <div style={{
-              padding: '18px 24px 22px',
+              padding: '16px 24px 20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: 14
+              gap: 14,
+              flexWrap: 'wrap'
             }}>
               <div>
-                <span style={{ fontSize: 11, color: '#64748B', display: 'block' }}>Total Payable:</span>
-                <span style={{ fontSize: 22, fontWeight: 800, color: '#0F172A' }}>
-                  ₹{activePlan.finalPayable}
+                <span style={{ fontSize: 11, color: '#64748B', display: 'block' }}>
+                  {selectedPlan === 'annual' ? 'Program Requirement:' : 'Total Payable:'}
+                </span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>
+                  {selectedPlan === 'annual' ? (
+                    <span style={{ fontSize: 15, color: '#7C3AED', fontWeight: 800 }}>Attend Exam Required</span>
+                  ) : (
+                    `₹${activePlan.finalPayable}`
+                  )}
                 </span>
               </div>
 
+              {/* When Yearly Plan is selected -> ALWAYS Provide Attend Exam Option */}
+              {selectedPlan === 'annual' ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={handleGoToExam}
+                    disabled={examLinkSending}
+                    style={{
+                      background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                      color: '#FFFFFF',
+                      padding: '12px 24px',
+                      borderRadius: 12,
+                      fontSize: 14,
+                      fontWeight: 800,
+                      border: 'none',
+                      cursor: examLinkSending ? 'not-allowed' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      boxShadow: '0 8px 20px rgba(124, 58, 237, 0.35)'
+                    }}
+                  >
+                    {examLinkSending ? (
+                      <><Loader2 size={16} className="animate-spin" /> Opening Exam...</>
+                    ) : (
+                      <><Sparkles size={16} /> Attend Exam Now →</>
+                    )}
+                  </button>
+
+                  {hasPassedExam && (
+                    <button
+                      type="button"
+                      onClick={handleRenewalPayment}
+                      disabled={loading}
+                      style={{
+                        background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                        color: '#FFFFFF',
+                        padding: '12px 20px',
+                        borderRadius: 12,
+                        fontSize: 13.5,
+                        fontWeight: 800,
+                        border: 'none',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 7,
+                        boxShadow: '0 8px 20px rgba(5, 150, 105, 0.3)'
+                      }}
+                    >
+                      {loading ? (
+                        <><Loader2 size={15} className="animate-spin" /> Processing...</>
+                      ) : (
+                        <><CheckCircle2 size={15} /> Pay ₹{activePlan.finalPayable} (Qualified) →</>
+                      )}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                /* When Weekly Plan is selected -> Continue Learning Payment Option */
+                <button
+                  type="button"
+                  onClick={handleRenewalPayment}
+                  disabled={loading}
+                  style={{
+                    background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                    color: '#FFFFFF',
+                    padding: '12px 24px',
+                    borderRadius: 12,
+                    fontSize: 14,
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    boxShadow: '0 8px 20px rgba(37, 99, 235, 0.3)'
+                  }}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Processing Payment...
+                    </>
+                  ) : (
+                    <>
+                      Continue Learning • Pay ₹{activePlan.finalPayable} →
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {/* Instant Test Simulated Renewal */}
+            <div style={{ textAlign: 'center', paddingBottom: 16 }}>
               <button
                 type="button"
-                onClick={handleRenewalPayment}
+                onClick={handleSimulatedRenewal}
                 disabled={loading}
                 style={{
-                  background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-                  color: '#FFFFFF',
-                  padding: '12px 24px',
-                  borderRadius: 12,
-                  fontSize: 14,
-                  fontWeight: 700,
-                  border: 'none',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  boxShadow: '0 8px 20px rgba(37, 99, 235, 0.3)'
+                  background: 'none', border: 'none', color: '#64748B',
+                  fontSize: 11.5, cursor: 'pointer', textDecoration: 'underline'
                 }}
               >
-                {loading ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" /> Processing Renewal...
-                  </>
-                ) : (
-                  <>
-                    Renew Membership &bull; Pay ₹{activePlan.finalPayable} →
-                  </>
-                )}
+                ⚡ Instant Test Renewal (Simulated)
               </button>
             </div>
           </div>
@@ -569,4 +866,3 @@ export default function MembershipRenewalModal({
     </div>
   );
 }
-

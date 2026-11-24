@@ -389,6 +389,40 @@ export const addIndustrialProject = (data) => addDocument("industrial_projects",
 export const deleteIndustrialProject = (id) => deleteDocument("industrial_projects", id);
 
 // ─────────────────────────────────────────────────────────────────────────────
+// INDUSTRY-LEVEL & PORTFOLIO PROJECTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getPortfolioProjects = () => getDocuments("portfolio_projects");
+export const updatePortfolioProject = (id, data) => updateDocumentFields("portfolio_projects", id, data);
+export const addPortfolioProject = (data) => addDocument("portfolio_projects", data);
+export const deletePortfolioProject = (id) => deleteDocument("portfolio_projects", id);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HERO BANNER COMPANY VIDEO
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getHeroBannerVideo = async () => {
+  const docs = await getDocuments("hero_banner").catch(() => []);
+  if (Array.isArray(docs) && docs.length > 0) return docs[0];
+  return {
+    id: "hero_video_main",
+    title: "Welcome to Levlox Academy",
+    subtitle: "Get 24 Resources to Crack Your IT Interviews for Free",
+    badge: "Official Company Overview",
+    thumbnailUrl: "",
+    videoUrl: "",
+    enabled: true
+  };
+};
+
+export const updateHeroBannerVideo = (data) =>
+  setDocument("hero_banner", "hero_video_main", {
+    id: "hero_video_main",
+    ...data,
+    updatedAt: new Date().toISOString()
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
 // LIVE CLASSES
 // ─────────────────────────────────────────────────────────────────────────────
 

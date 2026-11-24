@@ -17,6 +17,7 @@ import NotificationBell from '../components/NotificationBell';
 import ErrorBoundary from '../components/ErrorBoundary';
 import DesktopOnlyGate from '../components/DesktopOnlyGate';
 import MembershipRenewalModal from '../components/MembershipRenewalModal';
+import StudentYearlyVaultView from '../components/StudentYearlyVaultView';
 import { isMobileDevice } from '../utils/device';
 import { CardSkeleton, DashboardSkeleton } from '../components/Skeleton';
 import levloxLogo from '../assets/levlox-logo.png';
@@ -79,7 +80,6 @@ const AttendancePage = lazy(() => import('./AttendancePage'));
 const RecordedClassesPage = lazy(() => import('./RecordedClassesPage'));
 const StudyMaterialsPage = lazy(() => import('./StudyMaterialsPage'));
 const LeaderboardPage = lazy(() => import('./LeaderboardPage'));
-const BatchChatPage = lazy(() => import('./BatchChatPage'));
 const AssignmentsPage = lazy(() => import('./AssignmentsPage'));
 
 /* ─── tiny helpers (Memoized for re-render optimization) ─────────────── */
@@ -599,8 +599,66 @@ const StudentDashboard = () => {
     : (studentDoc?.accessDays || studentDoc?.validityDays || 90);
   const isPaid = dynamicFeesStatus === 'Paid' && !isMembershipExpired;
   const isPartial = dynamicFeesStatus === 'Partially Paid';
+  const isYearlyMember = Boolean(
+    !isMembershipExpired && (
+      studentDoc?.membership?.planId === 'annual' ||
+      user?.membership?.planId === 'annual' ||
+      userProfile?.membership?.planId === 'annual' ||
+      studentDoc?.membership?.planName?.toLowerCase().includes('annual') ||
+      studentDoc?.membership?.planName?.toLowerCase().includes('year') ||
+      user?.membership?.planName?.toLowerCase().includes('annual') ||
+      user?.membership?.planName?.toLowerCase().includes('year') ||
+      studentDoc?.isYearlyMember === true ||
+      user?.isYearlyMember === true
+    )
+  );
+
+  // Dynamic Internship Hub Access: Unlocked if user has annual plan OR if admin explicitly enabled Internship Hub access
+  const hasInternshipHubAccess = Boolean(
+    studentDoc?.internshipHubAccess === true ||
+    studentDoc?.hasInternshipHubAccess === true ||
+    user?.internshipHubAccess === true ||
+    user?.hasInternshipHubAccess === true ||
+    userProfile?.internshipHubAccess === true ||
+    userProfile?.hasInternshipHubAccess === true ||
+    isYearlyMember
+  );
   const [showRenewalModal, setShowRenewalModal] = useState(false);
   const autoRenewalPromptedRef = useRef(false);
+
+  // Live Exam Eligibility & 7-Day Cooldown state
+  const [examEligibility, setExamEligibility] = useState(null);
+  const [examConfig, setExamConfig] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/internship-exam/config')
+      .then(r => r.json())
+      .then(d => { if (d.success) setExamConfig(d); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const studentEmail = currentStudent?.email || user?.email || userProfile?.email;
+    if (studentEmail) {
+      fetch(`/api/internship-exam/eligibility/${encodeURIComponent(studentEmail)}`)
+        .then(r => r.json())
+        .then(d => { if (d.success) setExamEligibility(d); })
+        .catch(() => {});
+    }
+  }, [currentStudent?.email, user?.email, userProfile?.email]);
+
+  const currentSprintWeek = Number(
+    currentStudent?.currentSprintWeek ||
+    currentStudent?.membership?.sprintWeek ||
+    currentStudent?.membership?.week ||
+    1
+  );
+  const nextSprintWeek = currentSprintWeek + 1;
+  const weeklyOfferPrice = Number(
+    currentStudent?.membership?.weeklyPrice ||
+    user?.membership?.weeklyPrice ||
+    299
+  );
 
   useEffect(() => {
     if (isMembershipExpired && !autoRenewalPromptedRef.current) {
@@ -1071,7 +1129,6 @@ const StudentDashboard = () => {
   const quickActions = [
     { label: 'Courses', icon: <BookOpen size={18} />, action: () => setActiveTab('recorded-classes-tab') },
     { label: 'Live Classes', icon: <Video size={18} />, action: () => setActiveTab('my-courses') },
-    { label: 'Batch Chat', icon: <MessageSquare size={18} />, action: () => setActiveTab('batch-chat-tab') },
     { label: 'Assignments', icon: <FileText size={18} />, action: () => setActiveTab('assignments-tab') },
     { label: 'Attendance', icon: <CalendarCheck size={18} />, action: () => setActiveTab('attendance-tab') },
     { label: 'Notice Board', icon: <Megaphone size={18} />, action: () => setActiveTab('announcements-tab') },
@@ -1081,10 +1138,10 @@ const StudentDashboard = () => {
   const navItems = isPortalBatch
     ? [
         { id: 'recorded-classes-tab', icon: <BookOpen size={18} strokeWidth={2} />, label: 'Courses' },
+        { id: 'yearly-vault-tab', icon: <Award size={18} strokeWidth={2} />, label: 'Internship Hub' },
         { id: 'profile', icon: <User size={18} strokeWidth={2} />, label: 'Profile' },
         { id: 'dashboard', icon: <Bookmark size={18} strokeWidth={2} />, label: 'Dashboard' },
         { id: 'my-courses', icon: <Video size={18} strokeWidth={2} />, label: 'Live Classes' },
-        { id: 'batch-chat-tab', icon: <MessageSquare size={18} strokeWidth={2} />, label: 'Batch Chat' },
         { id: 'assignments-tab', icon: <FileText size={18} strokeWidth={2} />, label: 'Assignments' },
         { id: 'attendance-tab', icon: <CalendarCheck size={18} strokeWidth={2} />, label: 'Attendance' },
         { id: 'announcements-tab', icon: <Megaphone size={18} strokeWidth={2} />, label: 'Notice Board' },
@@ -1092,8 +1149,8 @@ const StudentDashboard = () => {
     : [
         { id: 'dashboard', icon: <Bookmark size={18} strokeWidth={2} />, label: 'Dashboard' },
         { id: 'recorded-classes-tab', icon: <BookOpen size={18} strokeWidth={2} />, label: 'Courses' },
+        { id: 'yearly-vault-tab', icon: <Award size={18} strokeWidth={2} />, label: 'Internship Hub' },
         { id: 'my-courses', icon: <Video size={18} strokeWidth={2} />, label: 'Live Classes' },
-        { id: 'batch-chat-tab', icon: <MessageSquare size={18} strokeWidth={2} />, label: 'Batch Chat' },
         { id: 'assignments-tab', icon: <FileText size={18} strokeWidth={2} />, label: 'Assignments' },
         { id: 'attendance-tab', icon: <CalendarCheck size={18} strokeWidth={2} />, label: 'Attendance' },
         { id: 'announcements-tab', icon: <Megaphone size={18} strokeWidth={2} />, label: 'Notice Board' },
@@ -1148,7 +1205,7 @@ const StudentDashboard = () => {
           {navItems.map(item => {
             const isDisabled = mustChangePassword && item.id !== 'settings';
             const isActive = activeTab === item.id;
-            const isCohortLocked = isPortalBatch && ['dashboard', 'my-courses', 'batch-chat-tab', 'assignments-tab', 'attendance-tab', 'announcements-tab'].includes(item.id);
+            const isCohortLocked = isPortalBatch && ['dashboard', 'my-courses', 'assignments-tab', 'attendance-tab', 'announcements-tab'].includes(item.id);
             return (
               <button
                 key={item.label}
@@ -1199,7 +1256,6 @@ const StudentDashboard = () => {
             activeTab === 'dashboard' ? 'Dashboard' :
             activeTab === 'recorded-classes-tab' ? 'Courses' :
             activeTab === 'my-courses' ? 'Live Classes' :
-            activeTab === 'batch-chat-tab' ? 'Batch Chat' :
             activeTab === 'assignments-tab' ? 'Assignments' :
             activeTab === 'attendance-tab' ? 'Attendance' :
             activeTab === 'announcements-tab' ? 'Notice Board' :
@@ -1251,63 +1307,135 @@ const StudentDashboard = () => {
           </div>
         )}
 
-        {/* MEMBERSHIP EXPIRED NOTICE BANNER */}
+        {/* DESIGNER-GRADE MEMBERSHIP & SPRINT EXPIRED NOTICE BANNER */}
         {isMembershipExpired && (
           <div style={{
-            margin: '16px 28px 0',
-            padding: '14px 20px',
-            background: 'linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%)',
-            border: '1.5px solid #FCA5A5',
-            borderRadius: 14,
+            margin: '20px 0 24px',
+            padding: '18px 24px',
+            background: 'linear-gradient(135deg, #FFFFFF 0%, #FFF5F5 40%, #FEF2F2 100%)',
+            border: '1.5px solid #FECDD3',
+            borderRadius: 16,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            boxShadow: '0 4px 14px rgba(239, 68, 68, 0.08)'
+            flexWrap: 'wrap',
+            gap: 16,
+            boxShadow: '0 8px 24px -4px rgba(225, 29, 72, 0.08), 0 2px 6px rgba(0, 0, 0, 0.02)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 320, flex: '1 1 520px' }}>
               <div style={{
-                width: 38, height: 38, borderRadius: 10,
-                background: '#EF4444', color: '#FFFFFF',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                width: 48,
+                height: 48,
+                borderRadius: 14,
+                background: 'linear-gradient(135deg, #E11D48 0%, #BE123C 100%)',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                boxShadow: '0 6px 18px rgba(225, 29, 72, 0.28)'
               }}>
-                <Lock size={20} />
+                <Lock size={22} strokeWidth={2.4} />
               </div>
-              <div>
-                <strong style={{ fontSize: 14, color: '#991B1B', display: 'block', marginBottom: 2 }}>
-                  Academy Membership Expired on {rawAccessExpiresAt ? new Date(rawAccessExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'recently'}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.6px',
+                    color: '#BE123C',
+                    background: '#FFE4E6',
+                    border: '1px solid #FECDD3',
+                    padding: '2px 9px',
+                    borderRadius: 999
+                  }}>
+                    Week {currentSprintWeek} Sprint Lapsed
+                  </span>
+                  <span style={{ fontSize: 12, color: '#9F1239', fontWeight: 600 }}>
+                    Expired on {rawAccessExpiresAt ? new Date(rawAccessExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'recently'}
+                  </span>
+                </div>
+                <strong style={{ fontSize: 15.5, color: '#0F172A', display: 'block', lineHeight: 1.35, fontWeight: 800 }}>
+                  Course Lectures &amp; Capstone Projects Currently Locked
                 </strong>
-                <span style={{ fontSize: 12.5, color: '#B91C1C' }}>
-                  Recorded classes, video streaming, and coding modules are locked. Renew your plan to reactivate instant access.
+                <span style={{ fontSize: 13, color: '#475569', display: 'block', lineHeight: 1.45 }}>
+                  Renew for Week {nextSprintWeek} (₹{weeklyOfferPrice}/wk) to continue learning, or take the Qualifying Exam to unlock the 1-Year {examConfig?.courseName || 'Machine Learning Engineer Internship'}.
                 </span>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowRenewalModal(true)}
-              style={{
-                background: '#EF4444',
-                color: '#FFFFFF',
-                border: 'none',
-                padding: '9px 18px',
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)',
-                flexShrink: 0
-              }}
-            >
-              <Sparkles size={14} /> Renew Membership Now
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const studentEmail = currentStudent?.email || user?.email || userProfile?.email || '';
+                  navigate(`/internship-exam?email=${encodeURIComponent(studentEmail)}`);
+                }}
+                style={{
+                  height: 42,
+                  background: examEligibility?.cooldownActive
+                    ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                    : 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  padding: '0 20px',
+                  borderRadius: 10,
+                  fontSize: 13.5,
+                  fontWeight: 850,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 7,
+                  boxShadow: examEligibility?.cooldownActive
+                    ? '0 4px 14px rgba(217, 119, 6, 0.3)'
+                    : '0 4px 14px rgba(124, 58, 237, 0.3)',
+                  transition: 'transform 0.15s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                {examEligibility?.hasPassed ? (
+                  <><Award size={16} color="#FFF" /> Qualified! Activate 1-Year Pass</>
+                ) : examEligibility?.cooldownActive ? (
+                  <><Clock size={16} color="#FFF" /> Exam Cooldown ({Math.ceil((examEligibility.cooldownRemainingMs || 0) / (24 * 60 * 60 * 1000))}d left)</>
+                ) : (
+                  <><Sparkles size={15} color="#FFF" /> Attend {examConfig?.courseName ? `${examConfig.courseName} Exam` : 'Internship Exam'} 🏆</>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowRenewalModal(true)}
+                style={{
+                  height: 42,
+                  background: 'linear-gradient(135deg, #E11D48 0%, #BE123C 100%)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  padding: '0 20px',
+                  borderRadius: 10,
+                  fontSize: 13.5,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  boxShadow: '0 4px 14px rgba(225, 29, 72, 0.28)',
+                  transition: 'transform 0.15s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                Renew Week {nextSprintWeek} (₹{weeklyOfferPrice}) →
+              </button>
+            </div>
           </div>
         )}
 
         {/* ═══ PORTAL STUDENTS FEATURE GATE (SELF-PACED ONLY) ═══ */}
-        {isPortalBatch && ['dashboard', 'my-courses', 'batch-chat-tab', 'assignments-tab', 'attendance-tab', 'announcements-tab'].includes(activeTab) && (
+        {isPortalBatch && ['dashboard', 'my-courses', 'assignments-tab', 'attendance-tab', 'announcements-tab'].includes(activeTab) && (
           <div style={{
             background: '#FFFFFF',
             borderRadius: 20,
@@ -3142,13 +3270,6 @@ const StudentDashboard = () => {
             Loading content...
           </div>
         }>
-          {/* BATCH CHAT TAB */}
-          {activeTab === 'batch-chat-tab' && !isPortalBatch && (
-            <div className="animate-fade-in" style={{ height: 'calc(100vh - 120px)', maxHeight: 'calc(100vh - 120px)', overflow: 'hidden' }}>
-              <BatchChatPage user={user} userProfile={userProfile} />
-            </div>
-          )}
-
           {/* RECORDED CLASSES TAB */}
           {activeTab === 'recorded-classes-tab' && (
             <RecordedClassesPage
@@ -3159,6 +3280,16 @@ const StudentDashboard = () => {
               onOpenRenewal={() => setShowRenewalModal(true)}
               initialCourseId={replayTarget?.courseId || null}
               initialLessonId={replayTarget?.lessonId || null}
+            />
+          )}
+
+          {/* INTERNSHIP HUB (PROJECTS & INTERVIEW KIT VAULT) TAB */}
+          {activeTab === 'yearly-vault-tab' && (
+            <StudentYearlyVaultView
+              isYearlyMember={hasInternshipHubAccess}
+              onOpenRenewal={() => setShowRenewalModal(true)}
+              userProfile={userProfile || studentDoc}
+              currentUser={user}
             />
           )}
 

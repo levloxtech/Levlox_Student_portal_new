@@ -290,19 +290,15 @@ export default function AcademyShowcase() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
 
-  // Retrieve lead from localStorage if registered via /register
+  // Lead details for the active session (starts as null for unauthenticated visitors so registration is prompted during checkout)
   const [lead, setLead] = useState(() => {
-    try {
-      const saved = localStorage.getItem('levlox_academy_lead');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
+    // Only load lead if currently authenticated
+    return null;
   });
 
   // Sync logged-in user as lead if authenticated
   useEffect(() => {
-    if (currentUser?.email && !lead?.email) {
+    if (currentUser?.email) {
       const authLead = {
         name: currentUser.name || currentUser.displayName || 'Member',
         email: currentUser.email,
@@ -311,18 +307,11 @@ export default function AcademyShowcase() {
         credits: 3600
       };
       setLead(authLead);
-      localStorage.setItem('levlox_academy_lead', JSON.stringify(authLead));
     }
-  }, [currentUser, lead]);
+  }, [currentUser]);
 
-  // Mandatory Registration Gate:
-  // Visitors cannot access /academy without registering first
-  const isAuthorized = !!lead?.email || !!currentUser?.email;
-  useEffect(() => {
-    if (!isAuthorized) {
-      navigate('/register', { replace: true });
-    }
-  }, [isAuthorized, navigate]);
+  // State for Weekly Prerequisite Gate Modal (first-time members must start with Week 1 sprint)
+  const [showWeeklyGateModal, setShowWeeklyGateModal] = useState(false);
 
   // Modal for collecting lead if visiting directly without registering first
   const [showLeadModal, setShowLeadModal] = useState(false);
@@ -341,26 +330,37 @@ export default function AcademyShowcase() {
   const [expandedCourse, setExpandedCourse] = useState('python');
 
   // Membership & Pricing State
-  const [selectedPlan, setSelectedPlan] = useState('annual'); // 'monthly' | 'annual'
-  const [couponInputs, setCouponInputs] = useState({ monthly: '', annual: '' });
+  const [selectedPlan, setSelectedPlan] = useState('weekly'); // 'weekly' | 'annual'
+  const [couponInputs, setCouponInputs] = useState({ weekly: '', annual: '' });
   const [appliedCoupon, setAppliedCoupon] = useState('');
-  const [appliedCouponPlan, setAppliedCouponPlan] = useState(''); // 'monthly' | 'annual'
+  const [appliedCouponPlan, setAppliedCouponPlan] = useState(''); // 'weekly' | 'annual'
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponStatus, setCouponStatus] = useState({ plan: '', message: '', isSuccess: false });
   const [calcLoading, setCalcLoading] = useState(false);
 
-  // Dynamic calculations for both plans (Admin-controlled pricing & store credits)
-  const monthlyBase = 999;
-  const monthlyCredit = 300;
-  const isMonthlyCouponApplied = appliedCouponPlan === 'monthly' && !!appliedCoupon;
-  const monthlyCouponDiscount = isMonthlyCouponApplied ? couponDiscount : 0;
-  const monthlyPayable = Math.max(0, monthlyBase - monthlyCredit - monthlyCouponDiscount);
+  // Dynamic calculations for both plans
+  // Weekly Learning Cycle: Standard ₹749 cut to ₹99 for Week 1 (Auto-locks after 7 days; ₹299/week for Week 2+)
+  const weeklyBase = 99;
+  const isWeeklyCouponApplied = appliedCouponPlan === 'weekly' && !!appliedCoupon;
+  const weeklyCouponDiscount = isWeeklyCouponApplied ? couponDiscount : 0;
+  const weeklyPayable = Math.max(0, weeklyBase - weeklyCouponDiscount);
 
-  const annualBase = 17999;
-  const annualCreditTotal = 6600;
-  const isAnnualCouponApplied = appliedCouponPlan === 'annual' && !!appliedCoupon;
-  const annualCouponDiscount = isAnnualCouponApplied ? couponDiscount : 0;
-  const annualPayable = Math.max(0, annualBase - annualCreditTotal - annualCouponDiscount);
+  // Machine Learning Engineer Internship Program: Standard package ₹35,999.
+  // Apply Score Credits (₹20,000) and Enrolly Coupon (₹6,000) -> Net fee ₹9,999!
+  // Once applied, discounts are fixed (no remove option).
+  const [isAnnualCreditsApplied, setIsAnnualCreditsApplied] = useState(false);
+  const [isAnnualCouponApplied, setIsAnnualCouponApplied] = useState(false);
+
+  const annualBase = 35999;
+  const annualCreditsAmount = 20000;
+  const annualCouponAmount = 6000;
+
+  const annualCreditsDeduction = isAnnualCreditsApplied ? annualCreditsAmount : 0;
+  const annualEnrollyDeduction = isAnnualCouponApplied ? annualCouponAmount : 0;
+  const isAnnualCustomCouponApplied = appliedCouponPlan === 'annual' && !!appliedCoupon;
+  const customAnnualCouponDiscount = isAnnualCustomCouponApplied ? couponDiscount : 0;
+
+  const annualPayable = Math.max(0, annualBase - annualCreditsDeduction - annualEnrollyDeduction - customAnnualCouponDiscount);
 
   const handleSelectPlan = (planId) => {
     setSelectedPlan(planId);
@@ -369,6 +369,16 @@ export default function AcademyShowcase() {
   // Payment Execution State
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSuccessData, setPaymentSuccessData] = useState(null);
+
+  // Auto-detect exam qualification from query parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('qualified') === 'true' || params.get('plan') === 'annual') {
+      setSelectedPlan('annual');
+      setIsAnnualCreditsApplied(true);
+      setIsAnnualCouponApplied(true);
+    }
+  }, []);
 
   // Email OTP Verification State Before Payment
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -414,6 +424,7 @@ export default function AcademyShowcase() {
   // Video Testimonials from Admin Panel
   const [testimonials, setTestimonials] = useState([]);
   const [activeVideoModal, setActiveVideoModal] = useState(null);
+  const [testimonialVideoOrientation, setTestimonialVideoOrientation] = useState('portrait');
   const testimonialsScrollRef = useRef(null);
 
   const scrollTestimonials = (direction) => {
@@ -439,6 +450,7 @@ export default function AcademyShowcase() {
 
   // Industrial Projects from Database with fallback to DEFAULT_PROJECTS
   const [industrialProjectsList, setIndustrialProjectsList] = useState([]);
+  const [portfolioProjectsList, setPortfolioProjectsList] = useState([]);
   const [selectedProjectVideoModal, setSelectedProjectVideoModal] = useState(null);
 
   useEffect(() => {
@@ -450,7 +462,29 @@ export default function AcademyShowcase() {
         }
       })
       .catch(err => console.error('Failed to load industrial projects:', err));
+
+    fetch('/api/data/portfolio_projects')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setPortfolioProjectsList(data);
+        }
+      })
+      .catch(err => console.error('Failed to load portfolio projects:', err));
+
+    fetch('/api/data/hero_banner')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setHeroBannerData(data[0]);
+        }
+      })
+      .catch(err => console.error('Failed to load hero banner:', err));
   }, []);
+
+  // Hero Banner Company Video
+  const [heroBannerData, setHeroBannerData] = useState(null);
+  const [isPlayingHeroVideo, setIsPlayingHeroVideo] = useState(false);
 
   const pythonProjectsData = industrialProjectsList.filter(p => p.category === 'python').length > 0
     ? industrialProjectsList.filter(p => p.category === 'python')
@@ -463,6 +497,10 @@ export default function AcademyShowcase() {
   const sqlProjectsData = industrialProjectsList.filter(p => p.category === 'sql').length > 0
     ? industrialProjectsList.filter(p => p.category === 'sql')
     : SQL_PROJECTS;
+
+  const portfolioProjectsData = portfolioProjectsList.length > 0
+    ? portfolioProjectsList
+    : PORTFOLIO_PROJECTS;
 
   const getEmbedUrl = (url) => {
     if (!url) return '';
@@ -491,7 +529,7 @@ export default function AcademyShowcase() {
     setCalcLoading(true);
     setCouponStatus({ plan: targetPlan, message: 'Validating coupon...', isSuccess: false });
     try {
-      const creditToSend = targetPlan === 'annual' ? 6600 : 300;
+      const creditToSend = 0;
       const res = await fetch('/api/membership/calculate-price', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -590,12 +628,12 @@ export default function AcademyShowcase() {
       setLead(leadPayload);
       setShowLeadModal(false);
       // Trigger OTP verification for newly registered lead
-      setPendingCheckout({ isSimulated: false, targetPlan: selectedPlan });
+      setPendingCheckout(prev => prev || { isSimulated: false, targetPlan: selectedPlan });
       setOtpEmailInput(leadPayload.email);
       setOtpCodeInput('');
       setOtpError('');
       setShowOtpModal(true);
-      await sendPaymentOtp(leadPayload.email, leadPayload.name, selectedPlan);
+      await sendPaymentOtp(leadPayload.email, leadPayload.name, (pendingCheckout?.targetPlan || selectedPlan));
     } catch (err) {
       setModalError(err.message);
     } finally {
@@ -697,12 +735,37 @@ export default function AcademyShowcase() {
     if (planOverride && planOverride !== selectedPlan) {
       handleSelectPlan(planOverride);
     }
-    // Strict Registration Gate: Name, Email, and Phone required
-    if (!lead || !lead.email) {
-      navigate('/register');
-      return;
+
+    // FIRST-TIME MEMBER SPRINT-FIRST POLICY:
+    // If attempting to purchase the 1-Year Machine Learning Engineer Internship,
+    // verify that user has previous weekly enrollment or completed Week 1!
+    if (targetPlan === 'annual') {
+      const params = new URLSearchParams(window.location.search);
+      const isParamQualified = params.get('qualified') === 'true';
+      const hasWeeklyHistory = Boolean(
+        isParamQualified ||
+        currentUser?.hasPassedInternshipExam ||
+        currentUser?.membership?.planId ||
+        currentUser?.role === 'student' ||
+        lead?.hasPassedInternshipExam ||
+        lead?.isRenewal ||
+        lead?.hasWeeklyAccess
+      );
+      if (!hasWeeklyHistory) {
+        setShowWeeklyGateModal(true);
+        return;
+      }
     }
-    if (!lead.name || !lead.phone) {
+
+    // Registration Check: If visitor has not provided their details, open registration modal
+    const currentLead = lead || (currentUser ? {
+      name: currentUser.name || currentUser.displayName,
+      email: currentUser.email,
+      phone: currentUser.phone || ''
+    } : null);
+
+    if (!currentLead || !currentLead.email || !currentLead.name || !currentLead.phone) {
+      setPendingCheckout({ isSimulated, targetPlan });
       setShowLeadModal(true);
       return;
     }
@@ -710,25 +773,35 @@ export default function AcademyShowcase() {
     // Email OTP Authorization Gate
     if (!isEmailOtpVerified) {
       setPendingCheckout({ isSimulated, targetPlan });
-      setOtpEmailInput(lead.email);
+      setOtpEmailInput(currentLead.email);
       setOtpCodeInput('');
       setOtpError('');
       setOtpSuccessMsg('');
       setShowOtpModal(true);
-      await sendPaymentOtp(lead.email, lead.name, targetPlan);
+      await sendPaymentOtp(currentLead.email, currentLead.name, targetPlan);
       return;
     }
 
-    // Once email is OTP-verified, proceed to Razorpay Checkout
-    initiateCheckoutWithLead(lead, isSimulated, targetPlan);
+    // Once email is OTP-verified, proceed to Checkout
+    initiateCheckoutWithLead(currentLead, isSimulated, targetPlan);
   };
 
   // Initiate Razorpay order or simulated test payment
   const initiateCheckoutWithLead = async (currentLead, isSimulated, targetPlan = selectedPlan) => {
     setPaymentLoading(true);
     try {
-      const activeCoupon = (appliedCouponPlan === targetPlan) ? appliedCoupon : '';
-      const creditToSend = targetPlan === 'annual' ? 6600 : 300;
+      let activeCoupon = '';
+      let creditToSend = 0;
+      if (targetPlan === 'annual') {
+        creditToSend = isAnnualCreditsApplied ? 20000 : 0;
+        if (appliedCouponPlan === 'annual' && appliedCoupon) {
+          activeCoupon = appliedCoupon;
+        } else if (isAnnualCouponApplied) {
+          activeCoupon = 'ENROLL6000';
+        }
+      } else {
+        activeCoupon = (appliedCouponPlan === 'weekly') ? appliedCoupon : '';
+      }
       // 1. Create Order on Backend
       const orderRes = await fetch('/api/membership/create-order', {
         method: 'POST',
@@ -858,33 +931,7 @@ export default function AcademyShowcase() {
     }
   };
 
-  if (!isAuthorized) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#F8FAFC',
-        fontFamily: "'Plus Jakarta Sans', sans-serif"
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: 36,
-            height: 36,
-            border: '3px solid #E2E8F0',
-            borderTopColor: '#2563EB',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-            margin: '0 auto 12px'
-          }} />
-          <p style={{ color: '#64748B', fontSize: 13.5, fontWeight: 600 }}>
-            Redirecting to registration...
-          </p>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div style={{ background: '#F5F7FC', minHeight: '100vh', color: '#172033', fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: 'hidden' }}>
@@ -1040,16 +1087,17 @@ export default function AcademyShowcase() {
                 <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.name}</strong>
               </span>
             ) : (
-              <Link
-                to="/register"
+              <button
+                type="button"
+                onClick={() => handleEnrollClick(null)}
                 className="academy-login-btn"
                 style={{
-                  fontSize: 12.5, fontWeight: 700, color: '#4568F5', textDecoration: 'none',
-                  background: '#EEF2FE', padding: '6px 12px', borderRadius: 20, border: '1px solid #C7D4FD', whiteSpace: 'nowrap'
+                  fontSize: 12.5, fontWeight: 700, color: '#4568F5',
+                  background: '#EEF2FE', padding: '6px 14px', borderRadius: 20, border: '1px solid #C7D4FD', whiteSpace: 'nowrap', cursor: 'pointer'
                 }}
               >
-                Register
-              </Link>
+                Enroll Now
+              </button>
             )}
             <Link
               to="/login"
@@ -1117,9 +1165,210 @@ export default function AcademyShowcase() {
             </span>
           </h1>
 
-          <p style={{ fontSize: 16, color: '#64748B', lineHeight: 1.6, maxWidth: 720, margin: '0 auto' }}>
-            Master Industry Python, Machine Learning, SQL, Real-world Portfolios, Online Internships, Resume & LinkedIn optimization, and live doubt-clearing sessions designed to take you from beginner to job-ready engineer.
-          </p>
+          {/* HERO BANNER COMPANY VIDEO CARD */}
+          {heroBannerData?.enabled !== false && (
+            <div style={{
+              maxWidth: 780,
+              margin: '26px auto 0',
+              borderRadius: 22,
+              background: '#0B0F19',
+              boxShadow: '0 20px 50px rgba(37, 99, 235, 0.12), 0 8px 24px rgba(15, 23, 42, 0.08)',
+              border: '1.5px solid #E2E8F0',
+              overflow: 'hidden',
+              position: 'relative'
+            }}>
+              {/* Aspect Ratio Container (16:9) */}
+              <div style={{
+                position: 'relative',
+                width: '100%',
+                paddingBottom: '56.25%',
+                background: '#090D16',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden'
+              }}>
+                {isPlayingHeroVideo && heroBannerData?.videoUrl ? (
+                  getEmbedUrl(heroBannerData.videoUrl).includes('youtube.com/embed') ||
+                  getEmbedUrl(heroBannerData.videoUrl).includes('drive.google.com') ? (
+                    <iframe
+                      src={getEmbedUrl(heroBannerData.videoUrl)}
+                      title="Levlox Academy Company Overview"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        border: 'none',
+                        zIndex: 2
+                      }}
+                    />
+                  ) : (
+                    <video
+                      src={heroBannerData.videoUrl}
+                      controls
+                      autoPlay
+                      playsInline
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        zIndex: 2
+                      }}
+                    />
+                  )
+                ) : (
+                  <div
+                    onClick={() => {
+                      if (heroBannerData?.videoUrl) {
+                        setIsPlayingHeroVideo(true);
+                      }
+                    }}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      cursor: heroBannerData?.videoUrl ? 'pointer' : 'default',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {/* Background Thumbnail Image or Stylized Modern Tech Canvas */}
+                    {heroBannerData?.thumbnailUrl ? (
+                      <img
+                        src={heroBannerData.thumbnailUrl}
+                        alt="Levlox Academy Overview"
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'radial-gradient(circle at 50% 35%, #1E293B 0%, #090D16 100%)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 10
+                      }}>
+                        <div style={{
+                          width: 64,
+                          height: 64,
+                          borderRadius: '50%',
+                          background: 'rgba(37, 99, 235, 0.12)',
+                          border: '1.5px solid rgba(59, 130, 246, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <Film size={30} color="#60A5FA" />
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255, 255, 255, 0.65)' }}>
+                          Levlox Academy Overview
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Gradient Overlay for Cinematic Legibility */}
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'linear-gradient(180deg, rgba(15,23,42,0.45) 0%, rgba(15,23,42,0.15) 50%, rgba(15,23,42,0.85) 100%)',
+                      pointerEvents: 'none'
+                    }} />
+
+                    {/* Top-Left Badge */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 14,
+                      left: 14,
+                      background: 'rgba(15, 23, 42, 0.78)',
+                      backdropFilter: 'blur(8px)',
+                      border: '1px solid rgba(255, 255, 255, 0.18)',
+                      padding: '4px 12px',
+                      borderRadius: 20,
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: '#FFFFFF',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      zIndex: 3
+                    }}>
+                      <Sparkles size={12} color="#60A5FA" />
+                      <span>{heroBannerData?.badge || 'Official Company Overview'}</span>
+                    </div>
+
+                    {/* Top-Right HD Badge */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 14,
+                      right: 14,
+                      background: 'rgba(15, 23, 42, 0.78)',
+                      backdropFilter: 'blur(8px)',
+                      border: '1px solid rgba(255, 255, 255, 0.18)',
+                      padding: '4px 10px',
+                      borderRadius: 20,
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      color: '#E2E8F0',
+                      zIndex: 3
+                    }}>
+                      Full HD Video
+                    </div>
+
+                    {/* Centered Glowing Play Button */}
+                    <div style={{
+                      position: 'relative',
+                      zIndex: 3,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 10
+                    }}>
+                      <div
+                        style={{
+                          width: 66,
+                          height: 66,
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                          color: '#FFFFFF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 0 0 8px rgba(37, 99, 235, 0.28), 0 10px 30px rgba(0,0,0,0.5)',
+                          paddingLeft: 4
+                        }}
+                      >
+                        <Play size={26} fill="#FFFFFF" />
+                      </div>
+                      <span style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: '#FFFFFF',
+                        textShadow: '0 2px 8px rgba(0,0,0,0.85)',
+                        letterSpacing: '-0.2px'
+                      }}>
+                        {heroBannerData?.videoUrl ? 'Watch Company Video' : 'Company Overview Video'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1474,6 +1723,14 @@ export default function AcademyShowcase() {
           }}>
             <span style={{ color: '#2563EB' }}>24 Resources</span> to Crack Your IT Interviews for <span style={{ color: '#16A34A' }}>Free</span> in Tamil
           </h2>
+          <div style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', gap: 8, background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '6px 16px', borderRadius: 20 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#1E40AF' }}>
+              Total Curriculum Value: <strong>₹42,500</strong> (4 Comprehensive Course Modules)
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#059669', background: '#D1FAE5', padding: '2px 8px', borderRadius: 10 }}>
+              Free for Academy Members
+            </span>
+          </div>
         </div>
 
         <div className="courses-showcase-grid">
@@ -1651,16 +1908,26 @@ export default function AcademyShowcase() {
 
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
           {/* Section Title only, without description */}
-          <h2 style={{
-            fontSize: 'clamp(26px, 3.5vw, 36px)',
-            fontWeight: 800,
-            color: '#101B33',
-            textAlign: 'center',
-            margin: '0 0 40px',
-            letterSpacing: '-0.5px'
-          }}>
-            Industrial Project Experience
-          </h2>
+          <div style={{ textAlign: 'center', marginBottom: 36 }}>
+            <h2 style={{
+              fontSize: 'clamp(26px, 3.5vw, 36px)',
+              fontWeight: 800,
+              color: '#101B33',
+              textAlign: 'center',
+              margin: '0 0 10px',
+              letterSpacing: '-0.5px'
+            }}>
+              Industrial Project Experience
+            </h2>
+            <div style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', gap: 8, background: '#F0FDF4', border: '1px solid #BBF7D0', padding: '6px 16px', borderRadius: 20 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#166534' }}>
+                Total Industrial Projects Value: <strong>₹1,00,000</strong> (9 Real Enterprise Capstones)
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#059669', background: '#DCFCE7', padding: '2px 8px', borderRadius: 10 }}>
+                Free for Academy Members
+              </span>
+            </div>
+          </div>
 
           <div className="industrial-projects-grid">
             {/* Python Category Column */}
@@ -2197,9 +2464,17 @@ export default function AcademyShowcase() {
           <span style={{ fontSize: 12, fontWeight: 700, color: '#D97706', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
             HIGH-VALUE PORTFOLIO ASSETS
           </span>
-          <h2 style={{ fontSize: 32, fontWeight: 800, color: '#101B33', margin: '8px 0 12px' }}>
+          <h2 style={{ fontSize: 32, fontWeight: 800, color: '#101B33', margin: '8px 0 8px' }}>
             Industry-Level & Portfolio Projects
           </h2>
+          <div style={{ marginBottom: 12, display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', gap: 8, background: '#FEF3C7', border: '1px solid #FDE68A', padding: '6px 16px', borderRadius: 20 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#92400E' }}>
+              Total Portfolio Value: <strong>₹57,000</strong> (4 Production-Grade Portfolios)
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#059669', background: '#D1FAE5', padding: '2px 8px', borderRadius: 10 }}>
+              Free for Academy Members
+            </span>
+          </div>
           <p style={{ color: '#64748B', fontSize: 15, maxWidth: 640, margin: '0 auto' }}>
             Stand out in tech interviews by demonstrating real production experience on complex enterprise systems.
           </p>
@@ -2207,23 +2482,111 @@ export default function AcademyShowcase() {
 
         {/* Portfolio Projects Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, marginBottom: 40 }}>
-          {PORTFOLIO_PROJECTS.map((proj, idx) => (
-            <div key={idx} style={{
+          {portfolioProjectsData.map((proj, idx) => (
+            <div key={proj.id || idx} style={{
               background: '#FFFFFF',
               borderRadius: 14, padding: 22,
               border: '1px solid #E3E9F4',
               boxShadow: '0 4px 16px rgba(16, 27, 51, 0.04)',
-              display: 'flex', flexDirection: 'column'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#D97706', background: '#FEF3C7', padding: '3px 8px', borderRadius: 4 }}>
+              display: 'flex', flexDirection: 'column',
+              gap: 12,
+              transition: 'all 0.2s ease'
+            }}
+            className="portfolio-project-card"
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#D97706', background: '#FEF3C7', border: '1px solid #FDE68A', padding: '3px 8px', borderRadius: 6 }}>
                   PORTFOLIO #{idx + 1}
                 </span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#059669' }}>{proj.value}</span>
               </div>
-              <h4 style={{ fontSize: 17, fontWeight: 700, color: '#101B33', margin: '0 0 8px' }}>{proj.name}</h4>
-              <div style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}><strong>Tech Stack:</strong> {proj.tech}</div>
-              <div style={{ fontSize: 12, color: '#475569', flexGrow: 1 }}>{proj.outcome}</div>
+              <h4 style={{ fontSize: 17, fontWeight: 700, color: '#101B33', margin: 0, lineHeight: 1.35 }}>{proj.name}</h4>
+              <div style={{ fontSize: 12, color: '#64748B' }}><strong>Tech Stack:</strong> {proj.tech}</div>
+
+              {/* Media Slot (Thumbnail / Video Preview) */}
+              {(proj.thumbnailUrl || proj.videoUrl) ? (
+                <div
+                  className="project-media-slot"
+                  onClick={() => {
+                    if (proj.videoUrl) {
+                      setSelectedProjectVideoModal({
+                        name: proj.name,
+                        videoUrl: proj.videoUrl,
+                        thumbnailUrl: proj.thumbnailUrl,
+                        worth: proj.value,
+                        categoryLabel: `Portfolio Project #${idx + 1}`,
+                        outcome: proj.outcome
+                      });
+                    }
+                  }}
+                  style={{ cursor: proj.videoUrl ? 'pointer' : 'default', height: 125 }}
+                >
+                  {proj.thumbnailUrl ? (
+                    <img src={proj.thumbnailUrl} alt={proj.name} className="project-media-img" />
+                  ) : (
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexDirection: 'column',
+                      gap: 6
+                    }}>
+                      <Briefcase size={24} color="#D97706" />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#B45309' }}>
+                        Portfolio Project Demo
+                      </span>
+                    </div>
+                  )}
+                  {proj.videoUrl && (
+                    <div className="project-video-badge">
+                      <div className="project-play-pill">
+                        <Play size={13} fill="#0F172A" />
+                        <span>Watch Demo Video</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  className="project-media-slot"
+                  style={{
+                    background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+                    border: '1px dashed #FDE68A',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    padding: '8px 12px',
+                    height: 90
+                  }}
+                >
+                  <div style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    background: '#FEF3C7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Briefcase size={16} color="#D97706" />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#92400E', lineHeight: 1.2 }}>
+                      Enterprise Solution Architecture
+                    </span>
+                    <span style={{ fontSize: 10, color: '#64748B', fontWeight: 500 }}>
+                      Production pipeline & verified deployment
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ fontSize: 12, color: '#475569', flexGrow: 1, lineHeight: 1.45 }}>{proj.outcome}</div>
             </div>
           ))}
         </div>
@@ -2239,17 +2602,14 @@ export default function AcademyShowcase() {
                 Interview Kit
               </h3>
             </div>
-            <span style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: '#047857',
-              background: '#ECFDF5',
-              border: '1px solid #A7F3D0',
-              padding: '4px 12px',
-              borderRadius: 20
-            }}>
-              Total Kit Value: ₹19,000+ (Included with Membership)
-            </span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', gap: 8, background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '6px 16px', borderRadius: 20 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#065F46' }}>
+                Total Kit Value: <strong>₹19,000</strong> (ATS Resume, LinkedIn & 500+ Interview Q&A)
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#059669', background: '#D1FAE5', padding: '2px 8px', borderRadius: 10 }}>
+                Free for Academy Members
+              </span>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
@@ -2644,16 +3004,87 @@ export default function AcademyShowcase() {
 
       {/* MEMBERSHIP PLANS & PRICING CALCULATOR */}
       <section id="pricing" style={{ padding: '70px 24px', maxWidth: 1100, margin: '0 auto' }}>
+        <style>{`
+          @keyframes rollingBorder {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+          @keyframes rollShimmerSweep {
+            0% { transform: translateX(-150%) skewX(-20deg); }
+            35%, 100% { transform: translateX(350%) skewX(-20deg); }
+          }
+          @keyframes certHighlightPulse {
+            0%, 100% {
+              box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25), 0 0 0 1.5px #F59E0B;
+            }
+            50% {
+              box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45), 0 0 0 2.5px #D97706;
+            }
+          }
+        `}</style>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#4568F5', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-            MEMBERSHIP PLANS & CHECKOUT
-          </span>
-          <h2 style={{ fontSize: 34, fontWeight: 800, color: '#101B33', margin: '8px 0 12px' }}>
-            Choose Your Academy Plan
+          {/* Designer Professional Value Showcase Card */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexWrap: 'wrap',
+            gap: '12px 20px',
+            background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
+            border: '1.5px solid #E2E8F0',
+            borderRadius: 20,
+            padding: '12px 26px',
+            boxShadow: '0 10px 30px -10px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(0, 0, 0, 0.02)',
+            marginBottom: 20
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Total Standalone Value of All Resources:
+              </span>
+              <span style={{
+                fontSize: 25,
+                fontWeight: 900,
+                color: '#475569',
+                textDecoration: 'line-through',
+                textDecorationColor: '#EF4444',
+                textDecorationThickness: '3.5px',
+                letterSpacing: '-0.5px',
+                display: 'inline-block'
+              }}>
+                ₹2,18,500
+              </span>
+            </div>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+              color: '#FFFFFF',
+              fontSize: 12,
+              fontWeight: 800,
+              padding: '6px 16px',
+              borderRadius: 999,
+              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+              letterSpacing: '0.4px',
+              textTransform: 'uppercase'
+            }}>
+              <Sparkles size={13} color="#FFF" />
+              100% Free with Membership
+            </div>
+          </div>
+
+          <h2 style={{
+            fontSize: 'clamp(28px, 3.6vw, 38px)',
+            fontWeight: 850,
+            color: '#0F172A',
+            margin: '0',
+            lineHeight: 1.25,
+            letterSpacing: '-0.5px'
+          }}>
+            Become a <span style={{ color: '#2563EB' }}>Levlox Academy Member</span> and <span style={{ color: '#059669' }}>Get Everything for Free</span>
           </h2>
-          <p style={{ color: '#64748B', fontSize: 15, maxWidth: 580, margin: '0 auto' }}>
-            Apply store credits, workshop refund balances, and promotional coupons for maximum savings.
-          </p>
         </div>
 
         {/* Plan Cards Toggle Grid */}
@@ -2665,46 +3096,51 @@ export default function AcademyShowcase() {
           alignItems: 'stretch'
         }}>
 
-          {/* Monthly Membership Plan */}
+          {/* Weekly Learning Cycle Plan */}
           <div
-            onClick={() => handleSelectPlan('monthly')}
+            onClick={() => handleSelectPlan('weekly')}
             style={{
               background: '#FFFFFF',
-              border: selectedPlan === 'monthly' ? '2.5px solid #2563EB' : '1px solid #E2E8F0',
+              border: selectedPlan === 'weekly' ? '2.5px solid #2563EB' : '1px solid #E2E8F0',
               borderRadius: 18, padding: '24px 22px', cursor: 'pointer',
               position: 'relative', transition: 'all 0.2s ease',
               display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-              boxShadow: selectedPlan === 'monthly' ? '0 12px 35px rgba(37, 99, 235, 0.15)' : '0 2px 8px rgba(16, 27, 51, 0.04)'
+              boxShadow: selectedPlan === 'weekly' ? '0 12px 35px rgba(37, 99, 235, 0.15)' : '0 2px 8px rgba(16, 27, 51, 0.04)'
             }}
           >
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 20, color: '#0F172A', fontWeight: 800 }}>Monthly membership</h3>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 20, color: '#0F172A', fontWeight: 800 }}>Weekly Learning Cycle</h3>
+                  <div style={{ fontSize: 12, color: '#2563EB', fontWeight: 700, marginTop: 3 }}>
+                    Sprint-based access &bull; Automatic lock after 7 days
+                  </div>
+                </div>
                 <div style={{
                   width: 20, height: 20, borderRadius: '50%',
-                  border: selectedPlan === 'monthly' ? '6px solid #2563EB' : '2px solid #CBD5E1',
+                  border: selectedPlan === 'weekly' ? '6px solid #2563EB' : '2px solid #CBD5E1',
                   background: '#FFF'
                 }} />
               </div>
 
               <div style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: 14, color: '#94A3B8', textDecoration: 'line-through', marginRight: 8 }}>₹2,999</span>
-                <span style={{ fontSize: 32, fontWeight: 800, color: '#0F172A' }}>₹999</span>
-                <span style={{ fontSize: 13, color: '#64748B' }}> / month</span>
+                <span style={{ fontSize: 14, color: '#94A3B8', textDecoration: 'line-through', marginRight: 8 }}>₹749</span>
+                <span style={{ fontSize: 32, fontWeight: 800, color: '#0F172A' }}>₹99</span>
+                <span style={{ fontSize: 13, color: '#64748B' }}> / Week 1 access</span>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#059669', background: '#D1FAE5', padding: '2px 8px', borderRadius: 4, marginLeft: 8 }}>
-                  66% OFF
+                  FIRST WEEK SPECIAL
                 </span>
               </div>
 
               {/* Core Features List */}
               <ul style={{ margin: '0 0 16px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13 }}>
                 {[
-                  'Python',
-                  'advance python',
-                  'machine learning',
-                  'Sql',
-                  'recorded sessions',
-                  '5 industry level projects'
+                  '7 Days Unlocked Portal Access',
+                  'Python & Advance Python Modules',
+                  'Machine Learning & SQL Foundations',
+                  'Recorded Video Streaming in HD',
+                  '5+ Industry-Level & Portfolio Projects',
+                  'Weekly Learning Sprint & Assessments'
                 ].map((f, i) => (
                   <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#334155' }}>
                     <Check size={16} color="#10B981" /> {f}
@@ -2729,7 +3165,7 @@ export default function AcademyShowcase() {
                   marginBottom: 10
                 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Pricing Breakdown
+                    Weekly Cycle Breakdown
                   </span>
                   <span style={{
                     fontSize: 11,
@@ -2739,33 +3175,27 @@ export default function AcademyShowcase() {
                     padding: '2px 8px',
                     borderRadius: 12
                   }}>
-                    Limited Time Offer
+                    Week 1 Access: ₹99
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
-                    <span>Standard Monthly Fee</span>
-                    <span style={{ textDecoration: 'line-through' }}>₹2,999</span>
+                    <span>Standard Weekly Fee</span>
+                    <span style={{ textDecoration: 'line-through' }}>₹749</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0F172A', fontWeight: 600 }}>
-                    <span>Academy Special Offer</span>
-                    <span>₹999</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2563EB', fontWeight: 600 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Tag size={13} /> Welcome Store Credit
-                    </span>
-                    <span>- ₹300</span>
+                    <span>Week 1 Promotional Price</span>
+                    <span>₹99</span>
                   </div>
 
                   {/* Dynamic Workshop Coupon Line */}
-                  {isMonthlyCouponApplied ? (
+                  {isWeeklyCouponApplied ? (
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 700 }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <Gift size={13} /> Workshop Coupon ({appliedCoupon})
                       </span>
-                      <span>- ₹{monthlyCouponDiscount.toLocaleString('en-IN')}</span>
+                      <span>- ₹{weeklyCouponDiscount.toLocaleString('en-IN')}</span>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94A3B8', fontSize: 12 }}>
@@ -2786,10 +3216,10 @@ export default function AcademyShowcase() {
                   }}>
                     <div>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                        Net Payable Amount
+                        Net Payable (Week 1)
                       </div>
-                      <div style={{ fontSize: 11, color: isMonthlyCouponApplied ? '#059669' : '#2563EB', fontWeight: 600 }}>
-                        {isMonthlyCouponApplied ? '(Store Credit + Coupon Applied)' : '(Store Credit Applied)'}
+                      <div style={{ fontSize: 11, color: '#2563EB', fontWeight: 600 }}>
+                        7 Days Unlocked Access
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -2797,12 +3227,12 @@ export default function AcademyShowcase() {
                         fontSize: 22,
                         fontWeight: 800,
                         color: '#0F172A',
-                        background: isMonthlyCouponApplied ? '#DCFCE7' : '#FEF08A',
+                        background: isWeeklyCouponApplied ? '#DCFCE7' : '#FEF08A',
                         padding: '3px 10px',
                         borderRadius: 8,
                         transition: 'all 0.2s ease'
                       }}>
-                        ₹{monthlyPayable.toLocaleString('en-IN')}
+                        ₹{weeklyPayable.toLocaleString('en-IN')}
                       </span>
                     </div>
                   </div>
@@ -2810,7 +3240,7 @@ export default function AcademyShowcase() {
               </div>
             </div>
 
-            {/* Direct Payment Action for Monthly */}
+            {/* Direct Payment Action for Weekly */}
             <div style={{
               marginTop: 18, paddingTop: 16, borderTop: '1px solid #E2E8F0',
               display: 'flex', flexDirection: 'column', gap: 10
@@ -2819,46 +3249,42 @@ export default function AcademyShowcase() {
               <div style={{ display: 'flex', gap: 6 }}>
                 <input
                   type="text"
-                  placeholder="Enter workshop coupon code"
-                  value={isMonthlyCouponApplied ? appliedCoupon : couponInputs.monthly}
-                  disabled={isMonthlyCouponApplied}
+                  placeholder="Enter coupon code"
+                  value={isWeeklyCouponApplied ? appliedCoupon : couponInputs.weekly}
+                  disabled={isWeeklyCouponApplied}
                   onChange={(e) => {
-                    handleSelectPlan('monthly');
-                    setCouponInputs(prev => ({ ...prev, monthly: e.target.value.toUpperCase() }));
+                    handleSelectPlan('weekly');
+                    setCouponInputs(prev => ({ ...prev, weekly: e.target.value.toUpperCase() }));
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isMonthlyCouponApplied) {
+                    if (e.key === 'Enter' && !isWeeklyCouponApplied) {
                       e.preventDefault();
-                      handleApplyCoupon('monthly', couponInputs.monthly);
+                      handleApplyCoupon('weekly', couponInputs.weekly);
                     }
                   }}
                   style={{
                     flexGrow: 1, padding: '9px 12px', borderRadius: 8,
                     border: '1px solid #CBD5E1', fontSize: 12.5, textTransform: 'uppercase',
-                    letterSpacing: '0.5px', background: isMonthlyCouponApplied ? '#F1F5F9' : '#FFFFFF'
+                    letterSpacing: '0.5px', background: isWeeklyCouponApplied ? '#F1F5F9' : '#FFFFFF'
                   }}
                 />
-                {isMonthlyCouponApplied ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveCoupon('monthly');
-                    }}
+                {isWeeklyCouponApplied ? (
+                  <span
                     style={{
-                      padding: '8px 14px', borderRadius: 8, background: '#EF4444',
-                      color: '#FFF', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer'
+                      padding: '8px 14px', borderRadius: 8, background: '#DCFCE7',
+                      color: '#15803D', fontSize: 12, fontWeight: 700, border: '1px solid #86EFAC',
+                      display: 'flex', alignItems: 'center', gap: 4
                     }}
                   >
-                    Remove
-                  </button>
+                    ✓ Applied
+                  </span>
                 ) : (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleSelectPlan('monthly');
-                      handleApplyCoupon('monthly', couponInputs.monthly);
+                      handleSelectPlan('weekly');
+                      handleApplyCoupon('weekly', couponInputs.weekly);
                     }}
                     disabled={calcLoading}
                     style={{
@@ -2866,13 +3292,13 @@ export default function AcademyShowcase() {
                       color: '#FFF', fontSize: 12.5, fontWeight: 700, border: 'none', cursor: 'pointer'
                     }}
                   >
-                    {calcLoading && selectedPlan === 'monthly' ? 'Checking...' : 'Apply'}
+                    {calcLoading && selectedPlan === 'weekly' ? 'Checking...' : 'Apply'}
                   </button>
                 )}
               </div>
 
               {/* Dynamic Coupon Status Feedback */}
-              {couponStatus.plan === 'monthly' && couponStatus.message && (
+              {couponStatus.plan === 'weekly' && couponStatus.message && (
                 <div style={{
                   fontSize: 11.5,
                   fontWeight: 600,
@@ -2915,7 +3341,7 @@ export default function AcademyShowcase() {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleCheckout(false, 'monthly');
+                  handleCheckout(false, 'weekly');
                 }}
                 disabled={paymentLoading}
                 style={{
@@ -2928,9 +3354,9 @@ export default function AcademyShowcase() {
                   marginTop: 6
                 }}
               >
-                {paymentLoading && selectedPlan === 'monthly'
+                {paymentLoading && selectedPlan === 'weekly'
                   ? 'Connecting to UPI & Payment...'
-                  : `Pay ₹${monthlyPayable.toLocaleString('en-IN')} via UPI / Cards →`}
+                  : `Pay ₹${weeklyPayable.toLocaleString('en-IN')} to Unlock Week 1 →`}
               </button>
 
               {/* Instant Test Checkout */}
@@ -2939,7 +3365,7 @@ export default function AcademyShowcase() {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleCheckout(true, 'monthly');
+                    handleCheckout(true, 'weekly');
                   }}
                   disabled={paymentLoading}
                   style={{
@@ -2971,25 +3397,61 @@ export default function AcademyShowcase() {
               color: '#FFF', fontSize: 11, fontWeight: 800, padding: '4px 12px',
               borderRadius: 20, letterSpacing: '0.4px', textTransform: 'uppercase'
             }}>
-              ⭐ BEST VALUE: BUY 6 GET 6 FOR FREE
+              ⭐ BEST VALUE: SAVE UP TO ₹26,000
             </div>
 
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 20, color: '#0F172A', fontWeight: 800 }}>
-                    Annual membership ( buy 6 get 6 for free)
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                <div style={{ flex: 1, paddingRight: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                    <span style={{
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      color: '#6D28D9',
+                      background: '#EDE9FE',
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.4px'
+                    }}>
+                      ⭐ Flagship 1-Year Program
+                    </span>
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: 18.5, color: '#0F172A', fontWeight: 800, lineHeight: 1.35 }}>
+                    Machine Learning Engineer Internship
                   </h3>
+                  <div style={{ fontSize: 13, color: '#7C3AED', fontWeight: 700, marginTop: 4, lineHeight: 1.35 }}>
+                    3 Months Training + 9 Months Industrial Training
+                  </div>
+                  {/* Designer-Grade Highlighted Internship Certificate Banner (Matching Image 3) */}
                   <div style={{
-                    fontSize: 12,
-                    color: '#6D28D9',
-                    fontWeight: 700,
-                    marginTop: 4,
+                    marginTop: 10,
+                    padding: '10px 14px',
+                    background: '#FFFBEB',
+                    borderRadius: 12,
+                    border: '2px solid #F59E0B',
+                    boxShadow: '0 4px 14px rgba(245, 158, 11, 0.12)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 5
+                    gap: 10
                   }}>
-                    <Sparkles size={13} color="#7C3AED" /> First-time annual members get ₹3,999 store credit • Total ₹8,000 savings
+                    <Sparkles size={20} color="#D97706" style={{ flexShrink: 0 }} />
+                    <div style={{
+                      fontSize: 12.5,
+                      color: '#92400E',
+                      lineHeight: 1.45,
+                      fontWeight: 700
+                    }}>
+                      Finish it sooner to receive{' '}
+                      <u style={{
+                        fontWeight: 800,
+                        color: '#78350F',
+                        textUnderlineOffset: '3px',
+                        textDecorationThickness: '2px'
+                      }}>
+                        one year of internship certificate with industrial experience
+                      </u>
+                    </div>
                   </div>
                 </div>
                 <div style={{
@@ -3000,10 +3462,19 @@ export default function AcademyShowcase() {
               </div>
 
               <div style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: 32, fontWeight: 800, color: '#0F172A' }}>₹17,999</span>
-                <span style={{ fontSize: 13, color: '#64748B' }}> / 12 months</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#059669', background: '#D1FAE5', padding: '2px 8px', borderRadius: 4, marginLeft: 8 }}>
-                  Save ₹8,000
+                <span style={{ fontSize: 14, color: '#94A3B8', textDecoration: 'line-through', marginRight: 8 }}>₹35,999</span>
+                <span style={{ fontSize: 32, fontWeight: 800, color: '#0F172A' }}>₹{annualPayable.toLocaleString('en-IN')}</span>
+                <span style={{ fontSize: 13, color: '#64748B' }}> / 1 full year</span>
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: (isAnnualCreditsApplied && isAnnualCouponApplied) ? '#059669' : '#7C3AED',
+                  background: (isAnnualCreditsApplied && isAnnualCouponApplied) ? '#D1FAE5' : '#EDE9FE',
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  marginLeft: 8
+                }}>
+                  {(isAnnualCreditsApplied && isAnnualCouponApplied) ? '₹26,000 SAVINGS APPLIED' : 'APPLY DISCOUNTS BELOW'}
                 </span>
               </div>
 
@@ -3014,19 +3485,17 @@ export default function AcademyShowcase() {
                 gap: '9px 12px', fontSize: 13
               }}>
                 {[
-                  'Python',
-                  'advance python',
-                  'machine learning',
-                  'Sql',
-                  'recorded sessions',
-                  '9+ industry level projects',
-                  '4+ portfolio project',
-                  'Community',
-                  'support system ( for each course total 4 hrs )',
-                  'online internship',
-                  'certificate',
-                  'Resume builder',
-                  'LinkedIn builder'
+                  'Python & Advance Python',
+                  'Machine Learning & SQL',
+                  'All Recorded Sessions HD Streaming',
+                  '9+ Industry Level Projects',
+                  '4+ Portfolio Projects',
+                  'Community & Peer Network',
+                  'Support System (Live Doubt Sessions)',
+                  'Online Internship & Experience',
+                  'Verified Industry Certificate',
+                  'Resume Builder & LinkedIn Optimizer',
+                  '24 Free IT Interview Resources'
                 ].map((f, i) => (
                   <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#334155' }}>
                     <Check size={16} color="#8B5CF6" /> {f}
@@ -3051,7 +3520,7 @@ export default function AcademyShowcase() {
                   marginBottom: 10
                 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#6B21A8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Annual Pricing Breakdown
+                    Internship Pricing Breakdown
                   </span>
                   <span style={{
                     fontSize: 11,
@@ -3061,46 +3530,228 @@ export default function AcademyShowcase() {
                     padding: '2px 8px',
                     borderRadius: 12
                   }}>
-                    Best Value (12 Months)
+                    1 Full Year Program
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6B21A8', opacity: 0.8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6B21A8', opacity: 0.85 }}>
                     <span>Standard Annual Package</span>
-                    <span style={{ textDecoration: 'line-through' }}>₹25,999</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0F172A', fontWeight: 600 }}>
-                    <span>Academy Special Offer</span>
-                    <span>₹17,999</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#7C3AED', fontWeight: 600 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Tag size={13} /> Welcome Store Credit
-                    </span>
-                    <span>- ₹3,600</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#7C3AED', fontWeight: 600 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Sparkles size={13} /> Loyalty Store Credit
-                    </span>
-                    <span>- ₹3,000</span>
+                    <span style={{ fontWeight: 600 }}>₹35,999</span>
                   </div>
 
-                  {/* Dynamic Workshop Coupon Line */}
-                  {isAnnualCouponApplied ? (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 700 }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <Gift size={13} /> Workshop Coupon ({appliedCoupon})
-                      </span>
-                      <span>- ₹{annualCouponDiscount.toLocaleString('en-IN')}</span>
+                  {/* Score Credits ₹20,000 Row with Fixed Applied State & Shining Apply Button */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    background: isAnnualCreditsApplied ? '#DCFCE7' : '#FFFFFF',
+                    border: isAnnualCreditsApplied ? '1px solid #86EFAC' : '1px dashed #CBD5E1',
+                    transition: 'all 0.2s ease'
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: isAnnualCreditsApplied ? '#15803D' : '#334155', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <Tag size={13} color={isAnnualCreditsApplied ? '#16A34A' : '#7C3AED'} />
+                        Score Credits (₹20,000)
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748B' }}>
+                        {isAnnualCreditsApplied ? '✓ ₹20,000 score credits deducted' : 'Eligible score credits available'}
+                      </div>
                     </div>
-                  ) : (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94A3B8', fontSize: 12 }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <Gift size={13} /> Workshop Coupon
-                      </span>
-                      <span>₹0 <span style={{ fontSize: 11 }}>(Enter code below)</span></span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {isAnnualCreditsApplied ? (
+                        <>
+                          <span style={{ fontWeight: 800, color: '#16A34A', fontSize: 13 }}>- ₹20,000</span>
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: 6,
+                            border: '1px solid #86EFAC',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            background: '#DCFCE7',
+                            color: '#15803D'
+                          }}>
+                            ✓ Applied
+                          </span>
+                        </>
+                      ) : (
+                        <div style={{
+                          position: 'relative',
+                          borderRadius: 8,
+                          padding: '2px',
+                          background: 'linear-gradient(90deg, #2563EB, #60A5FA, #38BDF8, #2563EB)',
+                          backgroundSize: '300% 300%',
+                          animation: 'rollingBorder 2.5s linear infinite',
+                          boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)',
+                          overflow: 'hidden'
+                        }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectPlan('annual');
+                              setIsAnnualCreditsApplied(true);
+                            }}
+                            style={{
+                              position: 'relative',
+                              overflow: 'hidden',
+                              padding: '6px 14px',
+                              borderRadius: 6,
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: 11.5,
+                              fontWeight: 800,
+                              background: '#2563EB',
+                              color: '#FFFFFF',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 5
+                            }}
+                          >
+                            <div style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '45%',
+                              height: '100%',
+                              background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent)',
+                              animation: 'rollShimmerSweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+                              pointerEvents: 'none'
+                            }} />
+                            <Sparkles size={12} color="#FFF" />
+                            <span style={{ position: 'relative', zIndex: 1 }}>Apply</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Enrolly Coupon ₹6,000 Row with Fixed Applied State & Shining Apply Button */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    background: isAnnualCouponApplied ? '#DCFCE7' : '#FFFFFF',
+                    border: isAnnualCouponApplied ? '1px solid #86EFAC' : '1px dashed #CBD5E1',
+                    transition: 'all 0.2s ease'
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: isAnnualCouponApplied ? '#15803D' : '#334155', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <Gift size={13} color={isAnnualCouponApplied ? '#16A34A' : '#7C3AED'} />
+                        Enrolly Coupon (₹6,000)
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748B' }}>
+                        {isAnnualCouponApplied ? '✓ ₹6,000 coupon discount applied' : 'Special enrollment voucher'}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {isAnnualCouponApplied ? (
+                        <>
+                          <span style={{ fontWeight: 800, color: '#16A34A', fontSize: 13 }}>- ₹6,000</span>
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: 6,
+                            border: '1px solid #86EFAC',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            background: '#DCFCE7',
+                            color: '#15803D'
+                          }}>
+                            ✓ Applied
+                          </span>
+                        </>
+                      ) : (
+                        <div style={{
+                          position: 'relative',
+                          borderRadius: 8,
+                          padding: '2px',
+                          background: 'linear-gradient(90deg, #7C3AED, #C084FC, #EC4899, #7C3AED)',
+                          backgroundSize: '300% 300%',
+                          animation: 'rollingBorder 2.5s linear infinite',
+                          boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)',
+                          overflow: 'hidden'
+                        }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectPlan('annual');
+                              setIsAnnualCouponApplied(true);
+                            }}
+                            style={{
+                              position: 'relative',
+                              overflow: 'hidden',
+                              padding: '6px 14px',
+                              borderRadius: 6,
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: 11.5,
+                              fontWeight: 800,
+                              background: '#7C3AED',
+                              color: '#FFFFFF',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 5
+                            }}
+                          >
+                            <div style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '45%',
+                              height: '100%',
+                              background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent)',
+                              animation: 'rollShimmerSweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+                              pointerEvents: 'none'
+                            }} />
+                            <Sparkles size={12} color="#FFF" />
+                            <span style={{ position: 'relative', zIndex: 1 }}>Apply</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Separate Custom Coupon (if applied via promo input) */}
+                  {isAnnualCustomCouponApplied && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      background: '#DCFCE7',
+                      border: '1px solid #86EFAC'
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#15803D', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <Gift size={13} color="#16A34A" />
+                          Promo Code ({appliedCoupon})
+                        </div>
+                        <div style={{ fontSize: 11, color: '#15803D' }}>
+                          ✓ Additional discount applied
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 800, color: '#16A34A', fontSize: 13 }}>
+                          - ₹{customAnnualCouponDiscount.toLocaleString('en-IN')}
+                        </span>
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          border: '1px solid #86EFAC',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background: '#DCFCE7',
+                          color: '#15803D'
+                        }}>
+                          ✓ Applied
+                        </span>
+                      </div>
                     </div>
                   )}
 
@@ -3116,8 +3767,12 @@ export default function AcademyShowcase() {
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#6B21A8', textTransform: 'uppercase' }}>
                         Net Payable Amount
                       </div>
-                      <div style={{ fontSize: 11, color: isAnnualCouponApplied ? '#059669' : '#7C3AED', fontWeight: 600 }}>
-                        {isAnnualCouponApplied ? '(Store Credit + Coupon Applied)' : '(Store Credits Applied)'}
+                      <div style={{ fontSize: 11, color: (isAnnualCreditsApplied && isAnnualCouponApplied) ? '#16A34A' : '#7C3AED', fontWeight: 600 }}>
+                        {(isAnnualCreditsApplied && isAnnualCouponApplied)
+                          ? '✓ Score Credits + Enrolly Coupon Applied'
+                          : (isAnnualCreditsApplied || isAnnualCouponApplied)
+                            ? 'Discount Applied'
+                            : 'Press Apply above to reduce to ₹9,999'}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -3125,7 +3780,7 @@ export default function AcademyShowcase() {
                         fontSize: 22,
                         fontWeight: 800,
                         color: '#0F172A',
-                        background: isAnnualCouponApplied ? '#DCFCE7' : '#FEF08A',
+                        background: (isAnnualCreditsApplied && isAnnualCouponApplied) ? '#DCFCE7' : '#FEF08A',
                         padding: '3px 10px',
                         borderRadius: 8,
                         transition: 'all 0.2s ease'
@@ -3143,19 +3798,19 @@ export default function AcademyShowcase() {
               marginTop: 18, paddingTop: 16, borderTop: '1px solid #E2E8F0',
               display: 'flex', flexDirection: 'column', gap: 10
             }}>
-              {/* Dynamic Coupon Input row */}
+              {/* Separate Promo / Coupon Code Input row */}
               <div style={{ display: 'flex', gap: 6 }}>
                 <input
                   type="text"
-                  placeholder="Enter workshop coupon code"
-                  value={isAnnualCouponApplied ? appliedCoupon : couponInputs.annual}
-                  disabled={isAnnualCouponApplied}
+                  placeholder="Enter separate coupon code"
+                  value={isAnnualCustomCouponApplied ? appliedCoupon : couponInputs.annual}
+                  disabled={isAnnualCustomCouponApplied}
                   onChange={(e) => {
                     handleSelectPlan('annual');
                     setCouponInputs(prev => ({ ...prev, annual: e.target.value.toUpperCase() }));
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isAnnualCouponApplied) {
+                    if (e.key === 'Enter' && !isAnnualCustomCouponApplied) {
                       e.preventDefault();
                       handleApplyCoupon('annual', couponInputs.annual);
                     }
@@ -3163,23 +3818,19 @@ export default function AcademyShowcase() {
                   style={{
                     flexGrow: 1, padding: '9px 12px', borderRadius: 8,
                     border: '1px solid #CBD5E1', fontSize: 12.5, textTransform: 'uppercase',
-                    letterSpacing: '0.5px', background: isAnnualCouponApplied ? '#F1F5F9' : '#FFFFFF'
+                    letterSpacing: '0.5px', background: isAnnualCustomCouponApplied ? '#F1F5F9' : '#FFFFFF'
                   }}
                 />
-                {isAnnualCouponApplied ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveCoupon('annual');
-                    }}
+                {isAnnualCustomCouponApplied ? (
+                  <span
                     style={{
-                      padding: '8px 14px', borderRadius: 8, background: '#EF4444',
-                      color: '#FFF', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer'
+                      padding: '8px 14px', borderRadius: 8, background: '#DCFCE7',
+                      color: '#15803D', fontSize: 12, fontWeight: 700, border: '1px solid #86EFAC',
+                      display: 'flex', alignItems: 'center', gap: 4
                     }}
                   >
-                    Remove
-                  </button>
+                    ✓ Applied
+                  </span>
                 ) : (
                   <button
                     type="button"
@@ -3258,7 +3909,7 @@ export default function AcademyShowcase() {
               >
                 {paymentLoading && selectedPlan === 'annual'
                   ? 'Connecting to UPI & Payment...'
-                  : `Pay ₹${annualPayable.toLocaleString('en-IN')} via UPI / Cards →`}
+                  : `Pay ₹${annualPayable.toLocaleString('en-IN')} for Machine Learning Engineer Internship →`}
               </button>
 
               {/* Instant Test Checkout */}
@@ -3614,7 +4265,112 @@ export default function AcademyShowcase() {
         </div>
       )}
 
-      {/* MODAL: PROSPECTIVE STUDENT SIGNUP (IF USER SKIPPED /register) */}
+      {/* MODAL: WEEKLY SPRINT PREREQUISITE GATE FOR FIRST-TIME ENROLLMENT */}
+      {showWeeklyGateModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 120,
+          background: 'rgba(15, 23, 42, 0.76)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: '#FFFFFF', borderRadius: 24, maxWidth: 500, width: '100%',
+            padding: '34px 28px', border: '1px solid rgba(226, 232, 240, 0.9)',
+            boxShadow: '0 25px 65px -12px rgba(15, 23, 42, 0.35)', position: 'relative'
+          }}>
+            {/* Close button */}
+            <button
+              onClick={() => setShowWeeklyGateModal(false)}
+              style={{
+                position: 'absolute', top: 18, right: 18, background: '#F1F5F9',
+                border: 'none', width: 34, height: 34, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: '#64748B'
+              }}
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{
+              width: 56, height: 56, borderRadius: 16,
+              background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+              border: '1.5px solid #BFDBFE',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#2563EB', margin: '0 auto 18px',
+              boxShadow: '0 6px 16px rgba(37, 99, 235, 0.15)'
+            }}>
+              <Lock size={26} color="#2563EB" strokeWidth={2.4} />
+            </div>
+
+            <div style={{ textAlign: 'center', marginBottom: 18 }}>
+              <span style={{
+                fontSize: 11, fontWeight: 800, color: '#2563EB', background: '#EFF6FF',
+                border: '1px solid #BFDBFE', padding: '3px 10px', borderRadius: 12,
+                textTransform: 'uppercase', letterSpacing: '0.5px'
+              }}>
+                Sprint-First Learning Policy
+              </span>
+              <h3 style={{ fontSize: 22, fontWeight: 850, color: '#0F172A', margin: '10px 0 6px', lineHeight: 1.3 }}>
+                Start with Week 1 Sprint First
+              </h3>
+              <p style={{ fontSize: 13.5, color: '#64748B', lineHeight: 1.55, margin: '0 auto', maxWidth: 420 }}>
+                To guarantee student success, Levlox requires all new members to first experience <strong>Week 1 (7-Day Sprint for ₹99)</strong>. Once you try Week 1, the full <strong>1-Year Machine Learning Engineer Internship</strong> unlocks in your portal!
+              </p>
+            </div>
+
+            {/* 2-Step Progression Visual */}
+            <div style={{
+              background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 14,
+              padding: '14px 16px', marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 10
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 26, height: 26, borderRadius: '50%', background: '#2563EB', color: '#FFF',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0
+                }}>
+                  1
+                </div>
+                <div style={{ fontSize: 13, color: '#0F172A', fontWeight: 600 }}>
+                  <span style={{ color: '#2563EB', fontWeight: 800 }}>Week 1 Sprint (₹99):</span> Hands-on Python, ML, SQL &amp; capstone projects.
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 26, height: 26, borderRadius: '50%', background: '#EDE9FE', color: '#7C3AED',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0
+                }}>
+                  2
+                </div>
+                <div style={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>
+                  <span style={{ color: '#7C3AED', fontWeight: 800 }}>Yearly Internship Upgrade:</span> Unlocks seamlessly in your dashboard!
+                </div>
+              </div>
+            </div>
+
+            {/* Primary Action Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowWeeklyGateModal(false);
+                handleSelectPlan('weekly');
+                handleCheckout(false, 'weekly');
+              }}
+              style={{
+                width: '100%', padding: '13px 18px', borderRadius: 10,
+                background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                color: '#FFF', fontSize: 14.5, fontWeight: 800, border: 'none',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: 8, boxShadow: '0 8px 20px rgba(37, 99, 235, 0.3)'
+              }}
+            >
+              Unlock Week 1 Sprint for ₹99 Now →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: PROSPECTIVE STUDENT SIGNUP & REGISTRATION BEFORE PAYMENT */}
       {showLeadModal && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 100,
@@ -3622,15 +4378,27 @@ export default function AcademyShowcase() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
         }}>
           <div style={{
-            background: '#FFFFFF', borderRadius: 16, maxWidth: 460, width: '100%',
+            background: '#FFFFFF', borderRadius: 20, maxWidth: 470, width: '100%',
             padding: '32px 28px', border: '1px solid #E3E9F4',
-            boxShadow: '0 25px 50px rgba(16, 27, 51, 0.2)'
+            boxShadow: '0 25px 50px rgba(16, 27, 51, 0.25)',
+            position: 'relative'
           }}>
-            <h3 style={{ fontSize: 20, fontWeight: 700, color: '#101B33', margin: '0 0 6px' }}>
-              Student Information
+            {/* Step Indicator */}
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: '#EFF6FF', color: '#2563EB',
+              padding: '4px 10px', borderRadius: 999,
+              fontSize: 11, fontWeight: 800, textTransform: 'uppercase',
+              letterSpacing: '0.5px', marginBottom: 12
+            }}>
+              <User size={13} strokeWidth={2.4} /> Step 1 of 2 &bull; Student Registration
+            </div>
+
+            <h3 style={{ fontSize: 21, fontWeight: 800, color: '#0F172A', margin: '0 0 6px', letterSpacing: '-0.02em' }}>
+              Create Your Portal Account
             </h3>
             <p style={{ fontSize: 13, color: '#64748B', margin: '0 0 18px', lineHeight: 1.5 }}>
-              Please enter your details before proceeding to payment. (No portal user is created until payment succeeds).
+              Register your student details below. We'll verify your email via a 6-digit OTP before unlocking payment checkout.
             </p>
 
             {modalError && (
@@ -3700,15 +4468,20 @@ export default function AcademyShowcase() {
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   type="button" onClick={() => setShowLeadModal(false)}
-                  style={{ flex: 1, padding: '11px', borderRadius: 8, background: '#FFFFFF', color: '#64748B', border: '1px solid #CBD5E1', cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '11px', borderRadius: 8, background: '#FFFFFF', color: '#64748B', border: '1px solid #CBD5E1', cursor: 'pointer', fontWeight: 600 }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit" disabled={modalLoading}
-                  style={{ flex: 2, padding: '11px', borderRadius: 8, background: '#4568F5', color: '#FFF', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                  style={{
+                    flex: 2, padding: '11px', borderRadius: 8,
+                    background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                    color: '#FFF', fontWeight: 700, border: 'none', cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)'
+                  }}
                 >
-                  {modalLoading ? 'Saving...' : 'Continue to Payment →'}
+                  {modalLoading ? 'Registering...' : 'Register & Verify Email (OTP) →'}
                 </button>
               </div>
             </form>
@@ -3805,149 +4578,218 @@ export default function AcademyShowcase() {
         <div
           onClick={() => setActiveVideoModal(null)}
           style={{
-            position: 'fixed', inset: 0, zIndex: 120,
-            background: 'rgba(15, 23, 42, 0.88)', backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 12
+            position: 'fixed',
+            inset: 0,
+            zIndex: 120,
+            background: 'rgba(10, 15, 30, 0.88)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
               background: '#FFFFFF',
-              borderRadius: 18,
-              maxWidth: 680,
+              borderRadius: 22,
+              maxWidth: testimonialVideoOrientation === 'portrait' ? 430 : 720,
               width: '100%',
-              maxHeight: '92vh',
+              maxHeight: '94vh',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.4)',
-              position: 'relative'
+              boxShadow: '0 25px 70px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+              position: 'relative',
+              transition: 'max-width 0.25s ease'
             }}
           >
-            {/* Modal Header (Mobile-Optimized & Spacious) */}
+            {/* Modal Header */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              padding: '14px 16px',
+              alignItems: 'center',
+              padding: '14px 18px',
               borderBottom: '1px solid #E2E8F0',
               background: '#FFFFFF',
               flexShrink: 0,
               gap: 12
             }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h3 style={{
-                  fontSize: 17,
-                  fontWeight: 800,
-                  color: '#0F172A',
-                  margin: '0 0 5px',
-                  letterSpacing: '-0.3px',
-                  lineHeight: 1.25
-                }}>
-                  {activeVideoModal.studentName}
-                </h3>
-
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11, flex: 1, minWidth: 0 }}>
+                {/* Student Avatar Initial */}
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  flexWrap: 'wrap',
-                  rowGap: 4
-                }}>
-                  {activeVideoModal.role && (
-                    <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>
-                      {activeVideoModal.role}
-                    </span>
-                  )}
-
-                  {/* Star Rating */}
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                    {[...Array(5)].map((_, si) => (
-                      <span
-                        key={si}
-                        style={{
-                          color: si < (activeVideoModal.rating || 5) ? '#F59E0B' : '#E2E8F0',
-                          fontSize: 12,
-                          lineHeight: 1
-                        }}
-                      >
-                        ★
-                      </span>
-                    ))}
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#D97706', marginLeft: 2 }}>
-                      {(activeVideoModal.rating || 5)}.0
-                    </span>
-                  </div>
-
-                  {activeVideoModal.linkedinUrl && (
-                    <a
-                      href={activeVideoModal.linkedinUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        fontSize: 10.5,
-                        fontWeight: 700,
-                        color: '#0A66C2',
-                        background: '#EDF3F8',
-                        padding: '2px 8px',
-                        borderRadius: 4,
-                        textDecoration: 'none',
-                        border: '1px solid #D0E1F0'
-                      }}
-                    >
-                      <svg fill="#0A66C2" viewBox="0 0 24 24" style={{ width: 11, height: 11 }}>
-                        <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.53 1.53 0 1 0 0-3.06 1.53 1.53 0 0 0 0 3.06m1.39 9.74v-8.37H5.07v8.37h2.78Z" />
-                      </svg>
-                      <span>LinkedIn</span>
-                    </a>
-                  )}
-                </div>
-              </div>
-
-              {/* Modern Circular Close Button with high touch target */}
-              <button
-                type="button"
-                onClick={() => setActiveVideoModal(null)}
-                style={{
-                  width: 34,
-                  height: 34,
+                  width: 40,
+                  height: 40,
                   borderRadius: '50%',
-                  background: '#F1F5F9',
-                  border: '1px solid #E2E8F0',
+                  background: 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)',
+                  color: '#FFFFFF',
+                  fontSize: 16,
+                  fontWeight: 800,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer',
                   flexShrink: 0,
-                  color: '#475569',
-                  padding: 0
-                }}
-                aria-label="Close modal"
-              >
-                <X size={17} strokeWidth={2.4} />
-              </button>
+                  boxShadow: '0 3px 10px rgba(37, 99, 235, 0.28)'
+                }}>
+                  {activeVideoModal.studentName ? activeVideoModal.studentName.charAt(0).toUpperCase() : 'L'}
+                </div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <h3 style={{
+                      fontSize: 16,
+                      fontWeight: 800,
+                      color: '#0F172A',
+                      margin: 0,
+                      letterSpacing: '-0.3px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {activeVideoModal.studentName}
+                    </h3>
+                    <ShieldCheck size={16} color="#10B981" style={{ flexShrink: 0 }} />
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                    marginTop: 3
+                  }}>
+                    {activeVideoModal.role && (
+                      <span style={{
+                        fontSize: 11,
+                        color: '#2563EB',
+                        fontWeight: 700,
+                        background: '#EFF6FF',
+                        border: '1px solid #DBEAFE',
+                        padding: '1.5px 7px',
+                        borderRadius: 4
+                      }}>
+                        {activeVideoModal.role}
+                      </span>
+                    )}
+
+                    {/* Star Rating */}
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                      {[...Array(5)].map((_, si) => (
+                        <span
+                          key={si}
+                          style={{
+                            color: si < (activeVideoModal.rating || 5) ? '#F59E0B' : '#E2E8F0',
+                            fontSize: 12,
+                            lineHeight: 1
+                          }}
+                        >
+                          ★
+                        </span>
+                      ))}
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#D97706', marginLeft: 2 }}>
+                        {(activeVideoModal.rating || 5)}.0
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons (LinkedIn & Close) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                {activeVideoModal.linkedinUrl && (
+                  <a
+                    href={activeVideoModal.linkedinUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#0A66C2',
+                      background: '#EDF3F8',
+                      padding: '5px 10px',
+                      borderRadius: 6,
+                      textDecoration: 'none',
+                      border: '1px solid #D0E1F0'
+                    }}
+                  >
+                    <svg fill="#0A66C2" viewBox="0 0 24 24" style={{ width: 12, height: 12 }}>
+                      <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.53 1.53 0 1 0 0-3.06 1.53 1.53 0 0 0 0 3.06m1.39 9.74v-8.37H5.07v8.37h2.78Z" />
+                    </svg>
+                    <span>LinkedIn</span>
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setActiveVideoModal(null)}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    background: '#F1F5F9',
+                    border: '1px solid #E2E8F0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    color: '#475569'
+                  }}
+                  aria-label="Close modal"
+                >
+                  <X size={16} strokeWidth={2.4} />
+                </button>
+              </div>
             </div>
 
             {/* Video Player Container */}
             <div style={{
               position: 'relative',
               width: '100%',
-              paddingBottom: '56.25%',
-              background: '#0F172A',
-              flexShrink: 0
+              background: '#090D16',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              flexShrink: 0,
+              ...(testimonialVideoOrientation === 'portrait'
+                ? { height: 'min(62vh, 520px)' }
+                : { paddingBottom: '56.25%', height: 0 }
+              )
             }}>
+              {/* Subtle ambient blurred glow */}
+              {activeVideoModal.thumbnailUrl && (
+                <div style={{
+                  position: 'absolute',
+                  inset: '-20px',
+                  backgroundImage: `url(${activeVideoModal.thumbnailUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  filter: 'blur(30px) brightness(0.35)',
+                  opacity: 0.7,
+                  pointerEvents: 'none'
+                }} />
+              )}
+
               {getEmbedUrl(activeVideoModal.videoUrl).includes('youtube.com/embed') || getEmbedUrl(activeVideoModal.videoUrl).includes('drive.google.com') ? (
                 <iframe
                   src={getEmbedUrl(activeVideoModal.videoUrl)}
                   title={activeVideoModal.studentName}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                  style={{
+                    position: testimonialVideoOrientation === 'portrait' ? 'relative' : 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    zIndex: 1
+                  }}
                 />
               ) : (
                 <video
@@ -3955,7 +4797,23 @@ export default function AcademyShowcase() {
                   controls
                   autoPlay
                   playsInline
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                  onLoadedMetadata={(e) => {
+                    const w = e.target.videoWidth;
+                    const h = e.target.videoHeight;
+                    if (w && h) {
+                      setTestimonialVideoOrientation(h >= w ? 'portrait' : 'landscape');
+                    }
+                  }}
+                  style={{
+                    position: testimonialVideoOrientation === 'portrait' ? 'relative' : 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    zIndex: 1,
+                    maxHeight: testimonialVideoOrientation === 'portrait' ? 'min(62vh, 520px)' : 'none'
+                  }}
                 />
               )}
             </div>
@@ -3963,20 +4821,46 @@ export default function AcademyShowcase() {
             {/* Student Feedback Quote under Video in Modal */}
             {activeVideoModal.feedback && (
               <div style={{
-                padding: '14px 16px',
+                padding: '14px 18px',
                 background: '#F8FAFC',
                 borderTop: '1px solid #E2E8F0',
-                fontSize: 12.5,
-                color: '#334155',
-                fontStyle: 'italic',
-                lineHeight: 1.5,
                 display: 'flex',
+                flexDirection: 'column',
                 gap: 8,
-                alignItems: 'flex-start',
-                overflowY: 'auto'
+                overflowY: 'auto',
+                maxHeight: '120px'
               }}>
-                <span style={{ fontSize: 20, lineHeight: 1, color: '#4568F5', fontWeight: 800, flexShrink: 0 }}>“</span>
-                <span style={{ flex: 1 }}>{activeVideoModal.feedback}</span>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ fontSize: 20, lineHeight: 1, color: '#2563EB', fontWeight: 800, flexShrink: 0 }}>“</span>
+                  <p style={{
+                    margin: 0,
+                    fontSize: 12.5,
+                    color: '#334155',
+                    lineHeight: 1.5,
+                    fontStyle: 'normal',
+                    fontWeight: 500
+                  }}>
+                    {activeVideoModal.feedback}
+                  </p>
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingTop: 6,
+                  borderTop: '1px solid #EDF2F7',
+                  fontSize: 11,
+                  color: '#64748B'
+                }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600, color: '#059669' }}>
+                    <CheckCircle2 size={13} color="#059669" />
+                    Verified Career Review
+                  </span>
+                  <span style={{ fontWeight: 600, color: '#64748B' }}>
+                    Levlox Academy Alumni
+                  </span>
+                </div>
               </div>
             )}
           </div>

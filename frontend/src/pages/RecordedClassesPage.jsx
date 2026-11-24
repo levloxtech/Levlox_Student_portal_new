@@ -579,62 +579,6 @@ const RecordedClassesPage = ({
   return (
     <div className="levlox-courses-page" style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
 
-      {/* EXPIRED ACCESS NOTICE BANNER */}
-      {(!isPaid || isMembershipExpired) && (
-        <div style={{
-          background: 'linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%)',
-          border: '1.5px solid #FCA5A5',
-          borderRadius: 16,
-          padding: '16px 22px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-          boxShadow: '0 4px 14px rgba(239, 68, 68, 0.08)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{
-              width: 42, height: 42, borderRadius: 12,
-              background: '#EF4444', color: '#FFFFFF',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-            }}>
-              <Lock size={20} />
-            </div>
-            <div>
-              <strong style={{ fontSize: 14.5, color: '#991B1B', display: 'block', marginBottom: 2 }}>
-                Video Lectures &amp; Capstone Projects Locked
-              </strong>
-              <span style={{ fontSize: 13, color: '#B91C1C' }}>
-                Your membership access period has expired. Please renew your plan (Monthly or Annual) to restore HD video streaming and full coursework.
-              </span>
-            </div>
-          </div>
-          {onOpenRenewal && (
-            <button
-              type="button"
-              onClick={onOpenRenewal}
-              style={{
-                background: '#EF4444',
-                color: '#FFFFFF',
-                border: 'none',
-                padding: '10px 20px',
-                borderRadius: 10,
-                fontSize: 13.5,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)',
-                flexShrink: 0
-              }}
-            >
-              <Sparkles size={14} /> Renew Access Now →
-            </button>
-          )}
-        </div>
-      )}
-
       {/* ─── 1. TOP LEARNING BANNER (CLEAN MODERN WHITE/INDIGO HERO) ─── */}
       <div style={{
         background: '#FFFFFF',

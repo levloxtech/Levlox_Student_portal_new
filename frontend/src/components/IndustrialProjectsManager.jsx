@@ -1,14 +1,19 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FolderGit2, Video, Image as ImageIcon, Plus, Pencil, Check,
   X, Play, Upload, ExternalLink, RefreshCw, AlertCircle, Eye,
-  Tag, Layers, Sparkles, Trash2, ArrowUpRight
+  Tag, Layers, Sparkles, Trash2, ArrowUpRight, Briefcase
 } from 'lucide-react';
-import { getIndustrialProjects, updateIndustrialProject } from '../services/firebaseService';
+import {
+  getIndustrialProjects,
+  updateIndustrialProject,
+  getPortfolioProjects,
+  updatePortfolioProject
+} from '../services/firebaseService';
 import { uploadUniversalFile } from '../services/apiService';
 
-const DEFAULT_PROJECTS = [
+const DEFAULT_INDUSTRIAL_PROJECTS = [
   {
     id: 'proj_py_1',
     category: 'python',
@@ -119,21 +124,61 @@ const DEFAULT_PROJECTS = [
   }
 ];
 
+const DEFAULT_PORTFOLIO_PROJECTS = [
+  {
+    id: 'portfolio_1',
+    name: 'Customer Churn Prediction Engine',
+    tech: 'Python, Pandas, XGBoost, Scikit-Learn',
+    outcome: 'Identify high-risk churn customers with 92%+ precision, delivering retention insights.',
+    value: '₹12,000',
+    thumbnailUrl: '',
+    videoUrl: '',
+    order: 1
+  },
+  {
+    id: 'portfolio_2',
+    name: 'Public Transportation Crowding Forecast',
+    tech: 'Python, Docker, MySQL, SQLAlchemy, Scikit-Learn, Random Forest',
+    outcome: 'Predict commuter volume and transit route crowding across peak hours using containerized Random Forest models and relational database telemetry.',
+    value: '₹14,000',
+    thumbnailUrl: '',
+    videoUrl: '',
+    order: 2
+  },
+  {
+    id: 'portfolio_3',
+    name: 'Hyper-Local Food Delivery Time Estimator',
+    tech: 'Machine Learning, Feature Pipeline, APIs',
+    outcome: 'Predict real-time delivery turnaround incorporating weather, distance, and preparation latency.',
+    value: '₹15,000',
+    thumbnailUrl: '',
+    videoUrl: '',
+    order: 3
+  },
+  {
+    id: 'portfolio_4',
+    name: 'Full-Stack Billing System with Payment Integration',
+    tech: 'Python, SQL, Razorpay API, PDF Invoicing',
+    outcome: 'Production-ready billing software handling dynamic checkout, secure signatures, and receipts.',
+    value: '₹16,000',
+    thumbnailUrl: '',
+    videoUrl: '',
+    order: 4
+  }
+];
+
 // Helper to format YouTube / Vimeo embeds or direct video URLs
 export const getEmbedVideoUrl = (rawUrl) => {
   if (!rawUrl) return null;
   const clean = String(rawUrl).trim();
-  // YouTube watch?v=...
   if (clean.includes('youtube.com/watch')) {
     const v = new URL(clean).searchParams.get('v');
     return v ? `https://www.youtube.com/embed/${v}` : clean;
   }
-  // YouTube youtu.be/...
   if (clean.includes('youtu.be/')) {
     const v = clean.split('youtu.be/')[1]?.split('?')[0];
     return v ? `https://www.youtube.com/embed/${v}` : clean;
   }
-  // Vimeo
   if (clean.includes('vimeo.com/')) {
     const v = clean.split('vimeo.com/')[1]?.split('?')[0];
     return v ? `https://player.vimeo.com/video/${v}` : clean;
@@ -147,36 +192,67 @@ export const isEmbeddableVideo = (url) => {
   return c.includes('youtube.com') || c.includes('youtu.be') || c.includes('vimeo.com');
 };
 
-const IndustrialProjectsManager = () => {
+const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
   const queryClient = useQueryClient();
 
-  // Query database projects
-  const { data: dbProjects = [], isLoading, refetch } = useQuery({
+  // Active Main Section: 'industrial' | 'portfolio'
+  const [activeSection, setActiveSection] = useState(initialSection);
+
+  useEffect(() => {
+    if (initialSection) {
+      setActiveSection(initialSection);
+    }
+  }, [initialSection]);
+
+  // Query Industrial Projects
+  const { data: dbIndustrial = [], refetch: refetchIndustrial } = useQuery({
     queryKey: ['industrialProjects'],
     queryFn: async () => {
       const res = await getIndustrialProjects().catch(() => []);
       if (Array.isArray(res) && res.length > 0) return res;
-      return DEFAULT_PROJECTS;
+      return DEFAULT_INDUSTRIAL_PROJECTS;
     },
     staleTime: 1000 * 30,
   });
 
-  const projects = useMemo(() => {
-    if (dbProjects && dbProjects.length > 0) {
-      // Merge with defaults so any missing fields are safely fallback-protected
-      const map = new Map(dbProjects.map(p => [p.id, p]));
-      return DEFAULT_PROJECTS.map(def => {
+  const industrialProjects = useMemo(() => {
+    if (dbIndustrial && dbIndustrial.length > 0) {
+      const map = new Map(dbIndustrial.map(p => [p.id, p]));
+      return DEFAULT_INDUSTRIAL_PROJECTS.map(def => {
         const found = map.get(def.id);
         return found ? { ...def, ...found } : def;
       });
     }
-    return DEFAULT_PROJECTS;
-  }, [dbProjects]);
+    return DEFAULT_INDUSTRIAL_PROJECTS;
+  }, [dbIndustrial]);
+
+  // Query Portfolio Projects
+  const { data: dbPortfolio = [], refetch: refetchPortfolio } = useQuery({
+    queryKey: ['portfolioProjects'],
+    queryFn: async () => {
+      const res = await getPortfolioProjects().catch(() => []);
+      if (Array.isArray(res) && res.length > 0) return res;
+      return DEFAULT_PORTFOLIO_PROJECTS;
+    },
+    staleTime: 1000 * 30,
+  });
+
+  const portfolioProjects = useMemo(() => {
+    if (dbPortfolio && dbPortfolio.length > 0) {
+      const map = new Map(dbPortfolio.map(p => [p.id, p]));
+      return DEFAULT_PORTFOLIO_PROJECTS.map(def => {
+        const found = map.get(def.id);
+        return found ? { ...def, ...found } : def;
+      });
+    }
+    return DEFAULT_PORTFOLIO_PROJECTS;
+  }, [dbPortfolio]);
 
   const [activeCategory, setActiveCategory] = useState('all');
 
   // Edit/Upload Modal State
   const [editingProject, setEditingProject] = useState(null);
+  const [editingType, setEditingType] = useState('industrial'); // 'industrial' | 'portfolio'
   const [formName, setFormName] = useState('');
   const [formWorth, setFormWorth] = useState('');
   const [formTags, setFormTags] = useState('');
@@ -199,11 +275,15 @@ const IndustrialProjectsManager = () => {
   };
 
   // Open modal for project
-  const handleOpenEdit = (p) => {
+  const handleOpenEdit = (p, type = 'industrial') => {
     setEditingProject(p);
+    setEditingType(type);
     setFormName(p.name || '');
-    setFormWorth(p.worth || '');
-    setFormTags(Array.isArray(p.tags) ? p.tags.join(', ') : (p.tags || ''));
+    setFormWorth(type === 'portfolio' ? (p.value || p.worth || '') : (p.worth || ''));
+    setFormTags(type === 'portfolio'
+      ? (p.tech || (Array.isArray(p.tags) ? p.tags.join(', ') : ''))
+      : (Array.isArray(p.tags) ? p.tags.join(', ') : (p.tags || ''))
+    );
     setFormOutcome(p.outcome || '');
     setFormThumbnailUrl(p.thumbnailUrl || '');
     setFormVideoUrl(p.videoUrl || '');
@@ -222,7 +302,7 @@ const IndustrialProjectsManager = () => {
 
     try {
       setIsUploadingImage(true);
-      const res = await uploadUniversalFile(file, 'industrial-projects/thumbnails');
+      const res = await uploadUniversalFile(file, `${editingType}-projects/thumbnails`);
       if (res?.url) {
         setFormThumbnailUrl(res.url);
         showToast('Thumbnail uploaded successfully!');
@@ -247,7 +327,7 @@ const IndustrialProjectsManager = () => {
 
     try {
       setIsUploadingVideo(true);
-      const res = await uploadUniversalFile(file, 'industrial-projects/videos');
+      const res = await uploadUniversalFile(file, `${editingType}-projects/videos`);
       if (res?.url) {
         setFormVideoUrl(res.url);
         showToast('Project video uploaded successfully!');
@@ -269,46 +349,59 @@ const IndustrialProjectsManager = () => {
     setErrorMessage('');
 
     try {
-      const tagsArray = formTags
-        .split(',')
-        .map(t => t.trim())
-        .filter(Boolean);
+      if (editingType === 'portfolio') {
+        const payload = {
+          name: formName.trim(),
+          value: formWorth.trim(),
+          tech: formTags.trim(),
+          outcome: formOutcome.trim(),
+          thumbnailUrl: formThumbnailUrl.trim(),
+          videoUrl: formVideoUrl.trim(),
+          updatedAt: new Date().toISOString()
+        };
 
-      const payload = {
-        name: formName.trim(),
-        worth: formWorth.trim(),
-        tags: tagsArray,
-        outcome: formOutcome.trim(),
-        thumbnailUrl: formThumbnailUrl.trim(),
-        videoUrl: formVideoUrl.trim(),
-        updatedAt: new Date().toISOString()
-      };
+        await updatePortfolioProject(editingProject.id, payload);
+        await queryClient.invalidateQueries({ queryKey: ['portfolioProjects'] });
+        await refetchPortfolio();
+      } else {
+        const tagsArray = formTags
+          .split(',')
+          .map(t => t.trim())
+          .filter(Boolean);
 
-      await updateIndustrialProject(editingProject.id, payload);
+        const payload = {
+          name: formName.trim(),
+          worth: formWorth.trim(),
+          tags: tagsArray,
+          outcome: formOutcome.trim(),
+          thumbnailUrl: formThumbnailUrl.trim(),
+          videoUrl: formVideoUrl.trim(),
+          updatedAt: new Date().toISOString()
+        };
 
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['industrialProjects'] }),
-        queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] }),
-      ]);
-      await refetch();
+        await updateIndustrialProject(editingProject.id, payload);
+        await queryClient.invalidateQueries({ queryKey: ['industrialProjects'] });
+        await refetchIndustrial();
+      }
 
+      await queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
       showToast(`Project "${formName}" updated successfully!`);
       setEditingProject(null);
     } catch (err) {
-      console.error('[IndustrialProjects] Update error:', err);
+      console.error('[ProjectsManager] Update error:', err);
       setErrorMessage(err.message || 'Failed to save project. Please try again.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const filteredProjects = useMemo(() => {
-    if (activeCategory === 'all') return projects;
-    return projects.filter(p => p.category === activeCategory);
-  }, [projects, activeCategory]);
+  const filteredIndustrial = useMemo(() => {
+    if (activeCategory === 'all') return industrialProjects;
+    return industrialProjects.filter(p => p.category === activeCategory);
+  }, [industrialProjects, activeCategory]);
 
   const categories = [
-    { key: 'all', label: 'All Projects (9)', color: '#6C3CF0', bg: '#F5F3FF' },
+    { key: 'all', label: `All Projects (${industrialProjects.length})`, color: '#6C3CF0', bg: '#F5F3FF' },
     { key: 'python', label: 'Python Projects (3)', color: '#2563EB', bg: '#EFF6FF' },
     { key: 'ml', label: 'Machine Learning (3)', color: '#7C3AED', bg: '#F5F3FF' },
     { key: 'sql', label: 'SQL Projects (3)', color: '#059669', bg: '#ECFDF5' }
@@ -340,6 +433,64 @@ const IndustrialProjectsManager = () => {
         </div>
       )}
 
+      {/* Top Segmented Navigation Switcher */}
+      <div style={{
+        background: '#FFFFFF',
+        borderRadius: 16,
+        padding: '6px',
+        border: '1.5px solid #E2E8F0',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 20
+      }}>
+        <button
+          type="button"
+          onClick={() => setActiveSection('industrial')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '10px 20px',
+            borderRadius: 12,
+            fontSize: 13.5,
+            fontWeight: 800,
+            cursor: 'pointer',
+            border: 'none',
+            background: activeSection === 'industrial' ? '#6C3CF0' : 'transparent',
+            color: activeSection === 'industrial' ? '#FFFFFF' : '#64748B',
+            transition: 'all 0.2s ease',
+            boxShadow: activeSection === 'industrial' ? '0 4px 12px rgba(108, 60, 240, 0.28)' : 'none'
+          }}
+        >
+          <FolderGit2 size={16} />
+          <span>Industrial Experience ({industrialProjects.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSection('portfolio')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '10px 20px',
+            borderRadius: 12,
+            fontSize: 13.5,
+            fontWeight: 800,
+            cursor: 'pointer',
+            border: 'none',
+            background: activeSection === 'portfolio' ? '#D97706' : 'transparent',
+            color: activeSection === 'portfolio' ? '#FFFFFF' : '#64748B',
+            transition: 'all 0.2s ease',
+            boxShadow: activeSection === 'portfolio' ? '0 4px 12px rgba(217, 119, 6, 0.28)' : 'none'
+          }}
+        >
+          <Briefcase size={16} />
+          <span>Portfolio Projects ({portfolioProjects.length})</span>
+        </button>
+      </div>
+
       {/* Header Banner */}
       <div style={{
         background: '#FFFFFF',
@@ -359,33 +510,37 @@ const IndustrialProjectsManager = () => {
             width: 48,
             height: 48,
             borderRadius: 14,
-            background: '#F5F3FF',
+            background: activeSection === 'portfolio' ? '#FEF3C7' : '#F5F3FF',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#6C3CF0',
-            border: '1.5px solid #DDD6FE'
+            color: activeSection === 'portfolio' ? '#D97706' : '#6C3CF0',
+            border: activeSection === 'portfolio' ? '1.5px solid #FDE68A' : '1.5px solid #DDD6FE'
           }}>
-            <FolderGit2 size={24} />
+            {activeSection === 'portfolio' ? <Briefcase size={24} /> : <FolderGit2 size={24} />}
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: 0 }}>
-                Industrial Projects Experience
+                {activeSection === 'portfolio'
+                  ? 'Industry-Level & Portfolio Projects'
+                  : 'Industrial Projects Experience'}
               </h1>
               <span style={{
-                background: '#EDE9FE',
-                color: '#6C3CF0',
+                background: activeSection === 'portfolio' ? '#FEF3C7' : '#EDE9FE',
+                color: activeSection === 'portfolio' ? '#D97706' : '#6C3CF0',
                 fontSize: 12,
                 fontWeight: 800,
                 padding: '3px 10px',
                 borderRadius: 999
               }}>
-                9 Capstones
+                {activeSection === 'portfolio' ? `${portfolioProjects.length} Portfolio Assets` : `${industrialProjects.length} Capstones`}
               </span>
             </div>
             <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#64748B' }}>
-              Upload video walkthroughs, thumbnail images, and manage details for student portfolio capstone projects.
+              {activeSection === 'portfolio'
+                ? 'Upload project video walkthroughs, thumbnail images, and manage tech stack for high-value portfolio assets.'
+                : 'Upload video walkthroughs, thumbnail images, and manage details for student portfolio capstone projects.'}
             </p>
           </div>
         </div>
@@ -403,67 +558,219 @@ const IndustrialProjectsManager = () => {
           alignItems: 'center',
           gap: 8
         }}>
-          <Sparkles size={14} color="#6C3CF0" />
+          <Sparkles size={14} color={activeSection === 'portfolio' ? '#D97706' : '#6C3CF0'} />
           <span>Click any project to upload its video demo or thumbnail</span>
         </div>
       </div>
 
-      {/* Category Filter Pills */}
-      <div style={{
-        display: 'flex',
-        gap: 10,
-        flexWrap: 'wrap',
-        marginBottom: 24
-      }}>
-        {categories.map((c) => {
-          const isActive = activeCategory === c.key;
-          return (
-            <button
-              key={c.key}
-              type="button"
-              onClick={() => setActiveCategory(c.key)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: 12,
-                fontSize: 13,
-                fontWeight: 750,
-                cursor: 'pointer',
-                border: isActive ? `1.5px solid ${c.color}` : '1.5px solid #E2E8F0',
-                background: isActive ? c.bg : '#FFFFFF',
-                color: isActive ? c.color : '#475569',
-                transition: 'all 0.15s ease',
-                boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.04)' : 'none'
-              }}
-            >
-              {c.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* SECTION 1: INDUSTRIAL EXPERIENCE PROJECTS */}
+      {activeSection === 'industrial' && (
+        <>
+          {/* Category Filter Pills */}
+          <div style={{
+            display: 'flex',
+            gap: 10,
+            flexWrap: 'wrap',
+            marginBottom: 24
+          }}>
+            {categories.map((c) => {
+              const isActive = activeCategory === c.key;
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => setActiveCategory(c.key)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 12,
+                    fontSize: 13,
+                    fontWeight: 750,
+                    cursor: 'pointer',
+                    border: isActive ? `1.5px solid ${c.color}` : '1.5px solid #E2E8F0',
+                    background: isActive ? c.bg : '#FFFFFF',
+                    color: isActive ? c.color : '#475569',
+                    transition: 'all 0.15s ease',
+                    boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.04)' : 'none'
+                  }}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
 
-      {/* Projects Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-        gap: 20
-      }}>
-        {filteredProjects.map((p, index) => {
-          const isPython = p.category === 'python';
-          const isML = p.category === 'ml';
-          const isSQL = p.category === 'sql';
-          const categoryColor = isPython ? '#2563EB' : isML ? '#7C3AED' : '#059669';
-          const categoryBg = isPython ? '#EFF6FF' : isML ? '#F5F3FF' : '#ECFDF5';
-          const categoryBorder = isPython ? '#BFDBFE' : isML ? '#DDD6FE' : '#A7F3D0';
+          {/* Industrial Projects Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+            gap: 20
+          }}>
+            {filteredIndustrial.map((p) => {
+              const isPython = p.category === 'python';
+              const isML = p.category === 'ml';
+              const categoryColor = isPython ? '#2563EB' : isML ? '#7C3AED' : '#059669';
+              const categoryBg = isPython ? '#EFF6FF' : isML ? '#F5F3FF' : '#ECFDF5';
+              const categoryBorder = isPython ? '#BFDBFE' : isML ? '#DDD6FE' : '#A7F3D0';
 
-          return (
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => handleOpenEdit(p, 'industrial')}
+                  style={{
+                    background: '#FFFFFF',
+                    borderRadius: 18,
+                    border: '1.5px solid #E2E8F0',
+                    borderLeft: `4px solid ${categoryColor}`,
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    position: 'relative'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.06)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)';
+                  }}
+                >
+                  <div>
+                    {/* Header: Title & Worth Badge */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                      <div>
+                        <span style={{
+                          fontSize: 10.5,
+                          fontWeight: 800,
+                          color: categoryColor,
+                          background: categoryBg,
+                          border: `1px solid ${categoryBorder}`,
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          textTransform: 'uppercase',
+                          display: 'inline-block',
+                          marginBottom: 6
+                        }}>
+                          {p.categoryLabel || 'Industrial Project'}
+                        </span>
+                        <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', margin: 0, lineHeight: 1.35 }}>
+                          {p.name}
+                        </h3>
+                      </div>
+                      <span style={{
+                        fontSize: 12,
+                        fontWeight: 800,
+                        color: '#059669',
+                        background: '#ECFDF5',
+                        border: '1px solid #A7F3D0',
+                        padding: '3px 10px',
+                        borderRadius: 8,
+                        whiteSpace: 'nowrap'
+                      }}>
+                        Worth {p.worth}
+                      </span>
+                    </div>
+
+                    {/* Tags */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '10px 0 14px' }}>
+                      {(p.tags || []).map((t, idx) => (
+                        <span key={idx} style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: '#475569',
+                          background: '#F1F5F9',
+                          padding: '2px 8px',
+                          borderRadius: 6
+                        }}>
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Deliverable Outcome */}
+                    <p style={{ fontSize: 12.5, color: '#64748B', lineHeight: 1.5, margin: '0 0 16px' }}>
+                      {p.outcome}
+                    </p>
+                  </div>
+
+                  {/* Media Status Pill Badges */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingTop: 14,
+                    borderTop: '1px solid #F1F5F9'
+                  }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        background: p.thumbnailUrl ? '#ECFDF5' : '#F1F5F9',
+                        color: p.thumbnailUrl ? '#059669' : '#94A3B8'
+                      }}>
+                        <ImageIcon size={12} />
+                        {p.thumbnailUrl ? 'Image Added' : 'No Image'}
+                      </span>
+
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        background: p.videoUrl ? '#EFF6FF' : '#F1F5F9',
+                        color: p.videoUrl ? '#2563EB' : '#94A3B8'
+                      }}>
+                        <Video size={12} />
+                        {p.videoUrl ? 'Video Ready' : 'No Video'}
+                      </span>
+                    </div>
+
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#6C3CF0',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}>
+                      Edit / Upload <Pencil size={12} />
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* SECTION 2: INDUSTRY-LEVEL & PORTFOLIO PROJECTS */}
+      {activeSection === 'portfolio' && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+          gap: 20
+        }}>
+          {portfolioProjects.map((proj, idx) => (
             <div
-              key={p.id}
-              onClick={() => handleOpenEdit(p)}
+              key={proj.id}
+              onClick={() => handleOpenEdit(proj, 'portfolio')}
               style={{
                 background: '#FFFFFF',
                 borderRadius: 18,
                 border: '1.5px solid #E2E8F0',
-                borderLeft: `4px solid ${categoryColor}`,
+                borderLeft: '4px solid #D97706',
                 padding: '20px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -483,379 +790,223 @@ const IndustrialProjectsManager = () => {
               }}
             >
               <div>
-                {/* Header: Title & Worth Badge */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
-                  <div>
-                    <span style={{
-                      fontSize: 10.5,
-                      fontWeight: 800,
-                      color: categoryColor,
-                      background: categoryBg,
-                      border: `1px solid ${categoryBorder}`,
-                      padding: '2px 8px',
-                      borderRadius: 6,
-                      textTransform: 'uppercase',
-                      display: 'inline-block',
-                      marginBottom: 6
-                    }}>
-                      {p.categoryLabel || p.category}
-                    </span>
-                    <h3 style={{
-                      fontSize: 15.5,
-                      fontWeight: 800,
-                      color: '#0F172A',
-                      margin: 0,
-                      lineHeight: 1.35
-                    }}>
-                      {p.name}
-                    </h3>
-                  </div>
-
+                {/* Header: Portfolio Badge & Worth */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                   <span style={{
                     fontSize: 11,
-                    fontWeight: 750,
-                    color: '#047857',
+                    fontWeight: 800,
+                    color: '#D97706',
+                    background: '#FEF3C7',
+                    border: '1px solid #FDE68A',
+                    padding: '3px 9px',
+                    borderRadius: 6
+                  }}>
+                    PORTFOLIO #{idx + 1}
+                  </span>
+                  <span style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: '#059669',
                     background: '#ECFDF5',
                     border: '1px solid #A7F3D0',
-                    padding: '3px 9px',
-                    borderRadius: 6,
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0
+                    padding: '3px 10px',
+                    borderRadius: 8
                   }}>
-                    Worth {p.worth}
+                    {proj.value || '₹12,000'}
                   </span>
                 </div>
 
-                {/* Media Preview Slot (Thumbnail / Video Indicator) */}
+                <h3 style={{ fontSize: 16.5, fontWeight: 800, color: '#0F172A', margin: '0 0 8px', lineHeight: 1.35 }}>
+                  {proj.name}
+                </h3>
+
+                {/* Tech Stack */}
                 <div style={{
-                  height: 145,
-                  borderRadius: 12,
-                  overflow: 'hidden',
-                  margin: '12px 0',
-                  position: 'relative',
-                  border: '1px solid #E2E8F0',
-                  background: p.thumbnailUrl ? '#0F172A' : categoryBg,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {p.thumbnailUrl ? (
-                    <img
-                      src={p.thumbnailUrl}
-                      alt={p.name}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover'
-                      }}
-                    />
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: '16px' }}>
-                      <div style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 12,
-                        background: '#FFFFFF',
-                        color: categoryColor,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '0 auto 8px',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
-                      }}>
-                        {p.videoUrl ? <Video size={22} /> : <ImageIcon size={22} />}
-                      </div>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: categoryColor, display: 'block' }}>
-                        {p.videoUrl ? 'Video Attached (Click to Watch)' : '+ Click to Upload Video / Image'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Play Overlay if video exists */}
-                  {p.videoUrl && (
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveVideoModal(p);
-                      }}
-                      title="Play Project Video Demo"
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: 'rgba(15, 23, 42, 0.45)',
-                        backdropFilter: 'blur(2px)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 6,
-                        color: '#FFFFFF',
-                        cursor: 'pointer',
-                        transition: 'background 0.2s ease'
-                      }}
-                      onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(15, 23, 42, 0.6)'; }}
-                      onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(15, 23, 42, 0.45)'; }}
-                    >
-                      <div style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: '50%',
-                        background: '#6C3CF0',
-                        color: '#FFFFFF',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 4px 14px rgba(108, 60, 240, 0.45)'
-                      }}>
-                        <Play size={20} fill="#FFFFFF" style={{ marginLeft: 3 }} />
-                      </div>
-                      <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: 0.3 }}>
-                        Watch Video Demo
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Status badges */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    display: 'flex',
-                    gap: 5
-                  }}>
-                    {p.videoUrl && (
-                      <span style={{
-                        background: 'rgba(15, 23, 42, 0.85)',
-                        color: '#FFFFFF',
-                        fontSize: 10,
-                        fontWeight: 800,
-                        padding: '2px 7px',
-                        borderRadius: 6,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4
-                      }}>
-                        <Video size={11} color="#A78BFA" /> Video Ready
-                      </span>
-                    )}
-                    {p.thumbnailUrl && (
-                      <span style={{
-                        background: 'rgba(15, 23, 42, 0.85)',
-                        color: '#FFFFFF',
-                        fontSize: 10,
-                        fontWeight: 800,
-                        padding: '2px 7px',
-                        borderRadius: 6,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4
-                      }}>
-                        <ImageIcon size={11} color="#60A5FA" /> Image
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Tech Tags */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
-                  {(p.tags || []).map((tag, tIdx) => (
-                    <span
-                      key={tIdx}
-                      style={{
-                        fontSize: 10.5,
-                        fontWeight: 600,
-                        color: '#334155',
-                        background: '#F1F5F9',
-                        padding: '3px 8px',
-                        borderRadius: 6
-                      }}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Description */}
-                <p style={{
-                  fontSize: 12.5,
+                  fontSize: 12,
                   color: '#475569',
-                  lineHeight: 1.45,
-                  margin: '0 0 16px 0',
-                  minHeight: 36
+                  marginBottom: 10,
+                  background: '#F8FAFC',
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  border: '1px solid #E2E8F0'
                 }}>
-                  {p.outcome}
+                  <strong style={{ color: '#0F172A' }}>Tech Stack: </strong>
+                  {proj.tech}
+                </div>
+
+                {/* Outcome */}
+                <p style={{ fontSize: 12.5, color: '#64748B', lineHeight: 1.5, margin: '0 0 16px' }}>
+                  {proj.outcome}
                 </p>
               </div>
 
-              {/* Action Button */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenEdit(p);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '9px 14px',
-                  borderRadius: 10,
-                  border: '1.5px solid #E2E8F0',
-                  background: '#F8FAFC',
-                  color: '#0F172A',
-                  fontSize: 12.5,
-                  fontWeight: 750,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 7,
-                  transition: 'all 0.15s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = '#F5F3FF';
-                  e.currentTarget.style.borderColor = '#DDD6FE';
-                  e.currentTarget.style.color = '#6C3CF0';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = '#F8FAFC';
-                  e.currentTarget.style.borderColor = '#E2E8F0';
-                  e.currentTarget.style.color = '#0F172A';
-                }}
-              >
-                <Pencil size={13} /> Upload Video / Image & Edit
-              </button>
-            </div>
-          );
-        })}
-      </div>
+              {/* Media Status Pill Badges */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingTop: 14,
+                borderTop: '1px solid #F1F5F9'
+              }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    background: proj.thumbnailUrl ? '#ECFDF5' : '#F1F5F9',
+                    color: proj.thumbnailUrl ? '#059669' : '#94A3B8'
+                  }}>
+                    <ImageIcon size={12} />
+                    {proj.thumbnailUrl ? 'Image Added' : 'No Image'}
+                  </span>
 
-      {/* ── UPLOAD VIDEO & THUMBNAIL MODAL ── */}
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    background: proj.videoUrl ? '#EFF6FF' : '#F1F5F9',
+                    color: proj.videoUrl ? '#2563EB' : '#94A3B8'
+                  }}>
+                    <Video size={12} />
+                    {proj.videoUrl ? 'Video Ready' : 'No Video'}
+                  </span>
+                </div>
+
+                <span style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#D97706',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4
+                }}>
+                  Edit / Upload <Pencil size={12} />
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* EDIT / UPLOAD MODAL */}
       {editingProject && (
         <div style={{
           position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(15, 23, 42, 0.65)',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
           backdropFilter: 'blur(6px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 9999,
-          padding: 20
+          padding: 16
         }}>
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: 20,
-            maxWidth: 580,
-            width: '100%',
-            padding: '28px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            border: '1px solid #E2E8F0',
-            maxHeight: '90vh',
-            overflowY: 'auto'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 12,
-                  background: '#F5F3FF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6C3CF0',
-                  border: '1px solid #DDD6FE'
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 20,
+              maxWidth: 680,
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1.5px solid #E2E8F0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              position: 'sticky',
+              top: 0,
+              background: '#FFFFFF',
+              zIndex: 10
+            }}>
+              <div>
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: editingType === 'portfolio' ? '#D97706' : '#6C3CF0',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.4px'
                 }}>
-                  <Video size={22} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0F172A' }}>
-                    Upload Media & Edit Project
-                  </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: 12.5, color: '#64748B' }}>
-                    {editingProject.categoryLabel} &bull; {editingProject.id}
-                  </p>
-                </div>
+                  {editingType === 'portfolio' ? 'Industry-Level & Portfolio Project' : 'Industrial Capstone'}
+                </span>
+                <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', margin: '2px 0 0 0' }}>
+                  Manage Project Media & Info
+                </h2>
               </div>
-
               <button
                 type="button"
                 onClick={() => setEditingProject(null)}
                 style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  border: '1px solid #E2E8F0',
-                  background: '#F8FAFC',
-                  color: '#64748B',
+                  width: 34,
+                  height: 34,
+                  borderRadius: '50%',
+                  background: '#F1F5F9',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  color: '#64748B'
                 }}
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
-            {errorMessage && (
-              <div style={{
-                background: '#FEF2F2',
-                border: '1px solid #FCA5A5',
-                color: '#991B1B',
-                padding: '10px 14px',
-                borderRadius: 10,
-                fontSize: 12.5,
-                fontWeight: 600,
-                marginBottom: 16
-              }}>
-                {errorMessage}
-              </div>
-            )}
+            {/* Modal Body / Form */}
+            <form onSubmit={handleSaveProject} style={{ padding: '24px' }}>
+              {errorMessage && (
+                <div style={{
+                  background: '#FEF2F2',
+                  border: '1px solid #FCA5A5',
+                  color: '#B91C1C',
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  fontSize: 13,
+                  marginBottom: 18,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}>
+                  <AlertCircle size={16} />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
 
-            <form onSubmit={handleSaveProject}>
-              {/* Project Title */}
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                  Project Title *
-                </label>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: 10,
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: '#0F172A',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              {/* Worth & Category */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 }}>
+              {/* Title & Worth */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 14, marginBottom: 18 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                    Worth Label
+                  <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
+                    Project Title *
                   </label>
                   <input
                     type="text"
-                    value={formWorth}
-                    onChange={(e) => setFormWorth(e.target.value)}
-                    placeholder="e.g. ₹12,500"
+                    required
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
                     style={{
                       width: '100%',
                       padding: '10px 14px',
                       borderRadius: 10,
                       border: '1.5px solid #CBD5E1',
-                      fontSize: 13,
+                      fontSize: 13.5,
                       fontWeight: 600,
                       color: '#0F172A',
                       boxSizing: 'border-box'
@@ -864,98 +1015,126 @@ const IndustrialProjectsManager = () => {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                    Category
+                  <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
+                    Market Worth *
                   </label>
                   <input
                     type="text"
-                    disabled
-                    value={editingProject.categoryLabel || editingProject.category}
+                    required
+                    placeholder="e.g. ₹12,000"
+                    value={formWorth}
+                    onChange={(e) => setFormWorth(e.target.value)}
                     style={{
                       width: '100%',
                       padding: '10px 14px',
                       borderRadius: 10,
-                      border: '1.5px solid #E2E8F0',
-                      background: '#F1F5F9',
-                      fontSize: 13,
+                      border: '1.5px solid #CBD5E1',
+                      fontSize: 13.5,
                       fontWeight: 700,
-                      color: '#64748B',
+                      color: '#059669',
                       boxSizing: 'border-box'
                     }}
                   />
                 </div>
               </div>
 
-              {/* ── THUMBNAIL IMAGE SECTION ── */}
+              {/* Tech Stack / Tags */}
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
+                  {editingType === 'portfolio' ? 'Tech Stack (comma separated) *' : 'Tags / Architecture (comma separated) *'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Python, Pandas, XGBoost, Scikit-Learn"
+                  value={formTags}
+                  onChange={(e) => setFormTags(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: 10,
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: 13,
+                    color: '#0F172A',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Deliverable Outcome */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
+                  Industry Deliverable & Real-World Outcome *
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={formOutcome}
+                  onChange={(e) => setFormOutcome(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: 10,
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: 13,
+                    color: '#0F172A',
+                    lineHeight: 1.5,
+                    resize: 'vertical',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* ───────────────────────────────────────────────────────── */}
+              {/* MEDIA SECTION: THUMBNAIL UPLOAD */}
+              {/* ───────────────────────────────────────────────────────── */}
               <div style={{
                 background: '#F8FAFC',
                 border: '1.5px solid #E2E8F0',
                 borderRadius: 14,
-                padding: '16px',
+                padding: '16px 18px',
                 marginBottom: 18
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <label style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <ImageIcon size={15} color="#2563EB" /> Project Thumbnail Image
+                  <label style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+                    <ImageIcon size={16} color="#6C3CF0" />
+                    <span>Project Thumbnail Image</span>
                   </label>
                   {formThumbnailUrl && (
                     <button
                       type="button"
                       onClick={() => setFormThumbnailUrl('')}
                       style={{
-                        background: 'none',
+                        background: 'transparent',
                         border: 'none',
-                        color: '#DC2626',
-                        fontSize: 11.5,
+                        color: '#EF4444',
+                        fontSize: 12,
                         fontWeight: 700,
-                        cursor: 'pointer',
-                        padding: 0
+                        cursor: 'pointer'
                       }}
                     >
-                      Remove Image
+                      Remove
                     </button>
                   )}
                 </div>
 
-                {/* Thumbnail Preview if present */}
-                {formThumbnailUrl && (
-                  <div style={{
-                    width: '100%',
-                    height: 140,
-                    borderRadius: 10,
-                    overflow: 'hidden',
-                    marginBottom: 10,
-                    border: '1px solid #CBD5E1',
-                    position: 'relative'
-                  }}>
-                    <img
-                      src={formThumbnailUrl}
-                      alt="Thumbnail Preview"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  </div>
-                )}
-
-                {/* Upload or URL */}
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Upload File Button + URL Input */}
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
                   <label style={{
-                    flex: '1 1 180px',
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    padding: '9px 14px',
-                    borderRadius: 10,
+                    gap: 6,
+                    padding: '8px 14px',
+                    borderRadius: 8,
                     background: '#FFFFFF',
-                    border: '1.5px dashed #CBD5E1',
+                    border: '1.5px solid #CBD5E1',
                     fontSize: 12.5,
                     fontWeight: 700,
-                    color: '#2563EB',
-                    cursor: isUploadingImage ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.15s ease'
+                    color: '#334155',
+                    cursor: isUploadingImage ? 'wait' : 'pointer'
                   }}>
                     <Upload size={14} />
-                    <span>{isUploadingImage ? 'Uploading Image...' : 'Upload Image File'}</span>
+                    <span>{isUploadingImage ? 'Uploading Image...' : 'Choose Image File'}</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -965,105 +1144,99 @@ const IndustrialProjectsManager = () => {
                     />
                   </label>
 
-                  <span style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600 }}>OR URL:</span>
+                  <span style={{ fontSize: 12, color: '#94A3B8' }}>or paste URL:</span>
 
                   <input
                     type="url"
-                    placeholder="https://..."
+                    placeholder="https://.../thumbnail.png"
                     value={formThumbnailUrl}
                     onChange={(e) => setFormThumbnailUrl(e.target.value)}
                     style={{
-                      flex: '2 1 200px',
+                      flex: 1,
+                      minWidth: 200,
                       padding: '8px 12px',
-                      borderRadius: 10,
-                      border: '1px solid #CBD5E1',
+                      borderRadius: 8,
+                      border: '1.5px solid #CBD5E1',
                       fontSize: 12.5,
-                      background: '#FFFFFF'
+                      color: '#0F172A',
+                      boxSizing: 'border-box'
                     }}
                   />
                 </div>
+
+                {/* Thumbnail Preview */}
+                {formThumbnailUrl && (
+                  <div style={{
+                    marginTop: 10,
+                    borderRadius: 10,
+                    overflow: 'hidden',
+                    border: '1px solid #E2E8F0',
+                    maxHeight: 140,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#0F172A'
+                  }}>
+                    <img
+                      src={formThumbnailUrl}
+                      alt="Thumbnail Preview"
+                      style={{ maxWidth: '100%', maxHeight: 140, objectFit: 'cover' }}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* ── PROJECT VIDEO SECTION ── */}
+              {/* ───────────────────────────────────────────────────────── */}
+              {/* MEDIA SECTION: DEMO VIDEO UPLOAD */}
+              {/* ───────────────────────────────────────────────────────── */}
               <div style={{
                 background: '#F8FAFC',
                 border: '1.5px solid #E2E8F0',
                 borderRadius: 14,
-                padding: '16px',
-                marginBottom: 18
+                padding: '16px 18px',
+                marginBottom: 24
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <label style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Video size={15} color="#7C3AED" /> Project Walkthrough Video
+                  <label style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+                    <Video size={16} color="#2563EB" />
+                    <span>Project Demo Video</span>
                   </label>
                   {formVideoUrl && (
                     <button
                       type="button"
                       onClick={() => setFormVideoUrl('')}
                       style={{
-                        background: 'none',
+                        background: 'transparent',
                         border: 'none',
-                        color: '#DC2626',
-                        fontSize: 11.5,
+                        color: '#EF4444',
+                        fontSize: 12,
                         fontWeight: 700,
-                        cursor: 'pointer',
-                        padding: 0
+                        cursor: 'pointer'
                       }}
                     >
-                      Remove Video
+                      Remove
                     </button>
                   )}
                 </div>
 
-                {/* Video Preview Player if present */}
-                {formVideoUrl && (
-                  <div style={{
-                    width: '100%',
-                    borderRadius: 10,
-                    overflow: 'hidden',
-                    marginBottom: 10,
-                    border: '1px solid #CBD5E1',
-                    background: '#000000',
-                    aspectRatio: '16/9'
-                  }}>
-                    {isEmbeddableVideo(formVideoUrl) ? (
-                      <iframe
-                        src={getEmbedVideoUrl(formVideoUrl)}
-                        title="Video Preview"
-                        style={{ width: '100%', height: '100%', border: 'none' }}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    ) : (
-                      <video
-                        src={formVideoUrl}
-                        controls
-                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {/* Upload or URL */}
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Upload File Button + URL Input */}
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
                   <label style={{
-                    flex: '1 1 180px',
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    padding: '9px 14px',
-                    borderRadius: 10,
+                    gap: 6,
+                    padding: '8px 14px',
+                    borderRadius: 8,
                     background: '#FFFFFF',
-                    border: '1.5px dashed #CBD5E1',
+                    border: '1.5px solid #CBD5E1',
                     fontSize: 12.5,
                     fontWeight: 700,
-                    color: '#7C3AED',
-                    cursor: isUploadingVideo ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.15s ease'
+                    color: '#334155',
+                    cursor: isUploadingVideo ? 'wait' : 'pointer'
                   }}>
                     <Upload size={14} />
-                    <span>{isUploadingVideo ? 'Uploading Video...' : 'Upload Video File (MP4)'}</span>
+                    <span>{isUploadingVideo ? 'Uploading Video...' : 'Upload Video File (MP4/WebM)'}</span>
                     <input
                       type="file"
                       accept="video/*"
@@ -1073,83 +1246,70 @@ const IndustrialProjectsManager = () => {
                     />
                   </label>
 
-                  <span style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600 }}>OR URL:</span>
+                  <span style={{ fontSize: 12, color: '#94A3B8' }}>or paste URL:</span>
 
                   <input
                     type="url"
-                    placeholder="YouTube link, Vimeo, or direct MP4 URL"
+                    placeholder="YouTube URL, Vimeo, or MP4 link"
                     value={formVideoUrl}
                     onChange={(e) => setFormVideoUrl(e.target.value)}
                     style={{
-                      flex: '2 1 200px',
+                      flex: 1,
+                      minWidth: 200,
                       padding: '8px 12px',
-                      borderRadius: 10,
-                      border: '1px solid #CBD5E1',
+                      borderRadius: 8,
+                      border: '1.5px solid #CBD5E1',
                       fontSize: 12.5,
-                      background: '#FFFFFF'
+                      color: '#0F172A',
+                      boxSizing: 'border-box'
                     }}
                   />
                 </div>
-              </div>
 
-              {/* Tech Tags */}
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                  Technical Tags (comma-separated)
-                </label>
-                <input
-                  type="text"
-                  value={formTags}
-                  onChange={(e) => setFormTags(e.target.value)}
-                  placeholder="e.g. Python, FastApi, PostgreSQL"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
+                {/* Video In-Modal Preview Player */}
+                {formVideoUrl && (
+                  <div style={{
+                    marginTop: 10,
                     borderRadius: 10,
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: 13,
-                    boxSizing: 'border-box'
-                  }}
-                />
+                    overflow: 'hidden',
+                    border: '1px solid #E2E8F0',
+                    background: '#0F172A',
+                    position: 'relative',
+                    paddingBottom: '56.25%',
+                    height: 0
+                  }}>
+                    {isEmbeddableVideo(formVideoUrl) ? (
+                      <iframe
+                        src={getEmbedVideoUrl(formVideoUrl)}
+                        title="Demo Video Preview"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                      />
+                    ) : (
+                      <video
+                        src={formVideoUrl}
+                        controls
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Outcome / Description */}
-              <div style={{ marginBottom: 22 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                  Project Outcome / Summary Highlights
-                </label>
-                <textarea
-                  rows={3}
-                  value={formOutcome}
-                  onChange={(e) => setFormOutcome(e.target.value)}
-                  placeholder="Key real-world deliverables, engineering architecture, and metrics..."
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: 10,
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: 13,
-                    outline: 'none',
-                    resize: 'vertical',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                 <button
                   type="button"
                   onClick={() => setEditingProject(null)}
-                  disabled={isSaving}
                   style={{
                     padding: '10px 18px',
-                    borderRadius: 12,
-                    border: '1.5px solid #E2E8F0',
+                    borderRadius: 10,
+                    border: '1.5px solid #CBD5E1',
                     background: '#FFFFFF',
-                    color: '#475569',
+                    fontSize: 13.5,
                     fontWeight: 700,
-                    fontSize: 13,
+                    color: '#475569',
                     cursor: 'pointer'
                   }}
                 >
@@ -1157,117 +1317,25 @@ const IndustrialProjectsManager = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSaving}
+                  disabled={isSaving || isUploadingImage || isUploadingVideo}
                   style={{
-                    padding: '10px 22px',
-                    borderRadius: 12,
+                    padding: '10px 24px',
+                    borderRadius: 10,
                     border: 'none',
-                    background: '#6C3CF0',
+                    background: editingType === 'portfolio' ? '#D97706' : '#6C3CF0',
                     color: '#FFFFFF',
-                    fontWeight: 750,
-                    fontSize: 13,
-                    cursor: isSaving ? 'not-allowed' : 'pointer',
-                    opacity: isSaving ? 0.7 : 1,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    boxShadow: '0 4px 14px rgba(108, 60, 240, 0.35)'
+                    fontSize: 13.5,
+                    fontWeight: 800,
+                    cursor: isSaving ? 'wait' : 'pointer',
+                    boxShadow: editingType === 'portfolio'
+                      ? '0 4px 14px rgba(217, 119, 6, 0.35)'
+                      : '0 4px 14px rgba(108, 60, 240, 0.35)'
                   }}
                 >
-                  {isSaving ? (
-                    <>
-                      <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving Project...
-                    </>
-                  ) : (
-                    'Save Project Media & Details'
-                  )}
+                  {isSaving ? 'Saving Changes...' : 'Save Changes'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── VIDEO PLAYER MODAL ── */}
-      {activeVideoModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(15, 23, 42, 0.85)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000,
-          padding: 20
-        }}>
-          <div style={{
-            background: '#0F172A',
-            borderRadius: 20,
-            maxWidth: 820,
-            width: '100%',
-            overflow: 'hidden',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-            border: '1px solid #334155'
-          }}>
-            <div style={{
-              padding: '16px 20px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              borderBottom: '1px solid #1E293B',
-              color: '#FFFFFF'
-            }}>
-              <div>
-                <span style={{ fontSize: 11, fontWeight: 800, color: '#A78BFA', textTransform: 'uppercase' }}>
-                  {activeVideoModal.categoryLabel} &bull; Video Demo
-                </span>
-                <h3 style={{ margin: '2px 0 0 0', fontSize: 16, fontWeight: 800, color: '#FFFFFF' }}>
-                  {activeVideoModal.name}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveVideoModal(null)}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  border: '1px solid #334155',
-                  background: '#1E293B',
-                  color: '#94A3B8',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Video Player */}
-            <div style={{ width: '100%', aspectRatio: '16/9', background: '#000000' }}>
-              {isEmbeddableVideo(activeVideoModal.videoUrl) ? (
-                <iframe
-                  src={getEmbedVideoUrl(activeVideoModal.videoUrl)}
-                  title={activeVideoModal.name}
-                  style={{ width: '100%', height: '100%', border: 'none' }}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              ) : (
-                <video
-                  src={activeVideoModal.videoUrl}
-                  controls
-                  autoPlay
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                />
-              )}
-            </div>
           </div>
         </div>
       )}

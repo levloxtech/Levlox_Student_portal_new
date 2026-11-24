@@ -67,7 +67,6 @@ import {
 import SecureVideoPlayer from '../components/SecureVideoPlayer';
 import AcademiaCourseViewer from '../components/AcademiaCourseViewer';
 import TrainerAssignmentsView from '../components/TrainerAssignmentsView';
-import BatchChatPage from './BatchChatPage';
 import { uploadUniversalFile, getDownloadUrl } from '../services/apiService';
 import { getGoogleDriveFileId, getYouTubeVideoId, getResolvedThumbnail, parseDurationToSeconds, formatSecondsToDisplay } from '../utils/videoUtils';
 import { addDaysToDate, getDaysBetween, formatReadableDate, formatLocalDate } from '../utils/batchUtils';
@@ -1598,11 +1597,6 @@ const TrainerDashboard = () => {
           <button className={`sidebar-link ${activeTab === 'announcements' ? 'active' : ''}`} onClick={() => handleTabChange('announcements')}>
             <Megaphone size={18} />
             <span className="sidebar-link-text">Announcements</span>
-          </button>
-
-          <button className={`sidebar-link ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => handleTabChange('chat')}>
-            <MessageSquare size={18} />
-            <span className="sidebar-link-text">Batch Chat</span>
           </button>
 
           <button className={`sidebar-link ${activeTab === 'activity-scores' ? 'active' : ''}`} onClick={() => handleTabChange('activity-scores')}>
@@ -3407,13 +3401,6 @@ const TrainerDashboard = () => {
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {/* ─── TAB 10: BATCH CHAT ───────────────────────────────────────────── */}
-        {activeTab === 'chat' && (
-          <div className="animate-fade-in" style={{ height: 'calc(100vh - 120px)', maxHeight: 'calc(100vh - 120px)', overflow: 'hidden' }}>
-            <BatchChatPage user={currentUser} userProfile={userProfile} batches={batches} />
           </div>
         )}
 
