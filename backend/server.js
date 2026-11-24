@@ -197,6 +197,7 @@ async function requireAuth(req, res, next) {
     const session = localDb.verifySession(idToken);
     if (session) {
       req.user = { uid: session.userId, id: session.userId, email: session.email, role: session.role };
+      trackActiveUser(req.user);
       return next();
     }
   }
@@ -239,6 +240,103 @@ function requireAdminOrTrainer(req, res, next) {
   if (!['admin', 'trainer'].includes(req.user?.role)) return res.status(403).json({ error: 'Access denied.' });
   next();
 }
+
+// ── In-Memory Active Users Heartbeat Tracker ─────────────────────────────────
+const activeOnlineUsers = new Map();
+
+function trackActiveUser(user) {
+  if (!user || (!user.id && !user.uid && !user.email)) return;
+  const key = String(user.id || user.uid || user.email).toLowerCase();
+  const existing = activeOnlineUsers.get(key) || {};
+  const email = (user.email || existing.email || '').toLowerCase().trim();
+
+  let name = existing.name;
+  let batch = existing.batch;
+  let course = existing.course;
+
+  if (!name || !batch) {
+    const userDoc = localDb.getDocument('users', user.id || user.uid);
+    const studentDoc = localDb.getDocument('students', user.id || user.uid);
+    const trainerDoc = localDb.getDocument('trainers', user.id || user.uid);
+    name = studentDoc?.name || trainerDoc?.name || userDoc?.name || user.name || (email ? email.split('@')[0] : 'Portal User');
+    batch = studentDoc?.batch_name || studentDoc?.batch || userDoc?.batch || '';
+    course = studentDoc?.course_name || studentDoc?.course || userDoc?.course || '';
+  }
+
+  activeOnlineUsers.set(key, {
+    id: user.id || user.uid,
+    email,
+    name,
+    role: user.role || existing.role || 'student',
+    batch,
+    course,
+    lastActive: Date.now(),
+    lastActiveIso: new Date().toISOString()
+  });
+}
+
+// GET /api/admin/active-users - Real-time active users and live count for Admin
+app.get('/api/admin/active-users', requireAuth, requireAdminOrTrainer, (req, res) => {
+  const now = Date.now();
+  const recentThreshold = now - (15 * 60 * 1000); // 15 mins for active
+  const onlineThreshold = now - (3 * 60 * 1000); // 3 mins for "Online Now"
+
+  const sessions = localDb.loadCollection('sessions') || [];
+  const users = localDb.loadCollection('users') || [];
+  const students = localDb.loadCollection('students') || [];
+  const trainers = localDb.loadCollection('trainers') || [];
+
+  const userMap = new Map();
+
+  // 1. Gather all active memory heartbeats
+  for (const [key, info] of activeOnlineUsers.entries()) {
+    if (info.lastActive >= recentThreshold) {
+      userMap.set(info.email || key, {
+        ...info,
+        isOnline: (now - info.lastActive) <= onlineThreshold
+      });
+    }
+  }
+
+  // 2. Cross-reference unexpired persistent sessions
+  sessions.forEach(s => {
+    if (s.expiresAt > now && s.email) {
+      const emailLower = s.email.toLowerCase();
+      if (!userMap.has(emailLower)) {
+        const u = users.find(x => x.email?.toLowerCase() === emailLower || String(x.id) === String(s.userId));
+        const st = students.find(x => x.email?.toLowerCase() === emailLower || String(x.id) === String(s.userId));
+        const tr = trainers.find(x => x.email?.toLowerCase() === emailLower || String(x.id) === String(s.userId));
+        const lastAct = s.lastActive || s.createdAt || now;
+        userMap.set(emailLower, {
+          id: s.userId || s.token,
+          email: s.email,
+          name: st?.name || tr?.name || u?.name || s.name || s.email.split('@')[0],
+          role: s.role || u?.role || 'student',
+          batch: st?.batch_name || st?.batch || u?.batch || 'Portal Students',
+          course: st?.course_name || st?.course || u?.course || 'Levlox Academy',
+          lastActive: lastAct,
+          lastActiveIso: new Date(lastAct).toISOString(),
+          isOnline: (now - lastAct) <= onlineThreshold
+        });
+      }
+    }
+  });
+
+  const list = Array.from(userMap.values());
+  // Sort: online users first, then by lastActive descending
+  list.sort((a, b) => {
+    if (a.isOnline && !b.isOnline) return -1;
+    if (!a.isOnline && b.isOnline) return 1;
+    return b.lastActive - a.lastActive;
+  });
+
+  res.json({
+    success: true,
+    count: list.length,
+    onlineCount: list.filter(u => u.isOnline).length,
+    activeUsers: list
+  });
+});
 
 // ── Health Check ────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {

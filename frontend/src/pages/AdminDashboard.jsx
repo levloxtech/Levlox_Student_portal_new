@@ -412,6 +412,23 @@ const AdminDashboard = () => {
     refetchOnWindowFocus: true,
   });
 
+  // Live Active Users Polling for Admin Dashboard
+  const { data: activeUsersData, refetch: refetchActiveUsers } = useQuery({
+    queryKey: ['adminActiveUsers'],
+    queryFn: async () => {
+      const token = localStorage.getItem('levlox_auth_token');
+      const res = await fetch('/api/admin/active-users', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+      return { success: true, count: 0, onlineCount: 0, activeUsers: [] };
+    },
+    refetchInterval: 5000,
+    staleTime: 3000
+  });
+
   // Automatically refresh all admin data whenever navigating between tabs/pages
   useEffect(() => {
     refetchAdminData();
@@ -4710,6 +4727,27 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
+              {/* Card 3: Active Users (Live in Portal) */}
+              <div className="stat-card-premium" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px', borderRadius: '12px', border: '1.5px solid rgba(16, 185, 129, 0.35)', background: 'linear-gradient(145deg, #FFFFFF 0%, #F0FDF4 100%)' }}>
+                <div className="stat-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span className="stat-card-label" style={{ fontSize: '11px', color: '#047857', fontWeight: '700', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981', display: 'inline-block', boxShadow: '0 0 8px #10B981' }} />
+                    Active Users
+                  </span>
+                  <div className="stat-card-icon" style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#10B981', padding: '6px', borderRadius: '6px' }}>
+                    <Users size={16} />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="stat-card-value" style={{ fontSize: '24px', fontWeight: '800', margin: '4px 0', color: '#065F46' }}>
+                    {activeUsersData?.count ?? 0}
+                  </h3>
+                  <span className="stat-card-footer" style={{ fontSize: '11px', color: '#059669', fontWeight: 600 }}>
+                    {activeUsersData?.onlineCount ?? 0} Active In Portal
+                  </span>
+                </div>
+              </div>
+
               {/* Card 3: Fees Collected */}
               <div className="stat-card-premium" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px', borderRadius: '12px' }}>
                 <div className="stat-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -4747,6 +4785,126 @@ const AdminDashboard = () => {
 
               {/* Left Column */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                {/* Section 0: Active Users (Live Active Users & Email IDs) */}
+                <div className="dashboard-card-section" style={{ display: 'flex', flexDirection: 'column', border: '1.5px solid rgba(16, 185, 129, 0.35)', background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAF9 100%)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                    <h3 className="section-title-premium" style={{ margin: 0, fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: '#065F46' }}>
+                      <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#10B981', display: 'inline-block', boxShadow: '0 0 10px #10B981' }} />
+                      Active Users ({activeUsersData?.count ?? 0} Total Active • {activeUsersData?.onlineCount ?? 0} Online Now)
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => refetchActiveUsers()}
+                      style={{
+                        background: '#FFFFFF',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '6px',
+                        padding: '4px 10px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        color: '#475569',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <RefreshCw size={12} /> Refresh
+                    </button>
+                  </div>
+                  <div className="table-container-premium" style={{ border: 'none', background: 'transparent' }}>
+                    <table className="table-premium" style={{ width: '100%' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <th style={{ padding: '8px', fontSize: '11px' }}>User Name</th>
+                          <th style={{ padding: '8px', fontSize: '11px' }}>Email ID</th>
+                          <th style={{ padding: '8px', fontSize: '11px' }}>Role / Batch</th>
+                          <th style={{ padding: '8px', fontSize: '11px' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activeUsersData?.activeUsers && activeUsersData.activeUsers.length > 0 ? (
+                          activeUsersData.activeUsers.map((u) => {
+                            const initials = u.name ? u.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U';
+                            return (
+                              <tr key={u.id || u.email} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                                <td style={{ padding: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{
+                                    position: 'relative',
+                                    width: '30px',
+                                    height: '30px',
+                                    borderRadius: '50%',
+                                    background: u.isOnline ? '#DCFCE7' : '#F1F5F9',
+                                    color: u.isOnline ? '#15803D' : '#64748B',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontWeight: 'bold',
+                                    fontSize: '11px',
+                                    flexShrink: 0
+                                  }}>
+                                    {initials}
+                                    {u.isOnline && (
+                                      <span style={{
+                                        position: 'absolute',
+                                        bottom: 0,
+                                        right: 0,
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: '50%',
+                                        background: '#10B981',
+                                        border: '1.5px solid #FFFFFF'
+                                      }} />
+                                    )}
+                                  </div>
+                                  <span style={{ fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)' }}>{u.name}</span>
+                                </td>
+                                <td style={{ padding: '8px', fontSize: '12.5px', color: '#2563EB', fontWeight: 600 }}>
+                                  <a href={`mailto:${u.email}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                                    {u.email}
+                                  </a>
+                                </td>
+                                <td style={{ padding: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                  <span style={{
+                                    background: u.role === 'admin' ? '#FEF3C7' : '#EFF6FF',
+                                    color: u.role === 'admin' ? '#B45309' : '#1D4ED8',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    marginRight: '6px'
+                                  }}>
+                                    {u.role === 'admin' ? 'Admin' : (u.role === 'trainer' ? 'Trainer' : 'Student')}
+                                  </span>
+                                  {u.batch && <span>{u.batch}</span>}
+                                </td>
+                                <td style={{ padding: '8px', fontSize: '12px' }}>
+                                  {u.isOnline ? (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#16A34A', fontWeight: 700, fontSize: '11.5px' }}>
+                                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#16A34A', boxShadow: '0 0 6px #16A34A' }} />
+                                      Online Now
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: 'var(--text-tertiary)', fontSize: '11.5px' }}>
+                                      Active Session
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan="4" style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                              No active user sessions found.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
                 {/* Section 1: Recent Student Registrations */}
                 <div className="dashboard-card-section" style={{ display: 'flex', flexDirection: 'column' }}>
