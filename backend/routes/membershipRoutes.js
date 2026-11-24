@@ -1297,8 +1297,8 @@ function extractYouTubeId(url) {
 function extractDriveId(url) {
   if (!url || typeof url !== 'string') return null;
   const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/i) ||
-                url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/i) ||
-                url.match(/\/file\/u\/\d+\/d\/([a-zA-Z0-9_-]{10,})/i);
+    url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/i) ||
+    url.match(/\/file\/u\/\d+\/d\/([a-zA-Z0-9_-]{10,})/i);
   return match ? match[1] : null;
 }
 

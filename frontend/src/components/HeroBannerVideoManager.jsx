@@ -25,6 +25,9 @@ const HeroBannerVideoManager = () => {
   const [formVideoUrl, setFormVideoUrl] = useState('');
   const [formEnabled, setFormEnabled] = useState(true);
 
+  const [showExternalThumbnail, setShowExternalThumbnail] = useState(false);
+  const [showExternalVideo, setShowExternalVideo] = useState(false);
+
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -348,23 +351,30 @@ const HeroBannerVideoManager = () => {
               background: '#F8FAFC',
               border: '1.5px solid #E2E8F0',
               borderRadius: 14,
-              padding: '16px 18px'
+              padding: '18px'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <label style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
-                  <ImageIcon size={16} color="#2563EB" />
-                  <span>Company Video Thumbnail Image</span>
-                </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div>
+                  <label style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+                    <ImageIcon size={16} color="#2563EB" />
+                    <span>Company Video Thumbnail</span>
+                  </label>
+                  <p style={{ margin: '3px 0 0', fontSize: 12, color: '#64748B' }}>
+                    Upload thumbnail directly to server for instant loading on the showcase.
+                  </p>
+                </div>
                 {formThumbnailUrl && (
                   <button
                     type="button"
                     onClick={() => setFormThumbnailUrl('')}
                     style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#EF4444',
-                      fontSize: 12,
+                      background: '#FEE2E2',
+                      border: '1px solid #FECACA',
+                      color: '#DC2626',
+                      fontSize: 11.5,
                       fontWeight: 700,
+                      padding: '4px 10px',
+                      borderRadius: 6,
                       cursor: 'pointer'
                     }}
                   >
@@ -373,22 +383,24 @@ const HeroBannerVideoManager = () => {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+              {/* Upload to Server button */}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
                 <label style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 6,
-                  padding: '8px 14px',
-                  borderRadius: 8,
-                  background: '#FFFFFF',
-                  border: '1.5px solid #CBD5E1',
-                  fontSize: 12.5,
+                  gap: 8,
+                  padding: '10px 18px',
+                  borderRadius: 10,
+                  background: isUploadingImage ? '#E2E8F0' : '#2563EB',
+                  border: 'none',
+                  fontSize: 13,
                   fontWeight: 700,
-                  color: '#334155',
-                  cursor: isUploadingImage ? 'wait' : 'pointer'
+                  color: '#FFFFFF',
+                  cursor: isUploadingImage ? 'wait' : 'pointer',
+                  boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)'
                 }}>
-                  <Upload size={14} />
-                  <span>{isUploadingImage ? 'Uploading Image...' : 'Upload Image File'}</span>
+                  <Upload size={15} />
+                  <span>{isUploadingImage ? 'Uploading Image to Server...' : 'Upload Thumbnail Image to Server'}</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -397,46 +409,84 @@ const HeroBannerVideoManager = () => {
                     style={{ display: 'none' }}
                   />
                 </label>
-
-                <span style={{ fontSize: 12, color: '#94A3B8' }}>or paste URL:</span>
-
-                <input
-                  type="url"
-                  placeholder="https://.../thumbnail.jpg"
-                  value={formThumbnailUrl}
-                  onChange={(e) => setFormThumbnailUrl(e.target.value)}
-                  style={{
-                    flex: 1,
-                    minWidth: 180,
-                    padding: '8px 12px',
-                    borderRadius: 8,
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: 12.5,
-                    color: '#0F172A',
-                    boxSizing: 'border-box'
-                  }}
-                />
               </div>
 
               {formThumbnailUrl && (
                 <div style={{
                   marginTop: 10,
-                  borderRadius: 8,
+                  borderRadius: 10,
                   overflow: 'hidden',
-                  border: '1px solid #E2E8F0',
-                  maxHeight: 120,
+                  border: '1.5px solid #CBD5E1',
+                  maxHeight: 140,
                   background: '#0F172A',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  position: 'relative'
                 }}>
                   <img
                     src={formThumbnailUrl}
                     alt="Thumbnail preview"
-                    style={{ maxHeight: 120, maxWidth: '100%', objectFit: 'cover' }}
+                    style={{ maxHeight: 140, maxWidth: '100%', objectFit: 'cover' }}
                   />
+                  <div style={{
+                    position: 'absolute',
+                    top: 8,
+                    left: 8,
+                    background: 'rgba(16, 185, 129, 0.9)',
+                    color: '#FFFFFF',
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}>
+                    <Check size={12} />
+                    <span>Thumbnail Ready</span>
+                  </div>
                 </div>
               )}
+
+              {/* Collapsible External Link Input */}
+              <div style={{ marginTop: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowExternalThumbnail(!showExternalThumbnail)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    color: '#64748B',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  {showExternalThumbnail ? '− Hide external image URL input' : '+ Or paste external image URL'}
+                </button>
+                {showExternalThumbnail && (
+                  <div style={{ marginTop: 8 }}>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/thumbnail.jpg"
+                      value={formThumbnailUrl}
+                      onChange={(e) => setFormThumbnailUrl(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        border: '1.5px solid #CBD5E1',
+                        fontSize: 12.5,
+                        color: '#0F172A',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* ───────────────────────────────────────────────────────── */}
@@ -446,47 +496,60 @@ const HeroBannerVideoManager = () => {
               background: '#F8FAFC',
               border: '1.5px solid #E2E8F0',
               borderRadius: 14,
-              padding: '16px 18px'
+              padding: '18px'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <label style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
-                  <Video size={16} color="#7C3AED" />
-                  <span>Company Video File or Link</span>
-                </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div>
+                  <label style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+                    <Video size={16} color="#7C3AED" />
+                    <span>Company Video File (Fast Server Upload)</span>
+                  </label>
+                  <p style={{ margin: '3px 0 0', fontSize: 12, color: '#64748B' }}>
+                    Uploads directly to our high-speed server. No YouTube or external link required!
+                  </p>
+                </div>
                 {formVideoUrl && (
                   <button
                     type="button"
                     onClick={() => setFormVideoUrl('')}
                     style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#EF4444',
-                      fontSize: 12,
+                      background: '#FEE2E2',
+                      border: '1px solid #FECACA',
+                      color: '#DC2626',
+                      fontSize: 11.5,
                       fontWeight: 700,
+                      padding: '4px 10px',
+                      borderRadius: 6,
                       cursor: 'pointer'
                     }}
                   >
-                    Remove
+                    Remove Video
                   </button>
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+              {/* Upload to Server button */}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
                 <label style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 6,
-                  padding: '8px 14px',
-                  borderRadius: 8,
-                  background: '#FFFFFF',
-                  border: '1.5px solid #CBD5E1',
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  color: '#334155',
-                  cursor: isUploadingVideo ? 'wait' : 'pointer'
+                  gap: 8,
+                  padding: '11px 22px',
+                  borderRadius: 10,
+                  background: isUploadingVideo ? '#E2E8F0' : 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                  border: 'none',
+                  fontSize: 13.5,
+                  fontWeight: 800,
+                  color: '#FFFFFF',
+                  cursor: isUploadingVideo ? 'wait' : 'pointer',
+                  boxShadow: '0 3px 12px rgba(124, 58, 237, 0.3)'
                 }}>
-                  <Upload size={14} />
-                  <span>{isUploadingVideo ? (uploadProgress > 0 ? `Uploading Video (${uploadProgress}%)...` : 'Uploading Video...') : 'Upload MP4/WebM Video'}</span>
+                  <Upload size={16} />
+                  <span>
+                    {isUploadingVideo
+                      ? (uploadProgress > 0 ? `Uploading to Server: ${uploadProgress}%` : 'Uploading to Server...')
+                      : 'Upload Video File to Server'}
+                  </span>
                   <input
                     type="file"
                     accept="video/*"
@@ -496,35 +559,59 @@ const HeroBannerVideoManager = () => {
                   />
                 </label>
 
-                <span style={{ fontSize: 12, color: '#94A3B8' }}>or paste URL:</span>
-
-                <input
-                  type="url"
-                  placeholder="YouTube, Vimeo, or direct MP4 link"
-                  value={formVideoUrl}
-                  onChange={(e) => setFormVideoUrl(e.target.value)}
-                  style={{
-                    flex: 1,
-                    minWidth: 180,
-                    padding: '8px 12px',
+                {formVideoUrl && !isUploadingVideo && (
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: '#ECFDF5',
+                    color: '#059669',
+                    border: '1px solid #A7F3D0',
+                    padding: '6px 12px',
                     borderRadius: 8,
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: 12.5,
-                    color: '#0F172A',
-                    boxSizing: 'border-box'
-                  }}
-                />
+                    fontSize: 12,
+                    fontWeight: 700
+                  }}>
+                    <Check size={14} />
+                    <span>Video Uploaded to Server (Ready)</span>
+                  </span>
+                )}
               </div>
 
+              {/* Upload Progress Bar */}
+              {isUploadingVideo && (
+                <div style={{ marginTop: 10, marginBottom: 12 }}>
+                  <div style={{
+                    width: '100%',
+                    height: 8,
+                    background: '#E2E8F0',
+                    borderRadius: 999,
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${uploadProgress}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #7C3AED 0%, #2563EB 100%)',
+                      transition: 'width 0.2s ease'
+                    }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: '#64748B', display: 'block', marginTop: 4 }}>
+                    Uploading video file in fast chunks... {uploadProgress}%
+                  </span>
+                </div>
+              )}
+
+              {/* Video Player Preview if URL exists */}
               {formVideoUrl && (
                 <div style={{
                   marginTop: 10,
-                  borderRadius: 8,
+                  borderRadius: 10,
                   overflow: 'hidden',
                   background: '#0F172A',
                   position: 'relative',
                   paddingBottom: '56.25%',
-                  height: 0
+                  height: 0,
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.2)'
                 }}>
                   {isEmbeddableVideo(formVideoUrl) ? (
                     <iframe
@@ -543,6 +630,45 @@ const HeroBannerVideoManager = () => {
                   )}
                 </div>
               )}
+
+              {/* Collapsible External Link Input */}
+              <div style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowExternalVideo(!showExternalVideo)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    color: '#64748B',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  {showExternalVideo ? '− Hide external video URL input' : '+ Or use YouTube / Vimeo link instead'}
+                </button>
+                {showExternalVideo && (
+                  <div style={{ marginTop: 8 }}>
+                    <input
+                      type="url"
+                      placeholder="YouTube, Vimeo, or external MP4 link"
+                      value={formVideoUrl}
+                      onChange={(e) => setFormVideoUrl(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        border: '1.5px solid #CBD5E1',
+                        fontSize: 12.5,
+                        color: '#0F172A',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Submit Button */}
@@ -612,18 +738,8 @@ const HeroBannerVideoManager = () => {
               <div style={{
                 position: 'absolute',
                 inset: 0,
-                background: 'radial-gradient(circle at 50% 30%, #1E293B 0%, #0B0F19 100%)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6
-              }}>
-                <Film size={34} color="rgba(255, 255, 255, 0.25)" />
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255, 255, 255, 0.45)' }}>
-                  Levlox Academy Overview
-                </span>
-              </div>
+                background: 'radial-gradient(circle at 50% 30%, #1E293B 0%, #0B0F19 100%)'
+              }} />
             )}
 
             {/* Dark Gradient Overlay for Contrast */}

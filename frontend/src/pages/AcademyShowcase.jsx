@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, ArrowRight, Star, Gift, Tag,
   Clock, Users, FileText, Briefcase, HelpCircle,
   ExternalLink, Layers, Check, Zap, PlayCircle, Lock, User, Play, Film, X, Maximize2, Laptop,
-  ChevronLeft, ChevronRight, Mail, ShieldCheck, AlertCircle, CheckCircle2, RefreshCw
+  ChevronLeft, ChevronRight, Mail, ShieldCheck, AlertCircle, CheckCircle2, RefreshCw, ArrowDown
 } from 'lucide-react';
 import leveloxLogo from '../assets/levelox-icon-transparent.png';
 import studentPortalImg from '../assets/student-portal-interface.png';
@@ -1257,29 +1257,8 @@ export default function AcademyShowcase() {
                       <div style={{
                         position: 'absolute',
                         inset: 0,
-                        background: 'radial-gradient(circle at 50% 35%, #1E293B 0%, #090D16 100%)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 10
-                      }}>
-                        <div style={{
-                          width: 64,
-                          height: 64,
-                          borderRadius: '50%',
-                          background: 'rgba(37, 99, 235, 0.12)',
-                          border: '1.5px solid rgba(59, 130, 246, 0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          <Film size={30} color="#60A5FA" />
-                        </div>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255, 255, 255, 0.65)' }}>
-                          Levlox Academy Overview
-                        </span>
-                      </div>
+                        background: 'radial-gradient(circle at 50% 35%, #1E293B 0%, #090D16 100%)'
+                      }} />
                     )}
 
                     {/* Gradient Overlay for Cinematic Legibility */}
@@ -1367,6 +1346,50 @@ export default function AcademyShowcase() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Explore the Program Button */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                marginTop: 28,
+                marginBottom: 4
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = document.getElementById('courses') || document.getElementById('pricing');
+                    if (target) {
+                      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '13px 34px',
+                    borderRadius: 999,
+                    background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                    color: '#FFFFFF',
+                    fontSize: 15,
+                    fontWeight: 800,
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 10px 25px -4px rgba(37, 99, 235, 0.45), 0 4px 12px rgba(0, 0, 0, 0.08)',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 14px 30px -4px rgba(37, 99, 235, 0.55), 0 6px 16px rgba(0, 0, 0, 0.12)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 10px 25px -4px rgba(37, 99, 235, 0.45), 0 4px 12px rgba(0, 0, 0, 0.08)';
+                  }}
+                >
+                  <span>Explore the Program</span>
+                  <ArrowDown size={18} strokeWidth={2.6} />
+                </button>
               </div>
             </div>
           )}

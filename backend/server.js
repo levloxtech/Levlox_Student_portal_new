@@ -363,62 +363,31 @@ app.get('/api/admin/active-users', (req, res) => {
   }
 
   const now = Date.now();
-  const recentThreshold = now - (15 * 60 * 1000); // 15 mins for active
-  const onlineThreshold = now - (3 * 60 * 1000); // 3 mins for "Online Now"
-
-  const sessions = localDb.loadCollection('sessions') || [];
-  const users = localDb.loadCollection('users') || [];
-  const students = localDb.loadCollection('students') || [];
-  const trainers = localDb.loadCollection('trainers') || [];
+  const activeThreshold = now - (2 * 60 * 1000); // 2 minutes: only users actively using the portal right now
 
   const userMap = new Map();
 
-  // 1. Gather all active memory heartbeats
+  // 1. Gather all active memory heartbeats within the last 2 minutes
   for (const [key, info] of activeOnlineUsers.entries()) {
-    if (info.lastActive >= recentThreshold) {
+    if (info.lastActive >= activeThreshold) {
       userMap.set(info.email || key, {
         ...info,
-        isOnline: (now - info.lastActive) <= onlineThreshold
+        isOnline: true
       });
+    } else if (now - info.lastActive > (10 * 60 * 1000)) {
+      // Clean up stale memory heartbeats older than 10 mins
+      activeOnlineUsers.delete(key);
     }
   }
 
-  // 2. Cross-reference unexpired persistent sessions
-  sessions.forEach(s => {
-    if (s.expiresAt > now && s.email) {
-      const emailLower = s.email.toLowerCase();
-      if (!userMap.has(emailLower)) {
-        const u = users.find(x => x.email?.toLowerCase() === emailLower || String(x.id) === String(s.userId));
-        const st = students.find(x => x.email?.toLowerCase() === emailLower || String(x.id) === String(s.userId));
-        const tr = trainers.find(x => x.email?.toLowerCase() === emailLower || String(x.id) === String(s.userId));
-        const lastAct = s.lastActive || s.createdAt || now;
-        userMap.set(emailLower, {
-          id: s.userId || s.token,
-          email: s.email,
-          name: st?.name || tr?.name || u?.name || s.name || (s.role === 'admin' ? 'Super Admin' : s.email.split('@')[0]),
-          role: s.role || u?.role || 'student',
-          batch: st?.batch_name || st?.batch || u?.batch || (s.role === 'admin' ? 'Operations' : 'Portal Students'),
-          course: st?.course_name || st?.course || u?.course || 'Levlox Academy',
-          lastActive: lastAct,
-          lastActiveIso: new Date(lastAct).toISOString(),
-          isOnline: (now - lastAct) <= onlineThreshold
-        });
-      }
-    }
-  });
-
   const list = Array.from(userMap.values());
-  // Sort: online users first, then by lastActive descending
-  list.sort((a, b) => {
-    if (a.isOnline && !b.isOnline) return -1;
-    if (!a.isOnline && b.isOnline) return 1;
-    return b.lastActive - a.lastActive;
-  });
+  // Sort by lastActive descending
+  list.sort((a, b) => b.lastActive - a.lastActive);
 
   res.json({
     success: true,
     count: list.length,
-    onlineCount: list.filter(u => u.isOnline).length,
+    onlineCount: list.length,
     activeUsers: list
   });
 });
