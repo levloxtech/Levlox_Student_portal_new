@@ -2118,17 +2118,17 @@ app.post('/api/upload-chunk', (req, res) => {
         if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
         const finalPath = path.join(targetDir, finalFilename);
 
-        const writeStream = fs.createWriteStream(finalPath);
+        // Ensure target file is fresh
+        if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
+
         for (let i = 0; i < totalChunks; i++) {
           const partPath = path.join(chunkDir, `${i}.part`);
           if (!fs.existsSync(partPath)) {
-            writeStream.close();
             return res.status(400).json({ error: `Missing chunk ${i}. Upload incomplete.` });
           }
           const partBuffer = fs.readFileSync(partPath);
-          writeStream.write(partBuffer);
+          fs.appendFileSync(finalPath, partBuffer);
         }
-        writeStream.end();
 
         // Clean up temp parts
         fs.rm(chunkDir, { recursive: true, force: true }, () => {});
