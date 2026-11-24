@@ -27,6 +27,7 @@ const HeroBannerVideoManager = () => {
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [toast, setToast] = useState('');
@@ -84,7 +85,10 @@ const HeroBannerVideoManager = () => {
 
     try {
       setIsUploadingVideo(true);
-      const res = await uploadUniversalFile(file, 'hero-banner/videos');
+      setUploadProgress(0);
+      const res = await uploadUniversalFile(file, 'hero-banner/videos', (pct) => {
+        setUploadProgress(pct);
+      });
       if (res?.url) {
         setFormVideoUrl(res.url);
         showToast('Company video uploaded successfully!');
@@ -94,6 +98,7 @@ const HeroBannerVideoManager = () => {
       alert('Video upload failed: ' + err.message);
     } finally {
       setIsUploadingVideo(false);
+      setUploadProgress(0);
     }
   };
 
@@ -481,7 +486,7 @@ const HeroBannerVideoManager = () => {
                   cursor: isUploadingVideo ? 'wait' : 'pointer'
                 }}>
                   <Upload size={14} />
-                  <span>{isUploadingVideo ? 'Uploading Video...' : 'Upload MP4/WebM Video'}</span>
+                  <span>{isUploadingVideo ? (uploadProgress > 0 ? `Uploading Video (${uploadProgress}%)...` : 'Uploading Video...') : 'Upload MP4/WebM Video'}</span>
                   <input
                     type="file"
                     accept="video/*"

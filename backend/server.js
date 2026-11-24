@@ -2080,6 +2080,99 @@ app.post('/api/upload', (req, res) => {
   });
 });
 
+// Multer storage for temporary chunks
+const chunkUploadStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadId = (req.body.uploadId || 'default').replace(/[^a-zA-Z0-9_-]/g, '');
+    const chunkDir = path.join(STORAGE_ROOT, 'temp', uploadId);
+    if (!fs.existsSync(chunkDir)) fs.mkdirSync(chunkDir, { recursive: true });
+    cb(null, chunkDir);
+  },
+  filename: (req, file, cb) => {
+    const chunkIndex = parseInt(req.body.chunkIndex || '0');
+    cb(null, `${chunkIndex}.part`);
+  }
+});
+
+const chunkUpload = multer({
+  storage: chunkUploadStorage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10 MB max per single chunk
+});
+
+// POST /api/upload-chunk - Robust chunked uploader bypassing proxy & ISP limits
+app.post('/api/upload-chunk', (req, res) => {
+  chunkUpload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+
+    const chunkIndex = parseInt(req.body.chunkIndex);
+    const totalChunks = parseInt(req.body.totalChunks);
+    const uploadId = (req.body.uploadId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    const folder = (req.body.folder || 'videos').replace(/[^a-zA-Z0-9_\-\/]/g, '');
+    const originalName = req.body.fileName || 'video.mp4';
+
+    if (isNaN(chunkIndex) || isNaN(totalChunks) || !uploadId) {
+      return res.status(400).json({ error: 'Missing chunk parameters.' });
+    }
+
+    const chunkDir = path.join(STORAGE_ROOT, 'temp', uploadId);
+
+    // If this is the last chunk, assemble the final file!
+    if (chunkIndex === totalChunks - 1) {
+      try {
+        const ext = path.extname(originalName).toLowerCase() || '.mp4';
+        const cleanBase = path.basename(originalName, ext).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40) || 'file';
+        const finalFilename = `${cleanBase}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${ext}`;
+        const targetDir = path.join(STORAGE_ROOT, folder);
+        if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+        const finalPath = path.join(targetDir, finalFilename);
+
+        const writeStream = fs.createWriteStream(finalPath);
+        for (let i = 0; i < totalChunks; i++) {
+          const partPath = path.join(chunkDir, `${i}.part`);
+          if (!fs.existsSync(partPath)) {
+            writeStream.close();
+            return res.status(400).json({ error: `Missing chunk ${i}. Upload incomplete.` });
+          }
+          const partBuffer = fs.readFileSync(partPath);
+          writeStream.write(partBuffer);
+        }
+        writeStream.end();
+
+        // Clean up temp parts
+        fs.rm(chunkDir, { recursive: true, force: true }, () => {});
+
+        const stat = fs.statSync(finalPath);
+        const relativeToRoot = path.relative(STORAGE_ROOT, finalPath).replace(/\\/g, '/');
+        const relativePath = `/uploads/${relativeToRoot}`;
+        const fullUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
+
+        return res.json({
+          success: true,
+          assembled: true,
+          url: fullUrl,
+          relativePath,
+          filename: finalFilename,
+          originalName,
+          size: stat.size,
+          sizeDisplay: (stat.size / (1024 * 1024)).toFixed(2) + ' MB',
+          storagePath: relativeToRoot
+        });
+      } catch (stitchErr) {
+        console.error('[UploadChunk] Assembly failed:', stitchErr);
+        return res.status(500).json({ error: 'Failed to assemble video file: ' + stitchErr.message });
+      }
+    }
+
+    // Chunk received successfully, wait for remaining chunks
+    return res.json({
+      success: true,
+      assembled: false,
+      chunkIndex,
+      totalChunks
+    });
+  });
+});
+
 // Direct file download route with proper filename and Content-Disposition header
 app.get('/api/download', (req, res) => {
   const target = req.query.path || req.query.file;

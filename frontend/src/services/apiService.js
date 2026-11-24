@@ -268,52 +268,116 @@ export async function broadcastNotification({
 /**
  * Universal file upload to self-hosted storage.
  * Supports ANY file type (pdf, docx, zip, rar, tar, images, code files, etc.) up to 500MB.
- * Automatically routes large files (>3.5MB) to direct backend tunnel to bypass Vercel's 4.5MB limit.
+ * Automatically slices files > 2.5MB into 2MB chunks to guarantee 0 payload errors across Vercel, Cloudflare, and ISPs.
  */
-export async function uploadUniversalFile(file, folder = "assignments") {
+export async function uploadUniversalFile(file, folder = "assignments", onProgress = null) {
   const headers = await getAuthHeader();
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("folder", folder);
 
-  let uploadBase = API_BASE_URL;
+  // If file <= 2.5MB, upload directly in one quick request
+  if (!file || file.size <= 2.5 * 1024 * 1024) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("folder", folder);
 
-  // For files > 3.5MB, query direct tunnel endpoint to avoid Vercel 413 (Content Too Large)
-  if (file && file.size > 3.5 * 1024 * 1024) {
-    try {
-      const targetRes = await fetch(`${API_BASE_URL}/api/system/upload-target`);
-      if (targetRes.ok) {
-        const targetData = await targetRes.json();
-        if (targetData?.directUrl) {
-          uploadBase = targetData.directUrl.replace(/\/+$/, '');
+    const res = await fetch(`${API_BASE_URL}/api/upload`, {
+      method: "POST",
+      headers: { ...headers },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `File upload failed with status ${res.status}`);
+    }
+
+    const data = await res.json();
+    const cleanPath = data.url ? data.url.replace(/^https?:\/\/[^\/]+/, '') : '';
+    const fullUrl = cleanPath ? `${API_BASE_URL}${cleanPath}` : data.url;
+    if (onProgress) onProgress(100);
+    return {
+      ...data,
+      url: fullUrl,
+      originalName: data.originalName || file.name,
+      fileName: data.filename || file.name,
+      size: data.size || file.size,
+      sizeDisplay: data.sizeDisplay || (file.size / (1024 * 1024)).toFixed(2) + " MB",
+      fileType: file.name.split(".").pop()?.toLowerCase() || "file",
+    };
+  }
+
+  // For files > 2.5MB (videos & large assets), use robust 2MB chunking
+  const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunk size strictly under Vercel's 4.5MB limit
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  const uploadId = `up_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+  let finalResult = null;
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+
+    const chunkFormData = new FormData();
+    chunkFormData.append("file", chunk, `${i}.part`);
+    chunkFormData.append("chunkIndex", String(i));
+    chunkFormData.append("totalChunks", String(totalChunks));
+    chunkFormData.append("uploadId", uploadId);
+    chunkFormData.append("fileName", file.name);
+    chunkFormData.append("folder", folder);
+
+    let chunkOk = false;
+    let lastErr = null;
+
+    // Retry up to 3 times per chunk
+    for (let retry = 0; retry < 3; retry++) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/upload-chunk`, {
+          method: "POST",
+          headers: { ...headers },
+          body: chunkFormData
+        });
+
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData.assembled) {
+            finalResult = resData;
+          }
+          chunkOk = true;
+          if (onProgress) {
+            const pct = Math.min(99, Math.round(((i + 1) / totalChunks) * 100));
+            onProgress(pct);
+          }
+          break;
+        } else {
+          const errBody = await res.json().catch(() => ({}));
+          lastErr = new Error(errBody.error || `Chunk ${i + 1}/${totalChunks} failed (HTTP ${res.status})`);
         }
+      } catch (netErr) {
+        lastErr = netErr;
       }
-    } catch (err) {
-      console.warn("[Upload] Could not resolve direct tunnel target, falling back:", err);
+      await new Promise(r => setTimeout(r, 800));
+    }
+
+    if (!chunkOk) {
+      throw lastErr || new Error(`Upload failed on chunk ${i + 1} of ${totalChunks}`);
     }
   }
 
-  const res = await fetch(`${uploadBase}/api/upload`, {
-    method: "POST",
-    headers: { ...headers },
-    body: formData,
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `File upload failed with status ${res.status}`);
+  if (!finalResult) {
+    throw new Error("File upload could not be finalized on server.");
   }
 
-  const data = await res.json();
-  const cleanPath = data.url ? data.url.replace(/^https?:\/\/[^\/]+/, '') : '';
-  const fullUrl = cleanPath ? `${API_BASE_URL}${cleanPath}` : data.url;
+  if (onProgress) onProgress(100);
+
+  const cleanPath = finalResult.url ? finalResult.url.replace(/^https?:\/\/[^\/]+/, '') : '';
+  const fullUrl = cleanPath ? `${API_BASE_URL}${cleanPath}` : finalResult.url;
   return {
-    ...data,
+    ...finalResult,
     url: fullUrl,
-    originalName: data.originalName || file.name,
-    fileName: data.filename || file.name,
-    size: data.size || file.size,
-    sizeDisplay: data.sizeDisplay || (file.size / (1024 * 1024)).toFixed(2) + " MB",
+    originalName: finalResult.originalName || file.name,
+    fileName: finalResult.filename || file.name,
+    size: finalResult.size || file.size,
+    sizeDisplay: finalResult.sizeDisplay || (file.size / (1024 * 1024)).toFixed(2) + " MB",
     fileType: file.name.split(".").pop()?.toLowerCase() || "file",
   };
 }
