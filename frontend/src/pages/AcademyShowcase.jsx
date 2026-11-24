@@ -1169,12 +1169,11 @@ export default function AcademyShowcase() {
           {/* HERO BANNER COMPANY VIDEO CARD */}
           {heroBannerData?.enabled !== false && (
             <div style={{
-              maxWidth: 780,
-              margin: '26px auto 0',
+              maxWidth: 820,
+              margin: '28px auto 0',
               borderRadius: 22,
               background: '#0B0F19',
-              boxShadow: '0 20px 50px rgba(37, 99, 235, 0.12), 0 8px 24px rgba(15, 23, 42, 0.08)',
-              border: '1.5px solid #E2E8F0',
+              boxShadow: '0 24px 60px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(226, 232, 240, 0.9)',
               overflow: 'hidden',
               position: 'relative'
             }}>
@@ -1347,52 +1346,52 @@ export default function AcademyShowcase() {
                   </div>
                 )}
               </div>
-
-              {/* Explore the Program Button */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                marginTop: 28,
-                marginBottom: 4
-              }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const target = document.getElementById('courses') || document.getElementById('pricing');
-                    if (target) {
-                      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '13px 34px',
-                    borderRadius: 999,
-                    background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-                    color: '#FFFFFF',
-                    fontSize: 15,
-                    fontWeight: 800,
-                    border: 'none',
-                    cursor: 'pointer',
-                    boxShadow: '0 10px 25px -4px rgba(37, 99, 235, 0.45), 0 4px 12px rgba(0, 0, 0, 0.08)',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 14px 30px -4px rgba(37, 99, 235, 0.55), 0 6px 16px rgba(0, 0, 0, 0.12)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 10px 25px -4px rgba(37, 99, 235, 0.45), 0 4px 12px rgba(0, 0, 0, 0.08)';
-                  }}
-                >
-                  <span>Explore the Program</span>
-                  <ArrowDown size={18} strokeWidth={2.6} />
-                </button>
-              </div>
             </div>
           )}
+
+          {/* Separate Explore the Program Button (Outside & Below Video Container) */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            marginTop: 32,
+            marginBottom: 8
+          }}>
+            <button
+              type="button"
+              onClick={() => {
+                const target = document.getElementById('courses') || document.getElementById('pricing');
+                if (target) {
+                  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '14px 38px',
+                borderRadius: 999,
+                background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                color: '#FFFFFF',
+                fontSize: 15.5,
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 10px 25px -4px rgba(37, 99, 235, 0.45), 0 4px 12px rgba(0, 0, 0, 0.08)',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 14px 30px -4px rgba(37, 99, 235, 0.55), 0 6px 16px rgba(0, 0, 0, 0.12)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 10px 25px -4px rgba(37, 99, 235, 0.45), 0 4px 12px rgba(0, 0, 0, 0.08)';
+              }}
+            >
+              <span>Explore the Program</span>
+              <ArrowDown size={18} strokeWidth={2.6} />
+            </button>
+          </div>
         </div>
       </section>
 
