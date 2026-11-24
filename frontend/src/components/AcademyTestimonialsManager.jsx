@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Video, Plus, Trash2, Eye, CheckCircle, Upload, Link as LinkIcon, Play, Film, User, UploadCloud, Loader2 } from 'lucide-react';
 import CustomModal from './Modal';
+import { getResolvedThumbnail, resolveDirectImageUrl } from '../utils/videoUtils';
 
 export default function AcademyTestimonialsManager() {
   const [testimonials, setTestimonials] = useState([]);
@@ -72,7 +73,7 @@ export default function AcademyTestimonialsManager() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Failed to upload video');
 
-      setFormData(prev => ({ ...prev, videoUrl: result.url }));
+      setFormData(prev => ({ ...prev, videoUrl: result.relativePath || result.url }));
       showToast('Video file uploaded successfully!');
     } catch (err) {
       alert('Video upload error: ' + err.message);
@@ -99,7 +100,7 @@ export default function AcademyTestimonialsManager() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Failed to upload thumbnail');
 
-      setFormData(prev => ({ ...prev, thumbnailUrl: result.url }));
+      setFormData(prev => ({ ...prev, thumbnailUrl: result.relativePath || result.url }));
       showToast('Thumbnail uploaded successfully!');
     } catch (err) {
       alert('Thumbnail upload error: ' + err.message);
@@ -282,51 +283,60 @@ export default function AcademyTestimonialsManager() {
                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
             >
-              {/* Background Thumbnail Image or Stylized Avatar Fallback */}
-              {item.thumbnailUrl ? (
-                <img
-                  src={item.thumbnailUrl}
-                  alt={item.studentName}
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
-                  }}
-                />
-              ) : (
+              {/* Fallback Stylized Avatar (always rendered underneath) */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'radial-gradient(circle at 50% 30%, #1E2B4D 0%, #0D1424 100%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingBottom: 60
+              }}>
                 <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'radial-gradient(circle at 50% 30%, #1E2B4D 0%, #0D1424 100%)',
+                  width: 64,
+                  height: 64,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #4568F5 0%, #7C3AED 100%)',
+                  color: '#FFFFFF',
+                  fontSize: 24,
+                  fontWeight: 800,
                   display: 'flex',
-                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  paddingBottom: 60
+                  boxShadow: '0 8px 24px rgba(69, 104, 245, 0.4)',
+                  marginBottom: 8
                 }}>
-                  <div style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #4568F5 0%, #7C3AED 100%)',
-                    color: '#FFFFFF',
-                    fontSize: 24,
-                    fontWeight: 800,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 8px 24px rgba(69, 104, 245, 0.4)',
-                    marginBottom: 8
-                  }}>
-                    {item.studentName ? item.studentName.charAt(0).toUpperCase() : 'L'}
-                  </div>
-                  <span style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.65)', fontWeight: 600 }}>
-                    Video Story
-                  </span>
+                  {item.studentName ? item.studentName.charAt(0).toUpperCase() : 'L'}
                 </div>
-              )}
+                <span style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.65)', fontWeight: 600 }}>
+                  Video Story
+                </span>
+              </div>
+
+              {/* Background Thumbnail Image (auto-derived & auto-hides if broken/404) */}
+              {(() => {
+                const resolved = getResolvedThumbnail(item.videoUrl, item.thumbnailUrl);
+                if (!resolved) return null;
+                return (
+                  <img
+                    src={resolved}
+                    alt=""
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      zIndex: 1
+                    }}
+                  />
+                );
+              })()}
 
               {/* Gradient Overlay */}
               <div style={{

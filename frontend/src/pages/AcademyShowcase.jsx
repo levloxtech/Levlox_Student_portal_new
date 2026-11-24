@@ -14,6 +14,7 @@ import supportHubImg from '../assets/support-hub-interface.png';
 import verifiedCertImg from '../assets/verified-certificate.png';
 import supportSystemImg from '../assets/support-system-24-7.png';
 import levloxCertImg from '../assets/levlox-completion-certificate.png';
+import { getResolvedThumbnail, resolveDirectImageUrl } from '../utils/videoUtils';
 
 // Dedicated Authentic Brand Icons for Python, Machine Learning, and SQL
 function PythonBrandIcon({ size = 24 }) {
@@ -1439,51 +1440,60 @@ export default function AcademyShowcase() {
                     if (playBtn) playBtn.style.transform = 'scale(1)';
                   }}
                 >
-                  {/* Background Thumbnail Image or Stylized Avatar Fallback */}
-                  {item.thumbnailUrl ? (
-                    <img
-                      src={item.thumbnailUrl}
-                      alt={item.studentName}
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover'
-                      }}
-                    />
-                  ) : (
+                  {/* Fallback Stylized Avatar (always rendered underneath) */}
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'radial-gradient(circle at 50% 25%, #1E2B4D 0%, #0D1424 100%)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingBottom: 110
+                  }}>
                     <div style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: 'radial-gradient(circle at 50% 25%, #1E2B4D 0%, #0D1424 100%)',
+                      width: 68,
+                      height: 68,
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #4568F5 0%, #7C3AED 100%)',
+                      color: '#FFFFFF',
+                      fontSize: 26,
+                      fontWeight: 800,
                       display: 'flex',
-                      flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      paddingBottom: 110
+                      boxShadow: '0 8px 24px rgba(69, 104, 245, 0.4)',
+                      marginBottom: 8
                     }}>
-                      <div style={{
-                        width: 68,
-                        height: 68,
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #4568F5 0%, #7C3AED 100%)',
-                        color: '#FFFFFF',
-                        fontSize: 26,
-                        fontWeight: 800,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 8px 24px rgba(69, 104, 245, 0.4)',
-                        marginBottom: 8
-                      }}>
-                        {item.studentName ? item.studentName.charAt(0).toUpperCase() : 'L'}
-                      </div>
-                      <span style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.65)', fontWeight: 600, letterSpacing: '0.3px' }}>
-                        Video Review
-                      </span>
+                      {item.studentName ? item.studentName.charAt(0).toUpperCase() : 'L'}
                     </div>
-                  )}
+                    <span style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.65)', fontWeight: 600, letterSpacing: '0.3px' }}>
+                      Video Review
+                    </span>
+                  </div>
+
+                  {/* Background Thumbnail Image (auto-derived & auto-hides if broken/404) */}
+                  {(() => {
+                    const resolved = getResolvedThumbnail(item.videoUrl, item.thumbnailUrl);
+                    if (!resolved) return null;
+                    return (
+                      <img
+                        src={resolved}
+                        alt=""
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          zIndex: 1
+                        }}
+                      />
+                    );
+                  })()}
 
                   {/* Gradient Overlay for high-contrast legibility */}
                   <div style={{
@@ -4762,18 +4772,22 @@ export default function AcademyShowcase() {
               )
             }}>
               {/* Subtle ambient blurred glow */}
-              {activeVideoModal.thumbnailUrl && (
-                <div style={{
-                  position: 'absolute',
-                  inset: '-20px',
-                  backgroundImage: `url(${activeVideoModal.thumbnailUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  filter: 'blur(30px) brightness(0.35)',
-                  opacity: 0.7,
-                  pointerEvents: 'none'
-                }} />
-              )}
+              {(() => {
+                const glowThumb = getResolvedThumbnail(activeVideoModal.videoUrl, activeVideoModal.thumbnailUrl);
+                if (!glowThumb) return null;
+                return (
+                  <div style={{
+                    position: 'absolute',
+                    inset: '-20px',
+                    backgroundImage: `url(${glowThumb})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    filter: 'blur(30px) brightness(0.35)',
+                    opacity: 0.7,
+                    pointerEvents: 'none'
+                  }} />
+                );
+              })()}
 
               {getEmbedUrl(activeVideoModal.videoUrl).includes('youtube.com/embed') || getEmbedUrl(activeVideoModal.videoUrl).includes('drive.google.com') ? (
                 <iframe

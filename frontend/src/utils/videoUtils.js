@@ -113,9 +113,26 @@ export const getEmbedVideoUrl = (rawUrl) => {
  */
 export const resolveDirectImageUrl = (rawUrl) => {
   if (!rawUrl || typeof rawUrl !== 'string') return '';
-  const url = rawUrl.trim();
+  let url = rawUrl.trim();
 
-  // 1. ClipSafari clip page -> direct CDN PNG/SVG
+  // Strip localhost / 127.0.0.1 origin for uploads so relative path works across all domains
+  if (url.includes('/uploads/')) {
+    url = url.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?=\/uploads\/)/i, '');
+  }
+
+  // 1. Google Drive preview/view link -> direct high-speed CDN thumbnail
+  const driveId = getGoogleDriveFileId(url);
+  if (driveId) {
+    return `https://lh3.googleusercontent.com/d/${driveId}`;
+  }
+
+  // 2. YouTube link passed as thumbnail
+  const ytId = getYouTubeVideoId(url);
+  if (ytId) {
+    return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+  }
+
+  // 3. ClipSafari clip page -> direct CDN PNG/SVG
   if (url.includes('clipsafari.com/clips/')) {
     if (url.includes('o248484-python-logo') || url.includes('python-logo')) {
       return 'https://spaces-cdn.clipsafari.com/0xnv8d9ush4m3sh3cjkrglrw2j6n';
@@ -126,19 +143,13 @@ export const resolveDirectImageUrl = (rawUrl) => {
     }
   }
 
-  // 2. Google Drive preview/view link -> direct thumbnail
-  const driveId = getGoogleDriveFileId(url);
-  if (driveId) {
-    return `https://drive.google.com/thumbnail?id=${driveId}&sz=w800`;
-  }
-
-  // 3. Unsplash photo page -> direct image
+  // 4. Unsplash photo page -> direct image
   const unsplashMatch = url.match(/unsplash\.com\/photos\/([a-zA-Z0-9_-]+)/i);
   if (unsplashMatch && unsplashMatch[1]) {
     return `https://images.unsplash.com/photo-${unsplashMatch[1]}?w=800&auto=format&fit=crop&q=80`;
   }
 
-  // 4. Imgur page -> direct image
+  // 5. Imgur page -> direct image
   const imgurMatch = url.match(/imgur\.com\/([a-zA-Z0-9]{5,8})$/i);
   if (imgurMatch && imgurMatch[1]) {
     return `https://i.imgur.com/${imgurMatch[1]}.png`;
@@ -152,21 +163,21 @@ export const resolveDirectImageUrl = (rawUrl) => {
  */
 export const getResolvedThumbnail = (url, thumbnail) => {
   if (thumbnail && thumbnail.trim()) {
-    return resolveDirectImageUrl(thumbnail.trim());
+    const direct = resolveDirectImageUrl(thumbnail.trim());
+    if (direct) return direct;
   }
 
-  const ytId = getYouTubeVideoId(url);
+  const ytId = getYouTubeVideoId(url || thumbnail);
   if (ytId) {
     return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
   }
 
-  const driveId = getGoogleDriveFileId(url);
+  const driveId = getGoogleDriveFileId(url || thumbnail);
   if (driveId) {
-    // Google Drive thumbnail endpoint
-    return `https://drive.google.com/thumbnail?id=${driveId}&sz=w800`;
+    return `https://lh3.googleusercontent.com/d/${driveId}`;
   }
 
-  return 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80';
+  return '';
 };
 
 /**

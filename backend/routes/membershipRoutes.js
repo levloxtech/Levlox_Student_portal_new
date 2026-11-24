@@ -1294,6 +1294,34 @@ function extractYouTubeId(url) {
   return match ? match[1] : null;
 }
 
+function extractDriveId(url) {
+  if (!url || typeof url !== 'string') return null;
+  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/i) ||
+                url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/i) ||
+                url.match(/\/file\/u\/\d+\/d\/([a-zA-Z0-9_-]{10,})/i);
+  return match ? match[1] : null;
+}
+
+function normalizeMediaUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  let clean = url.trim();
+
+  // Strip localhost / 127.0.0.1 host from /uploads/
+  clean = clean.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?=\/uploads\/)/i, '');
+
+  const driveId = extractDriveId(clean);
+  if (driveId) {
+    return `https://lh3.googleusercontent.com/d/${driveId}`;
+  }
+
+  const ytId = extractYouTubeId(clean);
+  if (ytId && !clean.includes('watch') && !clean.includes('embed')) {
+    return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+  }
+
+  return clean;
+}
+
 // GET /api/membership/testimonials - Fetch all testimonials (public)
 router.get('/testimonials', (req, res) => {
   try {
@@ -1318,7 +1346,21 @@ router.get('/testimonials', (req, res) => {
       items = initial;
       initial.forEach(t => localDb.setDocument('academy_testimonials', t.id, t));
     }
-    res.json({ success: true, testimonials: items });
+    const cleaned = (items || []).map(t => {
+      let thumb = normalizeMediaUrl(t.thumbnailUrl);
+      if (!thumb && t.videoUrl) {
+        const ytId = extractYouTubeId(t.videoUrl);
+        if (ytId) thumb = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+        const driveId = extractDriveId(t.videoUrl);
+        if (driveId) thumb = `https://lh3.googleusercontent.com/d/${driveId}`;
+      }
+      return {
+        ...t,
+        thumbnailUrl: thumb || t.thumbnailUrl || '',
+        videoUrl: t.videoUrl ? t.videoUrl.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?=\/uploads\/)/i, '') : ''
+      };
+    });
+    res.json({ success: true, testimonials: cleaned });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch testimonials: ' + err.message });
   }
@@ -1332,11 +1374,15 @@ router.post('/testimonials', (req, res) => {
       return res.status(400).json({ error: 'Student Name and Video URL are required.' });
     }
 
-    let resolvedThumb = thumbnailUrl?.trim() || '';
-    const ytId = extractYouTubeId(videoUrl);
-    if (!resolvedThumb && ytId) {
-      resolvedThumb = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+    let resolvedThumb = normalizeMediaUrl(thumbnailUrl);
+    if (!resolvedThumb && videoUrl) {
+      const ytId = extractYouTubeId(videoUrl);
+      if (ytId) resolvedThumb = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+      const driveId = extractDriveId(videoUrl);
+      if (driveId) resolvedThumb = `https://lh3.googleusercontent.com/d/${driveId}`;
     }
+
+    const cleanVideo = videoUrl.trim().replace(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?=\/uploads\/)/i, '');
 
     const newDoc = {
       id: `testi_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
@@ -1345,7 +1391,7 @@ router.post('/testimonials', (req, res) => {
       role: role?.trim() || 'Levlox Academy Student',
       linkedinUrl: linkedinUrl?.trim() || '',
       rating: Math.max(1, Math.min(5, Number(rating) || 5)),
-      videoUrl: videoUrl.trim(),
+      videoUrl: cleanVideo,
       thumbnailUrl: resolvedThumb,
       feedback: feedback?.trim() || '',
       active: active !== false,
@@ -1369,12 +1415,16 @@ router.put('/testimonials/:id', (req, res) => {
     }
 
     const { title, studentName, role, linkedinUrl, rating, videoUrl, thumbnailUrl, feedback, active } = req.body;
-    let resolvedThumb = thumbnailUrl !== undefined ? thumbnailUrl.trim() : existing.thumbnailUrl;
+    let resolvedThumb = thumbnailUrl !== undefined ? normalizeMediaUrl(thumbnailUrl) : normalizeMediaUrl(existing.thumbnailUrl);
     const effectiveUrl = videoUrl ? videoUrl.trim() : existing.videoUrl;
-    const ytId = extractYouTubeId(effectiveUrl);
-    if (!resolvedThumb && ytId) {
-      resolvedThumb = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+    if (!resolvedThumb && effectiveUrl) {
+      const ytId = extractYouTubeId(effectiveUrl);
+      if (ytId) resolvedThumb = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+      const driveId = extractDriveId(effectiveUrl);
+      if (driveId) resolvedThumb = `https://lh3.googleusercontent.com/d/${driveId}`;
     }
+
+    const cleanVideo = effectiveUrl.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?=\/uploads\/)/i, '');
 
     const updated = {
       ...existing,
@@ -1383,10 +1433,10 @@ router.put('/testimonials/:id', (req, res) => {
       role: role !== undefined ? role.trim() : existing.role,
       linkedinUrl: linkedinUrl !== undefined ? linkedinUrl.trim() : (existing.linkedinUrl || ''),
       rating: rating !== undefined ? Math.max(1, Math.min(5, Number(rating) || 5)) : (existing.rating || 5),
-      videoUrl: effectiveUrl,
+      videoUrl: cleanVideo,
       thumbnailUrl: resolvedThumb,
-      feedback: feedback !== undefined ? feedback.trim() : existing.feedback,
-      active: active !== undefined ? Boolean(active) : existing.active,
+      feedback: feedback !== undefined ? feedback.trim() : (existing.feedback || ''),
+      active: active !== undefined ? Boolean(active) : (existing.active !== false),
       updatedAt: new Date().toISOString()
     };
 
