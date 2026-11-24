@@ -267,7 +267,8 @@ export async function broadcastNotification({
 
 /**
  * Universal file upload to self-hosted storage.
- * Supports ANY file type (pdf, docx, zip, rar, tar, images, code files, etc.) up to 250MB.
+ * Supports ANY file type (pdf, docx, zip, rar, tar, images, code files, etc.) up to 500MB.
+ * Automatically routes large files (>3.5MB) to direct backend tunnel to bypass Vercel's 4.5MB limit.
  */
 export async function uploadUniversalFile(file, folder = "assignments") {
   const headers = await getAuthHeader();
@@ -275,7 +276,24 @@ export async function uploadUniversalFile(file, folder = "assignments") {
   formData.append("file", file);
   formData.append("folder", folder);
 
-  const res = await fetch(`${API_BASE_URL}/api/upload`, {
+  let uploadBase = API_BASE_URL;
+
+  // For files > 3.5MB, query direct tunnel endpoint to avoid Vercel 413 (Content Too Large)
+  if (file && file.size > 3.5 * 1024 * 1024) {
+    try {
+      const targetRes = await fetch(`${API_BASE_URL}/api/system/upload-target`);
+      if (targetRes.ok) {
+        const targetData = await targetRes.json();
+        if (targetData?.directUrl) {
+          uploadBase = targetData.directUrl.replace(/\/+$/, '');
+        }
+      }
+    } catch (err) {
+      console.warn("[Upload] Could not resolve direct tunnel target, falling back:", err);
+    }
+  }
+
+  const res = await fetch(`${uploadBase}/api/upload`, {
     method: "POST",
     headers: { ...headers },
     body: formData,
@@ -283,11 +301,12 @@ export async function uploadUniversalFile(file, folder = "assignments") {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "File upload failed");
+    throw new Error(err.error || `File upload failed with status ${res.status}`);
   }
 
   const data = await res.json();
-  const fullUrl = data.url.startsWith("http") ? data.url : `${API_BASE_URL}${data.url}`;
+  const cleanPath = data.url ? data.url.replace(/^https?:\/\/[^\/]+/, '') : '';
+  const fullUrl = cleanPath ? `${API_BASE_URL}${cleanPath}` : data.url;
   return {
     ...data,
     url: fullUrl,

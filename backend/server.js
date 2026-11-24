@@ -179,8 +179,8 @@ const emailLimiter = rateLimit({
 });
 
 app.set('trust proxy', 1);
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use('/uploads', express.static(STORAGE_ROOT));
 app.use(morgan('combined'));
 
@@ -1998,7 +1998,31 @@ const universalUploadStorage = multer.diskStorage({
 
 const universalUpload = multer({
   storage: universalUploadStorage,
-  limits: { fileSize: 250 * 1024 * 1024 } // 250 MB max
+  limits: { fileSize: 500 * 1024 * 1024 } // 500 MB max for video uploads
+});
+
+// GET /api/system/upload-target - Direct tunnel upload target to bypass Vercel 4.5MB limit
+app.get('/api/system/upload-target', (req, res) => {
+  let tunnelUrl = process.env.TUNNEL_URL || '';
+  if (!tunnelUrl) {
+    try {
+      const vJsonPath = path.join(__dirname, '..', 'vercel.json');
+      if (fs.existsSync(vJsonPath)) {
+        const vJson = JSON.parse(fs.readFileSync(vJsonPath, 'utf8'));
+        const rw = (vJson.rewrites || []).find(r => r.source === '/api/:path*');
+        if (rw?.destination) {
+          const match = rw.destination.match(/https:\/\/[a-zA-Z0-9.-]+\.trycloudflare\.com/);
+          if (match) tunnelUrl = match[0];
+        }
+      }
+    } catch (e) {}
+  }
+
+  res.json({
+    success: true,
+    directUrl: tunnelUrl || '',
+    maxUploadMb: 500
+  });
 });
 
 app.post('/api/upload', (req, res) => {
