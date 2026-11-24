@@ -2080,22 +2080,9 @@ app.post('/api/upload', (req, res) => {
   });
 });
 
-// Multer storage for temporary chunks
-const chunkUploadStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadId = (req.body.uploadId || 'default').replace(/[^a-zA-Z0-9_-]/g, '');
-    const chunkDir = path.join(STORAGE_ROOT, 'temp', uploadId);
-    if (!fs.existsSync(chunkDir)) fs.mkdirSync(chunkDir, { recursive: true });
-    cb(null, chunkDir);
-  },
-  filename: (req, file, cb) => {
-    const chunkIndex = parseInt(req.body.chunkIndex || '0');
-    cb(null, `${chunkIndex}.part`);
-  }
-});
-
+// Multer memory storage for temporary chunks (avoids multipart field ordering issues)
 const chunkUpload = multer({
-  storage: chunkUploadStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 } // 10 MB max per single chunk
 });
 
@@ -2103,6 +2090,7 @@ const chunkUpload = multer({
 app.post('/api/upload-chunk', (req, res) => {
   chunkUpload.single('file')(req, res, (err) => {
     if (err) return res.status(400).json({ error: err.message });
+    if (!req.file || !req.file.buffer) return res.status(400).json({ error: 'Chunk buffer missing.' });
 
     const chunkIndex = parseInt(req.body.chunkIndex);
     const totalChunks = parseInt(req.body.totalChunks);
@@ -2115,6 +2103,10 @@ app.post('/api/upload-chunk', (req, res) => {
     }
 
     const chunkDir = path.join(STORAGE_ROOT, 'temp', uploadId);
+    if (!fs.existsSync(chunkDir)) fs.mkdirSync(chunkDir, { recursive: true });
+
+    // Save this chunk to disk
+    fs.writeFileSync(path.join(chunkDir, `${chunkIndex}.part`), req.file.buffer);
 
     // If this is the last chunk, assemble the final file!
     if (chunkIndex === totalChunks - 1) {

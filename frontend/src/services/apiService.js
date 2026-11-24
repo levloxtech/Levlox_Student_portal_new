@@ -318,12 +318,12 @@ export async function uploadUniversalFile(file, folder = "assignments", onProgre
     const chunk = file.slice(start, end);
 
     const chunkFormData = new FormData();
-    chunkFormData.append("file", chunk, `${i}.part`);
     chunkFormData.append("chunkIndex", String(i));
     chunkFormData.append("totalChunks", String(totalChunks));
     chunkFormData.append("uploadId", uploadId);
     chunkFormData.append("fileName", file.name);
     chunkFormData.append("folder", folder);
+    chunkFormData.append("file", chunk, `${i}.part`);
 
     let chunkOk = false;
     let lastErr = null;
