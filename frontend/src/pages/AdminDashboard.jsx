@@ -18,7 +18,7 @@ import FilterBar from '../components/FilterBar';
 import NotificationBell from '../components/NotificationBell';
 import AcademiaCourseViewer from '../components/AcademiaCourseViewer';
 import TrainerAssignmentsView from '../components/TrainerAssignmentsView';
-import { uploadUniversalFile, getDownloadUrl } from '../services/apiService';
+import { uploadUniversalFile, getDownloadUrl, getAuthHeader } from '../services/apiService';
 import levloxLogo from '../assets/levlox-logo.png';
 const leveloxIcon = levloxLogo;
 import MasterDataPage from './MasterDataPage';
@@ -416,18 +416,51 @@ const AdminDashboard = () => {
   const { data: activeUsersData, refetch: refetchActiveUsers } = useQuery({
     queryKey: ['adminActiveUsers'],
     queryFn: async () => {
-      const token = localStorage.getItem('levlox_auth_token');
-      const res = await fetch('/api/admin/active-users', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      const authHeader = await getAuthHeader();
+      const adminEmail = user.email || currentUser?.email || 'admin@levlox.com';
+      const adminName = user.name || 'Super Admin';
+      const params = new URLSearchParams({
+        currentUserId: currentUser?.uid || uid || user.id || 'super_admin',
+        currentEmail: adminEmail,
+        currentName: adminName,
+        currentRole: 'admin',
+        currentBatch: 'Operations'
+      });
+      const res = await fetch(`/api/admin/active-users?${params.toString()}`, {
+        headers: { ...authHeader }
       });
       if (res.ok) {
         return await res.json();
       }
       return { success: true, count: 0, onlineCount: 0, activeUsers: [] };
     },
-    refetchInterval: 5000,
-    staleTime: 3000
+    refetchInterval: 3500,
+    staleTime: 2000
   });
+
+  // Calculate live active users list ensuring current admin is always listed when viewing
+  const displayActiveUsers = (() => {
+    const list = [...(activeUsersData?.activeUsers || [])];
+    const adminEmail = (user.email || currentUser?.email || 'admin@levlox.com').toLowerCase();
+    const adminName = user.name || 'Super Admin';
+    const hasAdmin = list.some(u => (u.email || '').toLowerCase() === adminEmail || u.role === 'admin');
+
+    if (!hasAdmin) {
+      list.unshift({
+        id: currentUser?.uid || uid || user.id || 'super_admin_session',
+        email: adminEmail,
+        name: adminName,
+        role: 'admin',
+        batch: 'Operations',
+        course: 'Admin Portal',
+        isOnline: true,
+        lastActive: Date.now()
+      });
+    }
+    return list;
+  })();
+  const totalActiveCount = Math.max(displayActiveUsers.length, activeUsersData?.count ?? 0);
+  const totalOnlineCount = Math.max(displayActiveUsers.filter(u => u.isOnline).length, activeUsersData?.onlineCount ?? 0);
 
   // Automatically refresh all admin data whenever navigating between tabs/pages
   useEffect(() => {
@@ -4740,10 +4773,10 @@ const AdminDashboard = () => {
                 </div>
                 <div>
                   <h3 className="stat-card-value" style={{ fontSize: '24px', fontWeight: '800', margin: '4px 0', color: '#065F46' }}>
-                    {activeUsersData?.count ?? 0}
+                    {totalActiveCount}
                   </h3>
                   <span className="stat-card-footer" style={{ fontSize: '11px', color: '#059669', fontWeight: 600 }}>
-                    {activeUsersData?.onlineCount ?? 0} Active In Portal
+                    {totalOnlineCount} Active In Portal
                   </span>
                 </div>
               </div>
@@ -4791,7 +4824,7 @@ const AdminDashboard = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                     <h3 className="section-title-premium" style={{ margin: 0, fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: '#065F46' }}>
                       <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#10B981', display: 'inline-block', boxShadow: '0 0 10px #10B981' }} />
-                      Active Users ({activeUsersData?.count ?? 0} Total Active • {activeUsersData?.onlineCount ?? 0} Online Now)
+                      Active Users ({totalActiveCount} Total Active • {totalOnlineCount} Online Now)
                     </h3>
                     <button
                       type="button"
@@ -4824,8 +4857,8 @@ const AdminDashboard = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {activeUsersData?.activeUsers && activeUsersData.activeUsers.length > 0 ? (
-                          activeUsersData.activeUsers.map((u) => {
+                        {displayActiveUsers && displayActiveUsers.length > 0 ? (
+                          displayActiveUsers.map((u) => {
                             const initials = u.name ? u.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U';
                             return (
                               <tr key={u.id || u.email} style={{ borderBottom: '1px solid var(--border-light)' }}>

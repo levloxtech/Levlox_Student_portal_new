@@ -93,10 +93,36 @@ export const AuthProvider = ({ children }) => {
       });
   }, []);
 
-  // Real-time Heartbeat: kicks out deleted users or revoked sessions immediately
+  // Real-time Heartbeat: kicks out deleted users or revoked sessions immediately & sends presence
   useEffect(() => {
     if (!currentUser) return;
+
+    const sendPresence = () => {
+      try {
+        const token = localStorage.getItem(TOKEN_KEY);
+        const activeUserPayload = {
+          id: currentUser.uid || currentUser.id,
+          email: currentUser.email || userProfile?.email || '',
+          name: userProfile?.name || currentUser.displayName || 'Portal User',
+          role: userRole || userProfile?.role || 'student',
+          batch: userProfile?.batch_name || userProfile?.batch || ''
+        };
+        fetch(`${API_BASE}/api/active-heartbeat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify(activeUserPayload)
+        }).catch(() => {});
+      } catch (e) {}
+    };
+
+    // Send immediately on login/mount
+    sendPresence();
+
     const interval = setInterval(async () => {
+      sendPresence();
       const token = localStorage.getItem(TOKEN_KEY);
       if (!token) return;
       try {
@@ -127,7 +153,7 @@ export const AuthProvider = ({ children }) => {
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [currentUser, userProfile, userRole]);
 
   // BFCache and popstate protection: kick unauthenticated users out immediately if they press browser Back
   useEffect(() => {

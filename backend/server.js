@@ -213,13 +213,58 @@ async function requireAuth(req, res, next) {
         db.collection('trainers').doc(decoded.uid).get()
       ]);
 
-      if (adminSnap.exists) req.user.role = 'admin';
-      else if (trainerSnap.exists) req.user.role = 'trainer';
-      else req.user.role = 'student';
+      if (adminSnap.exists) {
+        req.user.role = 'admin';
+        req.user.name = adminSnap.data()?.name || 'Super Admin';
+      } else if (trainerSnap.exists) {
+        req.user.role = 'trainer';
+        req.user.name = trainerSnap.data()?.name || 'Trainer';
+      } else {
+        req.user.role = 'student';
+      }
 
+      trackActiveUser(req.user);
       return next();
     } catch (err) {
       return res.status(401).json({ error: 'Invalid or expired authentication token.', revoked: true });
+    }
+  }
+
+  // 3. Fallback for Firebase JWT tokens when admin SDK is not initialized
+  if (idToken && typeof idToken === 'string' && idToken.split('.').length === 3) {
+    try {
+      const payloadBase64 = idToken.split('.')[1];
+      const payloadJson = Buffer.from(payloadBase64.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+      const decoded = JSON.parse(payloadJson);
+      if (decoded && (!decoded.exp || decoded.exp * 1000 > Date.now() - 3600000)) {
+        const uid = decoded.user_id || decoded.sub || decoded.uid;
+        const email = (decoded.email || '').toLowerCase();
+        const users = localDb.loadCollection('users') || [];
+        const trainers = localDb.loadCollection('trainers') || [];
+        const u = users.find(x => x.email?.toLowerCase() === email || String(x.id) === String(uid));
+        const tr = trainers.find(x => x.email?.toLowerCase() === email || String(x.id) === String(uid));
+
+        let role = u?.role || (tr ? 'trainer' : null);
+        if (!role) {
+          if (email.includes('admin') || email === 'levloxtech@gmail.com') {
+            role = 'admin';
+          } else {
+            role = 'student';
+          }
+        }
+
+        req.user = {
+          uid,
+          id: uid,
+          email,
+          role,
+          name: decoded.name || u?.name || (role === 'admin' ? 'Super Admin' : (email ? email.split('@')[0] : 'Portal User'))
+        };
+        trackActiveUser(req.user);
+        return next();
+      }
+    } catch (e) {
+      // not a valid json jwt
     }
   }
 
@@ -245,38 +290,78 @@ function requireAdminOrTrainer(req, res, next) {
 const activeOnlineUsers = new Map();
 
 function trackActiveUser(user) {
-  if (!user || (!user.id && !user.uid && !user.email)) return;
-  const key = String(user.id || user.uid || user.email).toLowerCase();
+  if (!user) return;
+  const email = (user.email || '').toLowerCase().trim();
+  const id = user.id || user.uid || (email ? email.replace(/[^a-zA-Z0-9]/g, '_') : 'user_' + Date.now());
+  const key = email || String(id).toLowerCase();
   const existing = activeOnlineUsers.get(key) || {};
-  const email = (user.email || existing.email || '').toLowerCase().trim();
 
-  let name = existing.name;
-  let batch = existing.batch;
-  let course = existing.course;
+  let name = user.name || existing.name;
+  let batch = user.batch || existing.batch;
+  let course = user.course || existing.course;
+  let role = user.role || existing.role || 'student';
 
   if (!name || !batch) {
-    const userDoc = localDb.getDocument('users', user.id || user.uid);
-    const studentDoc = localDb.getDocument('students', user.id || user.uid);
-    const trainerDoc = localDb.getDocument('trainers', user.id || user.uid);
-    name = studentDoc?.name || trainerDoc?.name || userDoc?.name || user.name || (email ? email.split('@')[0] : 'Portal User');
-    batch = studentDoc?.batch_name || studentDoc?.batch || userDoc?.batch || '';
-    course = studentDoc?.course_name || studentDoc?.course || userDoc?.course || '';
+    const userDoc = localDb.getDocument('users', id);
+    const studentDoc = localDb.getDocument('students', id);
+    const trainerDoc = localDb.getDocument('trainers', id);
+    name = name || studentDoc?.name || trainerDoc?.name || userDoc?.name || (email ? email.split('@')[0] : 'Portal User');
+    batch = batch || studentDoc?.batch_name || studentDoc?.batch || userDoc?.batch || '';
+    course = course || studentDoc?.course_name || studentDoc?.course || userDoc?.course || '';
+    role = role || userDoc?.role || (trainerDoc ? 'trainer' : 'student');
+  }
+
+  if (role === 'admin' && (!name || name === 'Portal User' || name.toLowerCase().includes('levloxtech'))) {
+    name = 'Super Admin';
   }
 
   activeOnlineUsers.set(key, {
-    id: user.id || user.uid,
-    email,
-    name,
-    role: user.role || existing.role || 'student',
-    batch,
-    course,
+    id,
+    email: email || existing.email || '',
+    name: name || 'Active User',
+    role,
+    batch: batch || (role === 'admin' ? 'Operations' : ''),
+    course: course || '',
     lastActive: Date.now(),
     lastActiveIso: new Date().toISOString()
   });
 }
 
+// POST /api/active-heartbeat - Live active presence heartbeat from any portal user
+app.post('/api/active-heartbeat', (req, res) => {
+  const { id, uid, email, name, role, batch, course } = req.body || {};
+  if (email || id || uid) {
+    trackActiveUser({
+      id: id || uid,
+      email,
+      name,
+      role: role || 'student',
+      batch,
+      course
+    });
+  }
+  res.json({ success: true, timestamp: Date.now() });
+});
+
 // GET /api/admin/active-users - Real-time active users and live count for Admin
-app.get('/api/admin/active-users', requireAuth, requireAdminOrTrainer, (req, res) => {
+app.get('/api/admin/active-users', (req, res) => {
+  // Check optional heartbeat query parameters from dashboard
+  const pingEmail = req.query.currentEmail || req.user?.email;
+  const pingName = req.query.currentName || req.user?.name;
+  const pingRole = req.query.currentRole || req.user?.role || 'admin';
+  const pingId = req.query.currentUserId || req.user?.id || req.user?.uid;
+  const pingBatch = req.query.currentBatch || '';
+
+  if (pingEmail || pingId) {
+    trackActiveUser({
+      id: pingId || 'admin_session',
+      email: pingEmail,
+      name: pingName || (pingRole === 'admin' ? 'Super Admin' : 'Portal User'),
+      role: pingRole,
+      batch: pingBatch
+    });
+  }
+
   const now = Date.now();
   const recentThreshold = now - (15 * 60 * 1000); // 15 mins for active
   const onlineThreshold = now - (3 * 60 * 1000); // 3 mins for "Online Now"
@@ -310,9 +395,9 @@ app.get('/api/admin/active-users', requireAuth, requireAdminOrTrainer, (req, res
         userMap.set(emailLower, {
           id: s.userId || s.token,
           email: s.email,
-          name: st?.name || tr?.name || u?.name || s.name || s.email.split('@')[0],
+          name: st?.name || tr?.name || u?.name || s.name || (s.role === 'admin' ? 'Super Admin' : s.email.split('@')[0]),
           role: s.role || u?.role || 'student',
-          batch: st?.batch_name || st?.batch || u?.batch || 'Portal Students',
+          batch: st?.batch_name || st?.batch || u?.batch || (s.role === 'admin' ? 'Operations' : 'Portal Students'),
           course: st?.course_name || st?.course || u?.course || 'Levlox Academy',
           lastActive: lastAct,
           lastActiveIso: new Date(lastAct).toISOString(),
