@@ -26,6 +26,14 @@ export default function RegisterSignup() {
     message: ''
   });
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const refCode = params.get('ref') || params.get('referral') || params.get('code');
+    if (refCode) {
+      localStorage.setItem('levlox_referral_code', refCode.trim().toUpperCase());
+    }
+  }, []);
+
   const isValidEmail = (email) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email || '').trim());
   };
@@ -145,8 +153,9 @@ export default function RegisterSignup() {
       };
       localStorage.setItem('levlox_academy_lead', JSON.stringify(leadPayload));
 
-      // 3. Redirect user to the Academy Showcase Page
-      navigate('/academy');
+      // 3. Redirect user to the Academy Showcase Page with referral preserved
+      const savedRef = localStorage.getItem('levlox_referral_code');
+      navigate(savedRef ? `/academy?ref=${encodeURIComponent(savedRef)}` : '/academy');
     } catch (err) {
       setError(err.message);
     } finally {
