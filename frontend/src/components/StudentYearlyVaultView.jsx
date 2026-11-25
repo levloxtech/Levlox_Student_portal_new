@@ -1016,27 +1016,43 @@ export default function StudentYearlyVaultView({
 
                 {/* Title & Description */}
                 <h3 style={{
-                  fontSize: 15.5,
-                  fontWeight: 850,
+                  fontSize: 15,
+                  fontWeight: 800,
                   color: '#0F172A',
                   margin: '0 0 8px',
-                  lineHeight: 1.35
+                  lineHeight: 1.4,
+                  minHeight: 42,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
                 }}>
                   {mat.title}
                 </h3>
                 <p style={{
                   fontSize: 12.5,
                   color: '#64748B',
-                  lineHeight: 1.55,
-                  margin: '0 0 16px',
-                  flex: 1
+                  lineHeight: 1.5,
+                  margin: '0 0 12px',
+                  minHeight: 56,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
                 }}>
                   {mat.description}
                 </p>
 
                 {/* Tech Tags */}
-                {Array.isArray(mat.tags) && mat.tags.length > 0 && (
-                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 16 }}>
+                {Array.isArray(mat.tags) && mat.tags.length > 0 ? (
+                  <div style={{
+                    display: 'flex',
+                    gap: 5,
+                    flexWrap: 'wrap',
+                    alignContent: 'flex-start',
+                    minHeight: 50,
+                    marginBottom: 14
+                  }}>
                     {mat.tags.map((t, i) => (
                       <span
                         key={i}
@@ -1047,19 +1063,23 @@ export default function StudentYearlyVaultView({
                           padding: '2px 8px',
                           borderRadius: 5,
                           fontWeight: 700,
-                          border: '1px solid #E2E8F0'
+                          border: '1px solid #E2E8F0',
+                          lineHeight: 1.5
                         }}
                       >
                         {t}
                       </span>
                     ))}
                   </div>
+                ) : (
+                  <div style={{ minHeight: 50, marginBottom: 14 }} />
                 )}
 
                 {/* Bottom Action Footer */}
                 <div style={{
                   borderTop: '1px solid #F1F5F9',
                   paddingTop: 14,
+                  marginTop: 'auto',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',

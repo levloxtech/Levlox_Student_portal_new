@@ -302,6 +302,93 @@ function generateReferralCode(name, rollNumber) {
   return `REF-${cleanName}-${suffix}`;
 }
 
+// Unified resolver for promotional coupons and student referral codes
+function resolveCouponOrReferral(inputCode) {
+  if (!inputCode) return null;
+  const cleanCode = String(inputCode).trim().toUpperCase();
+  const coupons = getCoupons();
+  let matched = coupons.find(c => c.code?.toUpperCase() === cleanCode);
+  if (!matched && cleanCode.startsWith('REF-')) {
+    const referralProfiles = localDb.loadCollection('referral_profiles') || [];
+    const prof = referralProfiles.find(p => p.referralCode?.toUpperCase() === cleanCode);
+    if (prof) {
+      matched = {
+        id: `ref_${prof.id}`,
+        code: cleanCode,
+        discount: 15,
+        discountType: 'percentage',
+        minPlan: 'all',
+        description: `15% Referral Discount by ${prof.name || 'Student'}`,
+        isActive: true,
+        promoterName: prof.name || '',
+        promoterPhone: prof.phone || '',
+        promoterEmail: prof.email || '',
+        promoterUpiId: prof.upiId || ''
+      };
+    }
+  }
+  return matched;
+}
+
+// ── GET & POST /api/membership/verify-coupon ─────────────────────────────────
+const handleVerifyCoupon = (req, res) => {
+  const code = (req.query.code || req.body?.code || '').trim().toUpperCase();
+  const planId = req.query.planId || req.body?.planId || 'weekly';
+  const email = (req.query.email || req.body?.email || req.user?.email || '').toLowerCase().trim();
+
+  if (!code) {
+    return res.status(400).json({ valid: false, error: 'Please enter a coupon code.' });
+  }
+
+  const matched = resolveCouponOrReferral(code);
+  if (!matched) {
+    return res.status(400).json({ valid: false, error: 'Invalid or expired coupon code.' });
+  }
+
+  if (matched.isActive === false) {
+    return res.status(400).json({ valid: false, error: `Coupon '${code}' is currently inactive.` });
+  }
+
+  if (matched.expiryDate) {
+    const exp = new Date(matched.expiryDate);
+    exp.setHours(23, 59, 59, 999);
+    if (new Date() > exp) {
+      return res.status(400).json({
+        valid: false,
+        error: `Coupon '${matched.code}' expired on ${new Date(matched.expiryDate).toLocaleDateString('en-IN')}.`,
+        isExpired: true
+      });
+    }
+  }
+
+  // Weekly coupons and student referral codes can be used for weekly AND yearly renewals
+  const isPlanMatch = !matched.minPlan || matched.minPlan === 'all' || matched.minPlan === planId ||
+    (matched.minPlan === 'weekly' && (planId === 'weekly' || planId === 'monthly' || planId === 'annual')) ||
+    (matched.minPlan === 'monthly' && (planId === 'weekly' || planId === 'monthly' || planId === 'annual')) ||
+    planId === 'annual';
+
+  if (!isPlanMatch) {
+    return res.status(400).json({ valid: false, error: `Coupon '${code}' is not applicable on this plan.` });
+  }
+
+  const basePrice = (planId === 'annual') ? 11499 : 299;
+  const discountAmount = getCouponDiscountAmount(matched, basePrice, planId);
+
+  return res.json({
+    valid: true,
+    code: matched.code,
+    discount: discountAmount,
+    discountType: matched.discountType || 'flat',
+    discountValue: matched.discount,
+    description: matched.description || `${matched.code} coupon applied`,
+    basePrice,
+    finalPrice: Math.max(0, basePrice - discountAmount)
+  });
+};
+
+router.get('/verify-coupon', handleVerifyCoupon);
+router.post('/verify-coupon', handleVerifyCoupon);
+
 // ── GET /api/membership/coupons
 router.get('/coupons', (req, res) => {
   try {
@@ -664,8 +751,7 @@ router.post('/calculate-price', (req, res) => {
   let appliedCoupon = null;
 
   if (couponCode) {
-    const coupons = getCoupons();
-    const matched = coupons.find(c => c.code.toUpperCase() === String(couponCode).trim().toUpperCase());
+    const matched = resolveCouponOrReferral(couponCode);
     if (matched) {
       if (matched.isActive === false) {
         return res.status(400).json({ error: `Coupon ${couponCode} is currently inactive.` });
@@ -681,8 +767,8 @@ router.post('/calculate-price', (req, res) => {
         }
       }
       const isPlanMatch = !matched.minPlan || matched.minPlan === 'all' || matched.minPlan === planId ||
-        (matched.minPlan === 'weekly' && (planId === 'weekly' || planId === 'monthly')) ||
-        (matched.minPlan === 'monthly' && (planId === 'weekly' || planId === 'monthly')) ||
+        (matched.minPlan === 'weekly' && (planId === 'weekly' || planId === 'monthly' || planId === 'annual')) ||
+        (matched.minPlan === 'monthly' && (planId === 'weekly' || planId === 'monthly' || planId === 'annual')) ||
         planId === 'annual';
 
       if (isPlanMatch) {
@@ -945,8 +1031,7 @@ router.post('/create-order', async (req, res) => {
 
     let couponDiscount = 0;
     if (couponCode) {
-      const coupons = getCoupons();
-      const matched = coupons.find(c => c.code.toUpperCase() === String(couponCode).trim().toUpperCase());
+      const matched = resolveCouponOrReferral(couponCode);
       if (matched && matched.isActive !== false) {
         let isExpired = false;
         if (matched.expiryDate) {
@@ -955,8 +1040,8 @@ router.post('/create-order', async (req, res) => {
           if (new Date() > exp) isExpired = true;
         }
         const isPlanMatch = !matched.minPlan || matched.minPlan === 'all' || matched.minPlan === planId ||
-          (matched.minPlan === 'weekly' && (planId === 'weekly' || planId === 'monthly')) ||
-          (matched.minPlan === 'monthly' && (planId === 'weekly' || planId === 'monthly')) ||
+          (matched.minPlan === 'weekly' && (planId === 'weekly' || planId === 'monthly' || planId === 'annual')) ||
+          (matched.minPlan === 'monthly' && (planId === 'weekly' || planId === 'monthly' || planId === 'annual')) ||
           planId === 'annual';
 
         if (!isExpired && isPlanMatch) {

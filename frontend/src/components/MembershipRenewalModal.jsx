@@ -117,26 +117,43 @@ export default function MembershipRenewalModal({
 
   // Apply Coupon Handler
   const handleApplyCoupon = async (e) => {
-    e.preventDefault();
-    if (!couponCode.trim()) return;
+    if (e && e.preventDefault) e.preventDefault();
+    const cleanCode = couponCode.trim().toUpperCase();
+    if (!cleanCode) return;
     setCouponError('');
     setCouponMessage('');
 
     try {
-      const res = await fetch(`/api/membership/verify-coupon?code=${encodeURIComponent(couponCode.trim())}&planId=${selectedPlan}`);
+      const res = await fetch(`/api/membership/verify-coupon?code=${encodeURIComponent(cleanCode)}&planId=${selectedPlan}&email=${encodeURIComponent(student.email || '')}`);
       const data = await res.json();
       if (res.ok && data.valid) {
-        setCouponDiscount(data.discount || (selectedPlan === 'annual' ? 1400 : 400));
-        setCouponMessage(`Coupon applied: ₹${data.discount || (selectedPlan === 'annual' ? 1400 : 400)} discount added!`);
+        setCouponDiscount(data.discount);
+        setCouponMessage(`✓ Coupon "${cleanCode}" applied! ₹${data.discount} discount deducted.`);
       } else {
         setCouponDiscount(0);
         setCouponError(data.error || 'Invalid or expired coupon code.');
       }
-    } catch (err) {
+    } catch {
       setCouponDiscount(0);
       setCouponError('Could not verify coupon.');
     }
   };
+
+  // Dynamically re-verify coupon when toggling between weekly and annual
+  useEffect(() => {
+    if (couponCode.trim() && couponDiscount > 0) {
+      const cleanCode = couponCode.trim().toUpperCase();
+      fetch(`/api/membership/verify-coupon?code=${encodeURIComponent(cleanCode)}&planId=${selectedPlan}&email=${encodeURIComponent(student.email || '')}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.valid) {
+            setCouponDiscount(data.discount);
+            setCouponMessage(`✓ Coupon "${cleanCode}" applied! ₹${data.discount} discount deducted.`);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [selectedPlan]);
 
   // Payment checkout handler for Weekly Sprint (Continue Learning) or Qualified 1-Year Pass via Real Razorpay Gateway
   const handleRenewalPayment = async () => {
@@ -439,7 +456,7 @@ export default function MembershipRenewalModal({
                 Renew Your Academy Membership
               </h2>
               <p style={{ fontSize: 13, color: '#64748B', margin: 0, lineHeight: 1.5 }}>
-                Your learning validity period has expired. Course recorded lessons, code sandboxes, and cohort materials are currently locked. Select a renewal package to unlock access.
+                Your learning validity period has expired. Select a renewal package below to unlock access.
               </p>
             </div>
 
@@ -507,7 +524,7 @@ export default function MembershipRenewalModal({
                 </div>
 
                 <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <CheckCircle2 size={13} color="#10B981" /> Continue learning to prepare for the qualifying exam • All Python, ML, SQL &amp; 5+ projects
+                  <CheckCircle2 size={13} color="#10B981" /> Full Python, ML, SQL course modules &amp; capstone projects
                 </div>
               </div>
 
@@ -539,7 +556,7 @@ export default function MembershipRenewalModal({
                       {examConfig?.courseName || 'Machine Learning Engineer Internship'} (365 Days • 1 Full Year)
                     </strong>
                     <span style={{ fontSize: 12, color: '#7C3AED', fontWeight: 600 }}>
-                      Attend exam to enroll {examConfig?.courseName || 'Machine Learning Internship'} with certification
+                      Verified internship certification &amp; placement interview kit
                     </span>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -551,7 +568,7 @@ export default function MembershipRenewalModal({
                 </div>
 
                 <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 6, marginBottom: selectedPlan === 'annual' ? 8 : 0 }}>
-                  <CheckCircle2 size={13} color="#10B981" /> 365 Days uninterrupted access, all 9+ projects, 4+ portfolios &amp; certificate
+                  <CheckCircle2 size={13} color="#10B981" /> 365 Days access to all 9+ industry projects, 4 portfolios &amp; certificate
                 </div>
 
                 {/* Exam Requirement Callout when Annual Plan is selected */}
@@ -692,7 +709,7 @@ export default function MembershipRenewalModal({
                   <Tag size={14} color="#94A3B8" style={{ position: 'absolute', left: 10, top: 11 }} />
                   <input
                     type="text"
-                    placeholder="Enter coupon code (e.g. LVX400)"
+                    placeholder="Enter coupon or referral code (e.g. LVX400 or REF-...)"
                     value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                     style={{
