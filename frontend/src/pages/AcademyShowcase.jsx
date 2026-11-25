@@ -1451,102 +1451,102 @@ export default function AcademyShowcase() {
                 }}
               >
                 {testimonials.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => setActiveVideoModal(item)}
-                  style={{
-                    position: 'relative',
-                    width: 'min(280px, calc(100vw - 48px))',
-                    minWidth: 'min(280px, calc(100vw - 48px))',
-                    maxWidth: 290,
-                    height: 380,
-                    borderRadius: 22,
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    boxShadow: '0 12px 32px rgba(16, 27, 51, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.7)',
-                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                    background: '#070E36',
-                    flexShrink: 0,
-                    scrollSnapAlign: 'center',
-                    margin: '0 auto'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-6px)';
-                    e.currentTarget.style.boxShadow = '0 20px 40px rgba(16, 27, 51, 0.2)';
-                    const playBtn = e.currentTarget.querySelector('.story-play-btn');
-                    if (playBtn) playBtn.style.transform = 'scale(1.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(16, 27, 51, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.7)';
-                    const playBtn = e.currentTarget.querySelector('.story-play-btn');
-                    if (playBtn) playBtn.style.transform = 'scale(1)';
-                  }}
-                >
-                  {/* Fallback Stylized Avatar (always rendered underneath) */}
-                  <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'radial-gradient(circle at 50% 25%, #1E2B4D 0%, #070E36 100%)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    paddingBottom: 110
-                  }}>
+                  <div
+                    key={item.id}
+                    onClick={() => setActiveVideoModal(item)}
+                    style={{
+                      position: 'relative',
+                      width: 'min(280px, calc(100vw - 48px))',
+                      minWidth: 'min(280px, calc(100vw - 48px))',
+                      maxWidth: 290,
+                      height: 380,
+                      borderRadius: 22,
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      boxShadow: '0 12px 32px rgba(16, 27, 51, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.7)',
+                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                      background: '#070E36',
+                      flexShrink: 0,
+                      scrollSnapAlign: 'center',
+                      margin: '0 auto'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-6px)';
+                      e.currentTarget.style.boxShadow = '0 20px 40px rgba(16, 27, 51, 0.2)';
+                      const playBtn = e.currentTarget.querySelector('.story-play-btn');
+                      if (playBtn) playBtn.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 12px 32px rgba(16, 27, 51, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.7)';
+                      const playBtn = e.currentTarget.querySelector('.story-play-btn');
+                      if (playBtn) playBtn.style.transform = 'scale(1)';
+                    }}
+                  >
+                    {/* Fallback Stylized Avatar (always rendered underneath) */}
                     <div style={{
-                      width: 68,
-                      height: 68,
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #4568F5 0%, #7C3AED 100%)',
-                      color: '#FFFFFF',
-                      fontSize: 26,
-                      fontWeight: 800,
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'radial-gradient(circle at 50% 25%, #1E2B4D 0%, #070E36 100%)',
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 8px 24px rgba(69, 104, 245, 0.4)',
-                      marginBottom: 8
+                      paddingBottom: 110
                     }}>
-                      {item.studentName ? item.studentName.charAt(0).toUpperCase() : 'L'}
+                      <div style={{
+                        width: 68,
+                        height: 68,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #4568F5 0%, #7C3AED 100%)',
+                        color: '#FFFFFF',
+                        fontSize: 26,
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 8px 24px rgba(69, 104, 245, 0.4)',
+                        marginBottom: 8
+                      }}>
+                        {item.studentName ? item.studentName.charAt(0).toUpperCase() : 'L'}
+                      </div>
+                      <span style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.65)', fontWeight: 600, letterSpacing: '0.3px' }}>
+                        Video Review
+                      </span>
                     </div>
-                    <span style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.65)', fontWeight: 600, letterSpacing: '0.3px' }}>
-                      Video Review
-                    </span>
-                  </div>
 
-                  {/* Background Thumbnail Image (auto-derived & auto-hides if broken/404) */}
-                  {(() => {
-                    const resolved = getResolvedThumbnail(item.videoUrl, item.thumbnailUrl);
-                    if (!resolved) return null;
-                    return (
-                      <img
-                        src={resolved}
-                        alt=""
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          transform: 'scale(1.05)',
-                          zIndex: 1
-                        }}
-                      />
-                    );
-                  })()}
+                      {/* Background Thumbnail Image (auto-derived & auto-hides if broken/404) */}
+                      {(() => {
+                        const resolved = getResolvedThumbnail(item.videoUrl, item.thumbnailUrl);
+                        if (!resolved) return null;
+                        return (
+                          <img
+                            src={resolved}
+                            alt=""
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              transform: 'scale(1.05)',
+                              zIndex: 1
+                            }}
+                          />
+                        );
+                      })()}
 
-                  {/* Gradient Overlay for seamless blend and high-contrast legibility */}
-                  <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(7,14,54,0.15) 35%, rgba(7,14,54,0.7) 65%, rgba(7,14,54,0.95) 100%)',
-                    pointerEvents: 'none',
-                    zIndex: 2
-                  }} />
+                      {/* Gradient Overlay for seamless blend and high-contrast legibility */}
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(7,14,54,0.15) 35%, rgba(7,14,54,0.7) 65%, rgba(7,14,54,0.95) 100%)',
+                        pointerEvents: 'none',
+                        zIndex: 2
+                      }} />
 
                   {/* Card Bottom Content */}
                   <div style={{
@@ -1590,121 +1590,123 @@ export default function AcademyShowcase() {
                         </div>
 
                         {/* Floating Round White Play Button */}
-                        <div
-                          className="story-play-btn"
-                          style={{
-                            width: 38,
-                            height: 38,
-                            borderRadius: '50%',
-                            background: '#FFFFFF',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)',
-                            transition: 'transform 0.2s ease'
-                          }}
-                        >
-                          <Play size={15} fill="#101B33" color="#101B33" style={{ marginLeft: 2 }} />
-                        </div>
-                      </div>
-
-                      {/* Star Rating */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, margin: '6px 0 4px' }}>
-                        {[...Array(5)].map((_, si) => (
-                          <span
-                            key={si}
+                          <div
+                            className="story-play-btn"
                             style={{
-                              color: si < (item.rating || 5) ? '#FBBF24' : 'rgba(255, 255, 255, 0.3)',
-                              fontSize: 13,
-                              lineHeight: 1
-                            }}
-                          >
-                            ★
-                          </span>
-                        ))}
-                        <span style={{ color: '#FBBF24', fontSize: 11, fontWeight: 700, marginLeft: 4 }}>
-                          {(item.rating || 5)}.0
-                        </span>
-                      </div>
-
-                      {/* Feedback / Review Text right at the bottom of the stars */}
-                      {item.feedback ? (
-                        <p style={{
-                          color: 'rgba(255, 255, 255, 0.92)',
-                          fontSize: 12,
-                          lineHeight: 1.45,
-                          margin: '2px 0 8px',
-                          fontStyle: 'italic',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 3,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          "{item.feedback}"
-                        </p>
-                      ) : (
-                        <p style={{
-                          color: 'rgba(255, 255, 255, 0.7)',
-                          fontSize: 12,
-                          lineHeight: 1.4,
-                          margin: '2px 0 8px',
-                          fontStyle: 'italic'
-                        }}>
-                          "Cracked IT interview successfully with Levlox Academy."
-                        </p>
-                      )}
-
-                      {/* LinkedIn Button at the bottom */}
-                      {item.linkedinUrl && (
-                        <div style={{ marginTop: 2 }}>
-                          <a
-                            href={item.linkedinUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            title={`Verify ${item.studentName} on LinkedIn`}
-                            style={{
-                              display: 'inline-flex',
+                              width: 38,
+                              height: 38,
+                              borderRadius: '50%',
+                              background: '#FFFFFF',
+                              display: 'flex',
                               alignItems: 'center',
-                              gap: 4,
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: '#FFFFFF',
-                              background: 'rgba(10, 102, 194, 0.85)',
-                              backdropFilter: 'blur(4px)',
-                              padding: '3px 8px',
-                              borderRadius: 4,
-                              textDecoration: 'none'
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)',
+                              transition: 'transform 0.2s ease'
                             }}
                           >
-                            <svg fill="#FFFFFF" viewBox="0 0 24 24" style={{ width: 10, height: 10 }}>
-                              <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.53 1.53 0 1 0 0-3.06 1.53 1.53 0 0 0 0 3.06m1.39 9.74v-8.37H5.07v8.37h2.78Z" />
-                            </svg>
-                            LinkedIn
-                          </a>
+                            <Play size={15} fill="#101B33" color="#101B33" style={{ marginLeft: 2 }} />
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
 
-              {/* Right Arrow Button (Vertically Centered at Right Side) */}
-              {testimonials.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => scrollTestimonials('right')}
-                  className="carousel-nav-btn carousel-nav-next"
-                  aria-label="Next Testimonials"
-                  title="Scroll right"
-                >
-                  <ChevronRight size={22} strokeWidth={2.4} />
-                </button>
-              )}
+                        {/* Star Rating */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, margin: '6px 0 4px' }}>
+                          {[...Array(5)].map((_, si) => (
+                            <span
+                              key={si}
+                              style={{
+                                color: si < (item.rating || 5) ? '#FBBF24' : 'rgba(255, 255, 255, 0.3)',
+                                fontSize: 13,
+                                lineHeight: 1
+                              }}
+                            >
+                              ★
+                            </span>
+                          ))}
+                          <span style={{ color: '#FBBF24', fontSize: 11, fontWeight: 700, marginLeft: 4 }}>
+                            {(item.rating || 5)}.0
+                          </span>
+                        </div>
+
+                        {/* Feedback / Review Text right at the bottom of the stars */}
+                        {item.feedback ? (
+                          <p style={{
+                            color: 'rgba(255, 255, 255, 0.92)',
+                            fontSize: 12,
+                            lineHeight: 1.45,
+                            margin: '2px 0 8px',
+                            fontStyle: 'italic',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            "{item.feedback}"
+                          </p>
+                        ) : (
+                          <p style={{
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            fontSize: 12,
+                            lineHeight: 1.4,
+                            margin: '2px 0 8px',
+                            fontStyle: 'italic'
+                          }}>
+                            "Cracked IT interview successfully with Levlox Academy."
+                          </p>
+                        )}
+
+                        {/* LinkedIn Button at the bottom */}
+                        {item.linkedinUrl && (
+                          <div style={{ marginTop: 2 }}>
+                            <a
+                              href={item.linkedinUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              title={`Verify ${item.studentName} on LinkedIn`}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: '#FFFFFF',
+                                background: 'rgba(10, 102, 194, 0.85)',
+                                backdropFilter: 'blur(4px)',
+                                padding: '3px 8px',
+                                borderRadius: 4,
+                                textDecoration: 'none'
+                              }}
+                            >
+                              <svg fill="#FFFFFF" viewBox="0 0 24 24" style={{ width: 10, height: 10 }}>
+                                <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.53 1.53 0 1 0 0-3.06 1.53 1.53 0 0 0 0 3.06m1.39 9.74v-8.37H5.07v8.37h2.78Z" />
+                              </svg>
+                              LinkedIn
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                ))}
+                  </div>
+
+              {/* Right Arrow Button (Vertically Centered at Right Side) */ }
+              {
+                    testimonials.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => scrollTestimonials('right')}
+                        className="carousel-nav-btn carousel-nav-next"
+                        aria-label="Next Testimonials"
+                        title="Scroll right"
+                      >
+                        <ChevronRight size={22} strokeWidth={2.4} />
+                      </button>
+                    )
+                  }
             </div>
-          </div>
+            </div>
         </section>
       )}
 

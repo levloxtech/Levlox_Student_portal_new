@@ -286,10 +286,15 @@ router.get('/coupons', (req, res) => {
   }
 });
 
-// POST /api/membership/coupons (Create or Update Coupon)
+// POST /api/membership/coupons (Create or Update Coupon with Promoter / Beneficiary Details)
 router.post('/coupons', (req, res) => {
   try {
-    const { code, discount, minPlan, expiryDate, description, isActive } = req.body || {};
+    const {
+      code, discount, minPlan, expiryDate, description, isActive,
+      promoterName, promoterPhone, promoterEmail, promoterWhatsapp, promoterUpiId,
+      name, phone, email, whatsapp, upiId
+    } = req.body || {};
+
     if (!code || !discount) {
       return res.status(400).json({ error: 'Coupon code and discount amount are required.' });
     }
@@ -311,6 +316,14 @@ router.post('/coupons', (req, res) => {
       expiryDate: expiryDate || null,
       description: description || `₹${cleanDiscount} promotional discount`,
       isActive: isActive !== false,
+      // Promoter / Beneficiary / Affiliate details:
+      promoterName: (promoterName || name || '').trim(),
+      promoterPhone: (promoterPhone || phone || '').trim(),
+      promoterEmail: (promoterEmail || email || '').trim().toLowerCase(),
+      promoterWhatsapp: (promoterWhatsapp || whatsapp || promoterPhone || phone || '').trim(),
+      promoterUpiId: (promoterUpiId || upiId || '').trim(),
+      redemptionCount: existingIndex >= 0 ? (coupons[existingIndex].redemptionCount || 0) : 0,
+      totalDiscountGiven: existingIndex >= 0 ? (coupons[existingIndex].totalDiscountGiven || 0) : 0,
       updatedAt: new Date().toISOString()
     };
 
@@ -325,6 +338,23 @@ router.post('/coupons', (req, res) => {
     res.json({ success: true, message: 'Coupon saved successfully', coupon: couponData });
   } catch (err) {
     res.status(500).json({ error: 'Failed to save coupon: ' + err.message });
+  }
+});
+
+// GET /api/membership/coupon-redemptions (List all redemptions with student & promoter tracking)
+router.get('/coupon-redemptions', (req, res) => {
+  try {
+    const { code } = req.query || {};
+    let redemptions = localDb.loadCollection('coupon_redemptions') || [];
+    if (code) {
+      const filterCode = String(code).trim().toUpperCase();
+      redemptions = redemptions.filter(r => r.couponCode?.toUpperCase() === filterCode);
+    }
+    // Sort newest first
+    redemptions.sort((a, b) => new Date(b.redeemedAt || 0) - new Date(a.redeemedAt || 0));
+    res.json({ success: true, count: redemptions.length, redemptions });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch coupon redemptions: ' + err.message });
   }
 });
 
@@ -848,10 +878,11 @@ router.post('/verify-payment', async (req, res) => {
       }
     }
     let couponDiscount = 0;
+    let matchedCoupon = null;
     if (couponCode) {
       const coupons = getCoupons();
-      const matched = coupons.find(c => c.code.toUpperCase() === String(couponCode).trim().toUpperCase());
-      if (matched) couponDiscount = matched.discount;
+      matchedCoupon = coupons.find(c => c.code.toUpperCase() === String(couponCode).trim().toUpperCase());
+      if (matchedCoupon) couponDiscount = matchedCoupon.discount;
     }
 
     const storeCreditsList = localDb.loadCollection('store_credits');
@@ -891,6 +922,8 @@ router.post('/verify-payment', async (req, res) => {
       basePrice,
       couponDiscount,
       couponCode: couponCode || null,
+      promoterName: matchedCoupon?.promoterName || null,
+      promoterUpiId: matchedCoupon?.promoterUpiId || null,
       creditsDeducted,
       paidAmount,
       currency: 'INR',
@@ -901,6 +934,50 @@ router.post('/verify-payment', async (req, res) => {
     };
     invoices.push(invoiceRecord);
     localDb.saveCollection('invoices', invoices);
+
+    // 4b. Log Coupon Redemption with student and promoter tracking
+    if (couponCode && couponDiscount > 0) {
+      try {
+        const cleanCouponCode = String(couponCode).trim().toUpperCase();
+        let allCoupons = localDb.loadCollection('coupons');
+        let targetCoupon = allCoupons.find(c => c.code?.toUpperCase() === cleanCouponCode) || matchedCoupon;
+        if (targetCoupon) {
+          targetCoupon.redemptionCount = (targetCoupon.redemptionCount || 0) + 1;
+          targetCoupon.totalDiscountGiven = (targetCoupon.totalDiscountGiven || 0) + couponDiscount;
+          localDb.saveCollection('coupons', allCoupons);
+        }
+
+        const redemptions = localDb.loadCollection('coupon_redemptions');
+        const redemptionEntry = {
+          id: `red_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          couponCode: cleanCouponCode,
+          couponId: targetCoupon?.id || null,
+          discount: couponDiscount,
+          // Promoter / Beneficiary Info (who owns this coupon):
+          promoterName: targetCoupon?.promoterName || '',
+          promoterPhone: targetCoupon?.promoterPhone || '',
+          promoterEmail: targetCoupon?.promoterEmail || '',
+          promoterWhatsapp: targetCoupon?.promoterWhatsapp || targetCoupon?.promoterPhone || '',
+          promoterUpiId: targetCoupon?.promoterUpiId || '',
+          // Student / User Info (who redeemed):
+          studentName: name || normEmail.split('@')[0],
+          studentEmail: normEmail,
+          studentPhone: phone || '',
+          planId,
+          planName: plan.name,
+          basePrice,
+          paidAmount,
+          invoiceNumber,
+          orderId: razorpay_order_id || `sim_ord_${Date.now()}`,
+          paymentId: razorpay_payment_id || `sim_pay_${Date.now()}`,
+          redeemedAt: new Date().toISOString()
+        };
+        redemptions.push(redemptionEntry);
+        localDb.saveCollection('coupon_redemptions', redemptions);
+      } catch (redErr) {
+        console.warn('[Membership] Failed to log coupon redemption:', redErr.message);
+      }
+    }
 
     // 5. Create or Activate Student Account in students.json & users.json
     const users = localDb.loadCollection('users');
