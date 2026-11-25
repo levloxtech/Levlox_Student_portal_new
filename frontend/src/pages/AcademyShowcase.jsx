@@ -1802,10 +1802,10 @@ export default function AcademyShowcase() {
           </h2>
           <div style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', gap: 8, background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '6px 16px', borderRadius: 20 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: '#1E40AF' }}>
-              Total Curriculum Value: <strong>₹42,500</strong> (4 Comprehensive Course Modules)
+              4 Comprehensive Course Modules (Recorded Lessons & Practical Exercises)
             </span>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#059669', background: '#D1FAE5', padding: '2px 8px', borderRadius: 10 }}>
-              Free for Academy Members
+              Enroll to Get Free
             </span>
           </div>
         </div>
@@ -1842,8 +1842,18 @@ export default function AcademyShowcase() {
                     {course.badge}
                   </span>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 11, color: '#64748B' }}>Standalone Value</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: '#059669' }}>₹{course.referenceValue.toLocaleString('en-IN')}</div>
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#047857',
+                      background: '#ECFDF5',
+                      border: '1px solid #A7F3D0',
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      display: 'inline-block'
+                    }}>
+                      Enroll to Get Free
+                    </span>
                   </div>
                 </div>
 
@@ -2070,10 +2080,10 @@ export default function AcademyShowcase() {
             </h2>
             <div style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', gap: 8, background: '#F0FDF4', border: '1px solid #BBF7D0', padding: '6px 16px', borderRadius: 20 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#166534' }}>
-                Total Industrial Projects Value: <strong>₹1,00,000</strong> (9 Real Enterprise Capstones)
+                9 Real Enterprise Capstones (Full Production Codebases & Architecture)
               </span>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#059669', background: '#DCFCE7', padding: '2px 8px', borderRadius: 10 }}>
-                Free for Academy Members
+                Enroll to Get Free
               </span>
             </div>
           </div>
@@ -2138,7 +2148,7 @@ export default function AcademyShowcase() {
                         whiteSpace: 'nowrap',
                         flexShrink: 0
                       }}>
-                        Worth {p.worth}
+                        Enroll to Get Free
                       </span>
                     </div>
 
@@ -2306,7 +2316,7 @@ export default function AcademyShowcase() {
                         whiteSpace: 'nowrap',
                         flexShrink: 0
                       }}>
-                        Worth {p.worth}
+                        Enroll to Get Free
                       </span>
                     </div>
 
@@ -2474,7 +2484,7 @@ export default function AcademyShowcase() {
                         whiteSpace: 'nowrap',
                         flexShrink: 0
                       }}>
-                        Worth {p.worth}
+                        Enroll to Get Free
                       </span>
                     </div>
 
@@ -2595,14 +2605,7 @@ export default function AcademyShowcase() {
           <h2 style={{ fontSize: 32, fontWeight: 800, color: '#101B33', margin: '8px 0 8px' }}>
             Industry-Level & Portfolio Projects
           </h2>
-          <div style={{ marginBottom: 12, display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', gap: 8, background: '#FEF3C7', border: '1px solid #FDE68A', padding: '6px 16px', borderRadius: 20 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#92400E' }}>
-              Total Portfolio Value: <strong>₹57,000</strong> (4 Production-Grade Portfolios)
-            </span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#059669', background: '#D1FAE5', padding: '2px 8px', borderRadius: 10 }}>
-              Free for Academy Members
-            </span>
-          </div>
+
           <p style={{ color: '#64748B', fontSize: 15, maxWidth: 640, margin: '0 auto' }}>
             Stand out in tech interviews by demonstrating real production experience on complex enterprise systems.
           </p>
@@ -2626,7 +2629,18 @@ export default function AcademyShowcase() {
                 <span style={{ fontSize: 11, fontWeight: 800, color: '#D97706', background: '#FEF3C7', border: '1px solid #FDE68A', padding: '3px 8px', borderRadius: 6 }}>
                   PORTFOLIO #{idx + 1}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#059669' }}>{proj.value}</span>
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: '#047857',
+                  background: '#ECFDF5',
+                  border: '1px solid #A7F3D0',
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                  whiteSpace: 'nowrap'
+                }}>
+                  Enroll to Get Free
+                </span>
               </div>
               <h4 style={{ fontSize: 17, fontWeight: 700, color: '#101B33', margin: 0, lineHeight: 1.35 }}>{proj.name}</h4>
               <div style={{ fontSize: 12, color: '#64748B' }}><strong>Tech Stack:</strong> {proj.tech}</div>
@@ -2731,10 +2745,10 @@ export default function AcademyShowcase() {
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', gap: 8, background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '6px 16px', borderRadius: 20 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#065F46' }}>
-                Total Kit Value: <strong>₹19,000</strong> (ATS Resume, LinkedIn & 500+ Interview Q&A)
+                Complete Placement Preparation (ATS Resume, LinkedIn & 500+ Interview Q&A)
               </span>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#059669', background: '#D1FAE5', padding: '2px 8px', borderRadius: 10 }}>
-                Free for Academy Members
+                Enroll to Get Free
               </span>
             </div>
           </div>
@@ -2785,7 +2799,7 @@ export default function AcademyShowcase() {
                     borderRadius: 6,
                     whiteSpace: 'nowrap'
                   }}>
-                    Worth {item.worth}
+                    Enroll to Get Free
                   </span>
                 </div>
 
@@ -5100,18 +5114,17 @@ export default function AcademyShowcase() {
                     }}>
                       {selectedProjectVideoModal.categoryLabel || 'Industrial Project'}
                     </span>
-                    {selectedProjectVideoModal.worth && (
-                      <span style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: '#047857',
-                        background: '#ECFDF5',
-                        padding: '2px 8px',
-                        borderRadius: 4
-                      }}>
-                        Worth {selectedProjectVideoModal.worth}
-                      </span>
-                    )}
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#047857',
+                      background: '#ECFDF5',
+                      border: '1px solid #A7F3D0',
+                      padding: '2px 8px',
+                      borderRadius: 4
+                    }}>
+                      Enroll to Get Free
+                    </span>
                   </div>
                   <h3 style={{
                     fontSize: 16.5,
