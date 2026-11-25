@@ -1855,32 +1855,71 @@ export default function AcademyShowcase() {
             gap: 24px;
             align-items: stretch;
           }
+          .industrial-category-col {
+            background: #F8FAFC;
+            border-radius: 16px;
+            padding: 22px;
+            border: 1px solid #E2E8F0;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+          }
+          .industrial-cards-container {
+            display: grid;
+            grid-template-rows: repeat(3, 1fr);
+            gap: 16px;
+            flex-grow: 1;
+          }
           .industrial-project-card {
             background: #FFFFFF;
             padding: 16px 18px;
-            border-radius: 12px;
+            border-radius: 14px;
             border: 1px solid #E2E8F0;
             box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
             display: flex;
             flex-direction: column;
+            justify-content: space-between;
             gap: 12px;
-            transition: all 0.2s ease;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            height: 100%;
+            box-sizing: border-box;
           }
           .industrial-project-card:hover {
             border-color: #CBD5E1;
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
             transform: translateY(-2px);
+          }
+          .project-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            min-height: 40px;
+          }
+          .project-card-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0F172A;
+            line-height: 1.35;
+            margin: 0;
+          }
+          .project-card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-content: flex-start;
+            min-height: 48px;
           }
           .project-media-slot {
             position: relative;
             width: 100%;
-            height: 120px;
-            border-radius: 8px;
+            aspect-ratio: 16 / 9;
+            border-radius: 10px;
             overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #F1F5F9;
+            background: #0B0F19;
             border: 1px solid #E2E8F0;
             transition: all 0.2s ease;
           }
@@ -1888,10 +1927,21 @@ export default function AcademyShowcase() {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transition: transform 0.3s ease;
+            transition: transform 0.35s ease;
           }
           .industrial-project-card:hover .project-media-img {
             transform: scale(1.04);
+          }
+          .project-card-outcome {
+            font-size: 12px;
+            color: #64748B;
+            line-height: 1.48;
+            margin: 0;
+            min-height: 36px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
           }
           .project-video-badge {
             position: absolute;
@@ -1922,10 +1972,32 @@ export default function AcademyShowcase() {
           .project-video-badge:hover .project-play-pill {
             transform: scale(1.05);
           }
-          @media (max-width: 980px) {
+          @media (max-width: 1080px) {
             .industrial-projects-grid {
               grid-template-columns: 1fr !important;
-              gap: 28px !important;
+              gap: 24px !important;
+            }
+            .industrial-cards-container {
+              grid-template-rows: auto !important;
+            }
+          }
+          @media (max-width: 640px) {
+            .industrial-category-col {
+              padding: 16px 14px !important;
+              border-radius: 14px !important;
+            }
+            .industrial-project-card {
+              padding: 14px 14px !important;
+              gap: 10px !important;
+            }
+            .project-card-header {
+              min-height: auto !important;
+            }
+            .project-card-tags {
+              min-height: auto !important;
+            }
+            .project-card-outcome {
+              min-height: auto !important;
             }
           }
         `}</style>
@@ -1955,14 +2027,7 @@ export default function AcademyShowcase() {
 
           <div className="industrial-projects-grid">
             {/* Python Category Column */}
-            <div style={{
-              background: '#F8FAFC',
-              borderRadius: 16,
-              padding: 22,
-              border: '1px solid #E2E8F0',
-              display: 'flex',
-              flexDirection: 'column'
-            }}>
+            <div className="industrial-category-col">
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -2002,11 +2067,11 @@ export default function AcademyShowcase() {
                 </span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flexGrow: 1 }}>
+              <div className="industrial-cards-container">
                 {pythonProjectsData.map((p, i) => (
                   <div key={p.id || i} className="industrial-project-card" style={{ borderLeft: '3.5px solid #2563EB' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', lineHeight: 1.35 }}>
+                    <div className="project-card-header">
+                      <div className="project-card-title">
                         {i + 1}. {p.name}
                       </div>
                       <span style={{
@@ -2024,7 +2089,7 @@ export default function AcademyShowcase() {
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    <div className="project-card-tags">
                       {(p.tags || []).map((tag, tIdx) => (
                         <span key={tIdx} style={{
                           fontSize: 10,
@@ -2121,7 +2186,7 @@ export default function AcademyShowcase() {
                       </div>
                     )}
 
-                    <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
+                    <div className="project-card-outcome">
                       {p.outcome}
                     </div>
                   </div>
@@ -2130,14 +2195,7 @@ export default function AcademyShowcase() {
             </div>
 
             {/* ML Category Column */}
-            <div style={{
-              background: '#F8FAFC',
-              borderRadius: 16,
-              padding: 22,
-              border: '1px solid #E2E8F0',
-              display: 'flex',
-              flexDirection: 'column'
-            }}>
+            <div className="industrial-category-col">
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -2177,11 +2235,11 @@ export default function AcademyShowcase() {
                 </span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flexGrow: 1 }}>
+              <div className="industrial-cards-container">
                 {mlProjectsData.map((p, i) => (
                   <div key={p.id || i} className="industrial-project-card" style={{ borderLeft: '3.5px solid #7C3AED' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', lineHeight: 1.35 }}>
+                    <div className="project-card-header">
+                      <div className="project-card-title">
                         {i + 1}. {p.name}
                       </div>
                       <span style={{
@@ -2199,7 +2257,7 @@ export default function AcademyShowcase() {
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    <div className="project-card-tags">
                       {(p.tags || []).map((tag, tIdx) => (
                         <span key={tIdx} style={{
                           fontSize: 10,
@@ -2296,7 +2354,7 @@ export default function AcademyShowcase() {
                       </div>
                     )}
 
-                    <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
+                    <div className="project-card-outcome">
                       {p.outcome}
                     </div>
                   </div>
@@ -2305,14 +2363,7 @@ export default function AcademyShowcase() {
             </div>
 
             {/* SQL Category Column */}
-            <div style={{
-              background: '#F8FAFC',
-              borderRadius: 16,
-              padding: 22,
-              border: '1px solid #E2E8F0',
-              display: 'flex',
-              flexDirection: 'column'
-            }}>
+            <div className="industrial-category-col">
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -2352,11 +2403,11 @@ export default function AcademyShowcase() {
                 </span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flexGrow: 1 }}>
+              <div className="industrial-cards-container">
                 {sqlProjectsData.map((p, i) => (
                   <div key={p.id || i} className="industrial-project-card" style={{ borderLeft: '3.5px solid #059669' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', lineHeight: 1.35 }}>
+                    <div className="project-card-header">
+                      <div className="project-card-title">
                         {i + 1}. {p.name}
                       </div>
                       <span style={{
@@ -2374,7 +2425,7 @@ export default function AcademyShowcase() {
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    <div className="project-card-tags">
                       {(p.tags || []).map((tag, tIdx) => (
                         <span key={tIdx} style={{
                           fontSize: 10,
@@ -2471,7 +2522,7 @@ export default function AcademyShowcase() {
                       </div>
                     )}
 
-                    <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
+                    <div className="project-card-outcome">
                       {p.outcome}
                     </div>
                   </div>
@@ -2543,7 +2594,7 @@ export default function AcademyShowcase() {
                       });
                     }
                   }}
-                  style={{ cursor: proj.videoUrl ? 'pointer' : 'default', height: 125 }}
+                  style={{ cursor: proj.videoUrl ? 'pointer' : 'default' }}
                 >
                   {proj.thumbnailUrl ? (
                     <img src={proj.thumbnailUrl} alt={proj.name} className="project-media-img" />
@@ -2583,8 +2634,7 @@ export default function AcademyShowcase() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 8,
-                    padding: '8px 12px',
-                    height: 90
+                    padding: '8px 12px'
                   }}
                 >
                   <div style={{
