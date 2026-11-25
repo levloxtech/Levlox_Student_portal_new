@@ -1140,7 +1140,7 @@ const StudentDashboard = () => {
     ? [
         { id: 'recorded-classes-tab', icon: <BookOpen size={18} strokeWidth={2} />, label: 'Courses' },
         { id: 'yearly-vault-tab', icon: <Award size={18} strokeWidth={2} />, label: 'Internship Hub' },
-        { id: 'referral-tab', icon: <Share2 size={18} strokeWidth={2} />, label: 'Refer & Earn (15%)' },
+        { id: 'referral-tab', icon: <Share2 size={18} strokeWidth={2} />, label: 'Refer & Earn', isLocked: true },
         { id: 'profile', icon: <User size={18} strokeWidth={2} />, label: 'Profile' },
         { id: 'dashboard', icon: <Bookmark size={18} strokeWidth={2} />, label: 'Dashboard' },
         { id: 'my-courses', icon: <Video size={18} strokeWidth={2} />, label: 'Live Classes' },
@@ -1152,7 +1152,7 @@ const StudentDashboard = () => {
         { id: 'dashboard', icon: <Bookmark size={18} strokeWidth={2} />, label: 'Dashboard' },
         { id: 'recorded-classes-tab', icon: <BookOpen size={18} strokeWidth={2} />, label: 'Courses' },
         { id: 'yearly-vault-tab', icon: <Award size={18} strokeWidth={2} />, label: 'Internship Hub' },
-        { id: 'referral-tab', icon: <Share2 size={18} strokeWidth={2} />, label: 'Refer & Earn (15%)' },
+        { id: 'referral-tab', icon: <Share2 size={18} strokeWidth={2} />, label: 'Refer & Earn', isLocked: true },
         { id: 'my-courses', icon: <Video size={18} strokeWidth={2} />, label: 'Live Classes' },
         { id: 'assignments-tab', icon: <FileText size={18} strokeWidth={2} />, label: 'Assignments' },
         { id: 'attendance-tab', icon: <CalendarCheck size={18} strokeWidth={2} />, label: 'Attendance' },
@@ -1219,6 +1219,10 @@ const StudentDashboard = () => {
                     showModal('Security Alert', 'You are logged in with a temporary password. Please change your password to unlock the student portal.', 'warning');
                     return;
                   }
+                  if (item.isLocked) {
+                    showModal('Refer & Earn Program Launching Soon', 'The Student Refer & Earn 15% Direct UPI Cashback Program is currently undergoing final system activation. It will be unlocked for all students shortly!', 'info');
+                    return;
+                  }
                   setActiveTab(item.id);
                   setSelectedCourse(null);
                   setMobileMenuOpen(false);
@@ -1231,7 +1235,12 @@ const StudentDashboard = () => {
                 {item.icon}
                 <span className="sidebar-link-text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                   {item.label}
-                  {isCohortLocked && (
+                  {item.isLocked && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: '#4F46E5', background: '#EEF2FF', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+                      <Lock size={10} /> Locked
+                    </span>
+                  )}
+                  {isCohortLocked && !item.isLocked && (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 10, color: '#D97706', background: '#FEF3C7', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
                       <Lock size={10} /> Locked
                     </span>
@@ -3296,12 +3305,44 @@ const StudentDashboard = () => {
             />
           )}
 
-          {/* STUDENT REFERRAL & 15% CASHBACK PROGRAM TAB */}
+          {/* STUDENT REFERRAL & 15% CASHBACK PROGRAM TAB (LOCKED FOR LAUNCH) */}
           {activeTab === 'referral-tab' && (
-            <StudentReferralView
-              currentUser={currentUser || user}
-              userProfile={userProfile || studentDoc}
-            />
+            <div style={{
+              background: '#FFFFFF',
+              borderRadius: 16,
+              padding: '60px 24px',
+              textAlign: 'center',
+              border: '1px solid #E2E8F0',
+              maxWidth: 580,
+              margin: '40px auto',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.06)'
+            }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%',
+                background: '#EEF2FF', color: '#4F46E5',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                marginBottom: 16
+              }}>
+                <Lock size={30} />
+              </div>
+              <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800, color: '#0F172A' }}>
+                Refer & Earn Program Launching Soon
+              </h2>
+              <p style={{ margin: '0 auto 20px', color: '#64748B', fontSize: 14, lineHeight: 1.6, maxWidth: 440 }}>
+                The Student 15% Direct UPI Cashback Program is currently undergoing final verification. It will be activated shortly for all enrolled students!
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab('dashboard')}
+                style={{
+                  background: '#4F46E5', color: '#FFF', border: 'none',
+                  padding: '10px 22px', borderRadius: 8, fontSize: 13.5, fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Back to Dashboard
+              </button>
+            </div>
           )}
 
           {/* ASSIGNMENTS & CAPSTONE PROJECTS TAB */}
