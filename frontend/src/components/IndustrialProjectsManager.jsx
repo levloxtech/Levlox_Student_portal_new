@@ -346,6 +346,12 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
     e.preventDefault();
     if (!editingProject) return;
 
+    // When adding a video, a thumbnail image is required as the cover
+    if (formVideoUrl.trim() && !formThumbnailUrl.trim()) {
+      setErrorMessage('A thumbnail image is required when adding a video, so the project card has a cover image. Please upload a thumbnail image.');
+      return;
+    }
+
     setIsSaving(true);
     setErrorMessage('');
 
@@ -641,6 +647,56 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
                   }}
                 >
                   <div>
+                    {/* Project Cover Thumbnail Preview */}
+                    {p.thumbnailUrl && (
+                      <div style={{
+                        position: 'relative',
+                        width: '100%',
+                        paddingBottom: '52%',
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        marginBottom: 12,
+                        background: '#0F172A',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                      }}>
+                        <img
+                          src={p.thumbnailUrl}
+                          alt={p.name}
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                        />
+                        {p.videoUrl && (
+                          <div style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: 'rgba(15, 23, 42, 0.35)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <div style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: '50%',
+                              background: '#2563EB',
+                              color: '#FFFFFF',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.5)'
+                            }}>
+                              <Play size={15} fill="#FFFFFF" style={{ marginLeft: 2 }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Header: Title & Worth Badge */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
                       <div>
@@ -791,6 +847,56 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
               }}
             >
               <div>
+                {/* Project Cover Thumbnail Preview */}
+                {proj.thumbnailUrl && (
+                  <div style={{
+                    position: 'relative',
+                    width: '100%',
+                    paddingBottom: '52%',
+                    borderRadius: 12,
+                    overflow: 'hidden',
+                    marginBottom: 12,
+                    background: '#0F172A',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                  }}>
+                    <img
+                      src={proj.thumbnailUrl}
+                      alt={proj.name}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                    />
+                    {proj.videoUrl && (
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'rgba(15, 23, 42, 0.35)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <div style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: '50%',
+                          background: '#2563EB',
+                          color: '#FFFFFF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 12px rgba(37, 99, 235, 0.5)'
+                        }}>
+                          <Play size={15} fill="#FFFFFF" style={{ marginLeft: 2 }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Header: Portfolio Badge & Worth */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                   <span style={{
@@ -1097,20 +1203,54 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
                 marginBottom: 18
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <label style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
-                    <ImageIcon size={16} color="#6C3CF0" />
-                    <span>Project Thumbnail Image</span>
-                  </label>
+                  <div>
+                    <label style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                      <ImageIcon size={16} color="#2563EB" />
+                      <span>Cover Thumbnail Image</span>
+                      {formVideoUrl.trim() ? (
+                        <span style={{
+                          fontSize: 10.5,
+                          fontWeight: 800,
+                          color: '#DC2626',
+                          background: '#FEE2E2',
+                          border: '1px solid #FECACA',
+                          padding: '1px 7px',
+                          borderRadius: 5
+                        }}>
+                          Required with Video
+                        </span>
+                      ) : (
+                        <span style={{
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          color: '#64748B',
+                          background: '#F1F5F9',
+                          border: '1px solid #CBD5E1',
+                          padding: '1px 7px',
+                          borderRadius: 5
+                        }}>
+                          Card Cover Image
+                        </span>
+                      )}
+                    </label>
+                    <p style={{ margin: '3px 0 0', fontSize: 12, color: '#64748B' }}>
+                      {formVideoUrl.trim()
+                        ? 'A thumbnail image is required to display as the video cover on the project card.'
+                        : 'Upload an image directly to the server to display on the project card.'}
+                    </p>
+                  </div>
                   {formThumbnailUrl && (
                     <button
                       type="button"
                       onClick={() => setFormThumbnailUrl('')}
                       style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#EF4444',
-                        fontSize: 12,
+                        background: '#FEE2E2',
+                        border: '1px solid #FECACA',
+                        color: '#DC2626',
+                        fontSize: 11.5,
                         fontWeight: 700,
+                        padding: '4px 10px',
+                        borderRadius: 6,
                         cursor: 'pointer'
                       }}
                     >
@@ -1322,6 +1462,27 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
                     </span>
                   )}
                 </div>
+
+                {/* Cover Thumbnail Required Warning */}
+                {formVideoUrl.trim() && !formThumbnailUrl.trim() && (
+                  <div style={{
+                    marginTop: 8,
+                    marginBottom: 10,
+                    background: '#FFFBEB',
+                    border: '1.5px solid #FDE68A',
+                    color: '#B45309',
+                    padding: '10px 14px',
+                    borderRadius: 9,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8
+                  }}>
+                    <AlertCircle size={16} color="#D97706" style={{ flexShrink: 0 }} />
+                    <span><strong>Cover Thumbnail Required:</strong> A thumbnail image is required when adding a video walkthrough. Please upload a thumbnail image above before saving.</span>
+                  </div>
+                )}
 
                 {/* Upload Progress Bar */}
                 {isUploadingVideo && (
