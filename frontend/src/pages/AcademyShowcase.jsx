@@ -1065,12 +1065,9 @@ export default function AcademyShowcase() {
             box-shadow: 0 4px 14px rgba(16, 27, 51, 0.22);
           }
         }
-        @media (max-width: 480px) {
-          .carousel-nav-prev {
-            left: 2px;
-          }
-          .carousel-nav-next {
-            right: 2px;
+        @media (max-width: 640px) {
+          .carousel-nav-btn {
+            display: none !important;
           }
         }
         @media (max-width: 768px) {
@@ -1426,21 +1423,26 @@ export default function AcademyShowcase() {
 
             {/* Carousel Container with Floating Side Navigation Buttons */}
             <div style={{ position: 'relative' }}>
-              {/* Left Arrow Button (Vertically Centered at Left Side) */}
-              <button
-                type="button"
-                onClick={() => scrollTestimonials('left')}
-                className="carousel-nav-btn carousel-nav-prev"
-                aria-label="Previous Testimonials"
-                title="Scroll left"
-              >
-                <ChevronLeft size={22} strokeWidth={2.4} />
-              </button>
+              {/* Left Arrow Button (Only if multiple testimonials exist) */}
+              {testimonials.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => scrollTestimonials('left')}
+                  className="carousel-nav-btn carousel-nav-prev"
+                  aria-label="Previous Testimonials"
+                  title="Scroll left"
+                >
+                  <ChevronLeft size={22} strokeWidth={2.4} />
+                </button>
+              )}
 
               {/* Single Row with Side Movement Scroll (Horizontal Carousel) */}
               <div
                 ref={testimonialsScrollRef}
                 className="testimonials-carousel-row"
+                style={{
+                  justifyContent: testimonials.length <= 3 ? 'center' : 'flex-start'
+                }}
               >
                 {testimonials.map((item) => (
                 <div
@@ -1448,18 +1450,19 @@ export default function AcademyShowcase() {
                   onClick={() => setActiveVideoModal(item)}
                   style={{
                     position: 'relative',
-                    width: 250,
-                    minWidth: 250,
-                    maxWidth: 250,
-                    height: 350,
+                    width: 'min(280px, calc(100vw - 48px))',
+                    minWidth: 'min(280px, calc(100vw - 48px))',
+                    maxWidth: 300,
+                    height: 385,
                     borderRadius: 22,
                     overflow: 'hidden',
                     cursor: 'pointer',
-                    boxShadow: '0 8px 24px rgba(16, 27, 51, 0.08)',
+                    boxShadow: '0 12px 32px rgba(16, 27, 51, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.7)',
                     transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                    background: '#0F172A',
+                    background: '#0B0F19',
                     flexShrink: 0,
-                    scrollSnapAlign: 'start'
+                    scrollSnapAlign: 'center',
+                    margin: '0 auto'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-6px)';
@@ -1469,7 +1472,7 @@ export default function AcademyShowcase() {
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(16, 27, 51, 0.08)';
+                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(16, 27, 51, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.7)';
                     const playBtn = e.currentTarget.querySelector('.story-play-btn');
                     if (playBtn) playBtn.style.transform = 'scale(1)';
                   }}
@@ -1680,16 +1683,18 @@ export default function AcademyShowcase() {
               ))}
               </div>
 
-              {/* Right Arrow Button (Vertically Centered at Right Side) */}
-              <button
-                type="button"
-                onClick={() => scrollTestimonials('right')}
-                className="carousel-nav-btn carousel-nav-next"
-                aria-label="Next Testimonials"
-                title="Scroll right"
-              >
-                <ChevronRight size={22} strokeWidth={2.4} />
-              </button>
+              {/* Right Arrow Button (Only if multiple testimonials exist) */}
+              {testimonials.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => scrollTestimonials('right')}
+                  className="carousel-nav-btn carousel-nav-next"
+                  aria-label="Next Testimonials"
+                  title="Scroll right"
+                >
+                  <ChevronRight size={22} strokeWidth={2.4} />
+                </button>
+              )}
             </div>
           </div>
         </section>
