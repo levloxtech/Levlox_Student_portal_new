@@ -486,6 +486,61 @@ export default function AcademyShowcase() {
   // Hero Banner Company Video
   const [heroBannerData, setHeroBannerData] = useState(null);
   const [isPlayingHeroVideo, setIsPlayingHeroVideo] = useState(false);
+  const heroVideoRef = useRef(null);
+  const heroVideoContainerRef = useRef(null);
+
+  const handlePlayHeroVideo = () => {
+    if (!heroBannerData?.videoUrl) return;
+    setIsPlayingHeroVideo(true);
+
+    const isIframe =
+      getEmbedUrl(heroBannerData.videoUrl).includes('youtube.com/embed') ||
+      getEmbedUrl(heroBannerData.videoUrl).includes('drive.google.com');
+
+    const videoEl = heroVideoRef.current;
+    const containerEl = heroVideoContainerRef.current;
+
+    if (!isIframe && videoEl) {
+      const playPromise = videoEl.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => console.log('Autoplay handled:', err));
+      }
+
+      // Automatically launch fullscreen for optimal mobile phone and desktop viewing
+      if (videoEl.requestFullscreen) {
+        videoEl.requestFullscreen().catch(() => {});
+      } else if (videoEl.webkitEnterFullscreen) {
+        // iOS Safari native fullscreen on HTMLVideoElement
+        try {
+          videoEl.webkitEnterFullscreen();
+        } catch (e) {
+          console.warn('webkitEnterFullscreen error:', e);
+        }
+      } else if (videoEl.webkitRequestFullscreen) {
+        try {
+          videoEl.webkitRequestFullscreen();
+        } catch (e) {}
+      } else if (videoEl.mozRequestFullScreen) {
+        try {
+          videoEl.mozRequestFullScreen();
+        } catch (e) {}
+      } else if (videoEl.msRequestFullscreen) {
+        try {
+          videoEl.msRequestFullscreen();
+        } catch (e) {}
+      } else if (containerEl && containerEl.requestFullscreen) {
+        containerEl.requestFullscreen().catch(() => {});
+      }
+    } else if (containerEl) {
+      if (containerEl.requestFullscreen) {
+        containerEl.requestFullscreen().catch(() => {});
+      } else if (containerEl.webkitRequestFullscreen) {
+        try {
+          containerEl.webkitRequestFullscreen();
+        } catch (e) {}
+      }
+    }
+  };
 
   const pythonProjectsData = industrialProjectsList.filter(p => p.category === 'python').length > 0
     ? industrialProjectsList.filter(p => p.category === 'python')
@@ -1170,23 +1225,52 @@ export default function AcademyShowcase() {
               position: 'relative'
             }}>
               {/* Aspect Ratio Container (16:9) */}
-              <div style={{
-                position: 'relative',
-                width: '100%',
-                paddingBottom: '56.25%',
-                background: '#090D16',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden'
-              }}>
-                {isPlayingHeroVideo && heroBannerData?.videoUrl ? (
-                  getEmbedUrl(heroBannerData.videoUrl).includes('youtube.com/embed') ||
-                  getEmbedUrl(heroBannerData.videoUrl).includes('drive.google.com') ? (
+              <div
+                ref={heroVideoContainerRef}
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  paddingBottom: '56.25%',
+                  background: '#090D16',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden'
+                }}
+              >
+                {/* Direct Video Element - Pre-mounted so requestFullscreen & play trigger synchronously on user tap */}
+                {heroBannerData?.videoUrl &&
+                  !getEmbedUrl(heroBannerData.videoUrl).includes('youtube.com/embed') &&
+                  !getEmbedUrl(heroBannerData.videoUrl).includes('drive.google.com') && (
+                    <video
+                      ref={heroVideoRef}
+                      src={heroBannerData.videoUrl}
+                      controls
+                      playsInline
+                      onEnded={() => setIsPlayingHeroVideo(false)}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        zIndex: isPlayingHeroVideo ? 2 : 0,
+                        opacity: isPlayingHeroVideo ? 1 : 0,
+                        pointerEvents: isPlayingHeroVideo ? 'auto' : 'none',
+                        background: '#000000'
+                      }}
+                    />
+                )}
+
+                {/* If it's an iframe (YouTube or Google Drive embed), render when playing */}
+                {isPlayingHeroVideo && heroBannerData?.videoUrl &&
+                  (getEmbedUrl(heroBannerData.videoUrl).includes('youtube.com/embed') ||
+                   getEmbedUrl(heroBannerData.videoUrl).includes('drive.google.com')) && (
                     <iframe
                       src={getEmbedUrl(heroBannerData.videoUrl)}
                       title="Levlox Academy Company Overview"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                       allowFullScreen
                       style={{
                         position: 'absolute',
@@ -1198,37 +1282,20 @@ export default function AcademyShowcase() {
                         zIndex: 2
                       }}
                     />
-                  ) : (
-                    <video
-                      src={heroBannerData.videoUrl}
-                      controls
-                      autoPlay
-                      playsInline
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'contain',
-                        zIndex: 2
-                      }}
-                    />
-                  )
-                ) : (
+                )}
+
+                {/* Cover Thumbnail Overlay with Play Button - Hidden when playing */}
+                {!isPlayingHeroVideo && (
                   <div
-                    onClick={() => {
-                      if (heroBannerData?.videoUrl) {
-                        setIsPlayingHeroVideo(true);
-                      }
-                    }}
+                    onClick={handlePlayHeroVideo}
                     style={{
                       position: 'absolute',
                       inset: 0,
                       cursor: heroBannerData?.videoUrl ? 'pointer' : 'default',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      zIndex: 3
                     }}
                   >
                     {/* Background Thumbnail Image or Stylized Modern Tech Canvas */}
