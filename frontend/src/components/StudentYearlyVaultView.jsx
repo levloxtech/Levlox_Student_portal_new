@@ -1014,14 +1014,14 @@ export default function StudentYearlyVaultView({
                   )}
                 </div>
 
-                {/* Title & Description */}
+                {/* Title */}
                 <h3 style={{
-                  fontSize: 15,
+                  fontSize: 14.5,
                   fontWeight: 800,
                   color: '#0F172A',
-                  margin: '0 0 8px',
+                  margin: '0 0 6px',
                   lineHeight: 1.4,
-                  minHeight: 42,
+                  minHeight: 40,
                   display: '-webkit-box',
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical',
@@ -1029,14 +1029,16 @@ export default function StudentYearlyVaultView({
                 }}>
                   {mat.title}
                 </h3>
+
+                {/* Reduced Compact Description */}
                 <p style={{
-                  fontSize: 12.5,
+                  fontSize: 12,
                   color: '#64748B',
-                  lineHeight: 1.5,
-                  margin: '0 0 12px',
-                  minHeight: 56,
+                  lineHeight: 1.45,
+                  margin: '0 0 10px',
+                  minHeight: 34,
                   display: '-webkit-box',
-                  WebkitLineClamp: 3,
+                  WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical',
                   overflow: 'hidden'
                 }}>
@@ -1050,21 +1052,23 @@ export default function StudentYearlyVaultView({
                     gap: 5,
                     flexWrap: 'wrap',
                     alignContent: 'flex-start',
-                    minHeight: 50,
-                    marginBottom: 14
+                    minHeight: 28,
+                    maxHeight: 28,
+                    overflow: 'hidden',
+                    marginBottom: 12
                   }}>
-                    {mat.tags.map((t, i) => (
+                    {mat.tags.slice(0, 4).map((t, i) => (
                       <span
                         key={i}
                         style={{
                           background: '#F8FAFC',
                           color: '#475569',
                           fontSize: 10.5,
-                          padding: '2px 8px',
-                          borderRadius: 5,
+                          padding: '2px 7px',
+                          borderRadius: 4,
                           fontWeight: 700,
                           border: '1px solid #E2E8F0',
-                          lineHeight: 1.5
+                          lineHeight: 1.4
                         }}
                       >
                         {t}
@@ -1072,8 +1076,88 @@ export default function StudentYearlyVaultView({
                     ))}
                   </div>
                 ) : (
-                  <div style={{ minHeight: 50, marginBottom: 14 }} />
+                  <div style={{ minHeight: 28, marginBottom: 12 }} />
                 )}
+
+                {/* Media Slot: 16:9 Thumbnail / Video Preview Slot (Matching Main Page) */}
+                <div
+                  style={{
+                    position: 'relative',
+                    height: 120,
+                    borderRadius: 10,
+                    overflow: 'hidden',
+                    background: '#0F172A',
+                    marginBottom: 14,
+                    cursor: 'pointer',
+                    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)'
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isYearlyMember && onOpenRenewal) {
+                      onOpenRenewal();
+                      return;
+                    }
+                    if (hasWalkthroughVideo) {
+                      setActivePlayingMaterial(mat);
+                    }
+                  }}
+                >
+                  {mat.thumbnailUrl ? (
+                    <img src={mat.thumbnailUrl} alt={mat.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      background: (mat.category || '').toLowerCase().includes('python')
+                        ? 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)'
+                        : (mat.category || '').toLowerCase().includes('sql')
+                        ? 'linear-gradient(135deg, #064E3B 0%, #022C22 100%)'
+                        : (mat.category || '').toLowerCase().includes('ml') || (mat.category || '').toLowerCase().includes('machine')
+                        ? 'linear-gradient(135deg, #3B0764 0%, #1E1B4B 100%)'
+                        : 'linear-gradient(135deg, #451A03 0%, #1C1917 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexDirection: 'column',
+                      gap: 6
+                    }}>
+                      <div style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        background: 'rgba(255, 255, 255, 0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Play size={14} fill="#FFFFFF" color="#FFFFFF" style={{ marginLeft: 2 }} />
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#E2E8F0', letterSpacing: '0.3px' }}>
+                        {mat.category || 'Project'} Walkthrough
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Video Play Badge / Duration Overlay */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 8,
+                    right: 8,
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    backdropFilter: 'blur(4px)',
+                    color: '#FFFFFF',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: '2px 7px',
+                    borderRadius: 5,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}>
+                    <Play size={9} fill="#FFF" />
+                    <span>{mat.duration || (hasWalkthroughVideo ? 'HD Video' : 'Walkthrough')}</span>
+                  </div>
+                </div>
 
                 {/* Bottom Action Footer */}
                 <div style={{

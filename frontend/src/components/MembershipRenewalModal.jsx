@@ -59,6 +59,22 @@ export default function MembershipRenewalModal({
     }
   }, [student?.email, isOpen]);
 
+  // Dynamically re-verify coupon when toggling between weekly and annual (Must be before any early return)
+  useEffect(() => {
+    if (isOpen && couponCode.trim() && couponDiscount > 0) {
+      const cleanCode = couponCode.trim().toUpperCase();
+      fetch(`/api/membership/verify-coupon?code=${encodeURIComponent(cleanCode)}&planId=${selectedPlan}&email=${encodeURIComponent(student?.email || '')}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.valid) {
+            setCouponDiscount(data.discount);
+            setCouponMessage(`✓ Coupon "${cleanCode}" applied! ₹${data.discount} discount deducted.`);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [selectedPlan, isOpen]);
+
   const hasPassedExam = Boolean(student?.hasPassedInternshipExam || examStatus?.hasPassed);
 
   // Action: Attend Exam Immediately directly on portal (no email link required)
@@ -139,21 +155,6 @@ export default function MembershipRenewalModal({
     }
   };
 
-  // Dynamically re-verify coupon when toggling between weekly and annual
-  useEffect(() => {
-    if (couponCode.trim() && couponDiscount > 0) {
-      const cleanCode = couponCode.trim().toUpperCase();
-      fetch(`/api/membership/verify-coupon?code=${encodeURIComponent(cleanCode)}&planId=${selectedPlan}&email=${encodeURIComponent(student.email || '')}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.valid) {
-            setCouponDiscount(data.discount);
-            setCouponMessage(`✓ Coupon "${cleanCode}" applied! ₹${data.discount} discount deducted.`);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [selectedPlan]);
 
   // Payment checkout handler for Weekly Sprint (Continue Learning) or Qualified 1-Year Pass via Real Razorpay Gateway
   const handleRenewalPayment = async () => {
