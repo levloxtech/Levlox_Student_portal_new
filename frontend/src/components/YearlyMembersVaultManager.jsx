@@ -75,6 +75,7 @@ export default function YearlyMembersVaultManager() {
       description: '',
       externalUrl: '',
       videoUrl: '',
+      thumbnailUrl: '',
       duration: '',
       tags: ''
     });
@@ -92,6 +93,7 @@ export default function YearlyMembersVaultManager() {
       description: mat.description || '',
       externalUrl: mat.fileUrl || '',
       videoUrl: mat.videoUrl || (mat.type === 'video' ? mat.fileUrl : '') || '',
+      thumbnailUrl: mat.thumbnailUrl || '',
       duration: mat.duration || '',
       tags: Array.isArray(mat.tags) ? mat.tags.join(', ') : (mat.tags || '')
     });
@@ -131,6 +133,7 @@ export default function YearlyMembersVaultManager() {
       formData.append('description', newMat.description.trim());
       formData.append('externalUrl', newMat.externalUrl.trim());
       formData.append('videoUrl', newMat.videoUrl.trim());
+      formData.append('thumbnailUrl', (newMat.thumbnailUrl || '').trim());
       formData.append('duration', newMat.duration.trim());
       formData.append('tags', newMat.tags);
       if (selectedFile) {
@@ -712,16 +715,34 @@ export default function YearlyMembersVaultManager() {
                 />
               </div>
 
-              {/* File Upload (Optional override) */}
+              {/* Thumbnail Image URL */}
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                  <span>Thumbnail Image URL (or upload image file below)</span>
+                  <span style={{ fontSize: 10, background: '#ECFDF5', color: '#059669', padding: '1px 6px', borderRadius: 4, fontWeight: 800 }}>Cover</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://images.unsplash.com/... or /uploads/..."
+                  value={newMat.thumbnailUrl}
+                  onChange={(e) => setNewMat({ ...newMat, thumbnailUrl: e.target.value })}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13 }}
+                />
+              </div>
+
+              {/* File Upload (PDF Guide, Document, Video, or Thumbnail) */}
               <div style={{ marginBottom: 12 }}>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                  Optional Direct File Upload (PDF Guide, Video MP4, or Zip Archive)
+                  Direct File Attachment (PDF Handbook, Video MP4, Zip Repo, or Thumbnail Image)
                 </label>
                 <input
                   type="file"
                   onChange={(e) => setSelectedFile(e.target.files[0] || null)}
                   style={{ width: '100%', boxSizing: 'border-box', padding: '7px 0', fontSize: 12.5 }}
                 />
+                <span style={{ fontSize: 11, color: '#64748B', marginTop: 3, display: 'block' }}>
+                  Upload PDF documents, project code packages, or custom thumbnail covers directly from your machine.
+                </span>
               </div>
 
               {/* Duration & Tags */}

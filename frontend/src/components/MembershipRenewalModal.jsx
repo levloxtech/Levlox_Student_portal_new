@@ -13,33 +13,21 @@ export default function MembershipRenewalModal({
   const { userProfile, currentUser, refreshProfile } = useAuth();
   const student = userProfile || currentUser || {};
 
-  const [selectedPlan, setSelectedPlan] = useState('weekly');
-  const [couponCode, setCouponCode] = useState('');
-  const [couponDiscount, setCouponDiscount] = useState(0);
-  const [couponMessage, setCouponMessage] = useState('');
-  const [couponError, setCouponError] = useState('');
-  const [couponLoading, setCouponLoading] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(null);
+  // Independent Coupon State for Weekly and Annual Cards
+  const [weeklyCoupon, setWeeklyCoupon] = useState('');
+  const [weeklyDiscount, setWeeklyDiscount] = useState(0);
+  const [weeklyMsg, setWeeklyMsg] = useState('');
+  const [weeklyErr, setWeeklyErr] = useState('');
+  const [weeklyLoading, setWeeklyLoading] = useState(false);
 
-  // Dynamically re-verify coupon when switching plans
-  useEffect(() => {
-    if (isOpen && couponCode.trim() && couponDiscount > 0) {
-      const cleanCode = couponCode.trim().toUpperCase();
-      fetch(`/api/membership/verify-coupon?code=${encodeURIComponent(cleanCode)}&planId=${selectedPlan}&email=${encodeURIComponent(student?.email || '')}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.valid) {
-            setCouponDiscount(data.discount);
-            setCouponMessage(`Coupon "${cleanCode}" applied! You save ₹${data.discount}.`);
-          } else {
-            setCouponDiscount(0);
-            setCouponMessage('');
-          }
-        })
-        .catch(() => {});
-    }
-  }, [selectedPlan, isOpen]);
+  const [annualCoupon, setAnnualCoupon] = useState('');
+  const [annualDiscount, setAnnualDiscount] = useState(0);
+  const [annualMsg, setAnnualMsg] = useState('');
+  const [annualErr, setAnnualErr] = useState('');
+  const [annualLoading, setAnnualLoading] = useState(false);
+
+  const [loadingPlan, setLoadingPlan] = useState(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(null);
 
   if (!isOpen) return null;
 
@@ -49,93 +37,80 @@ export default function MembershipRenewalModal({
     ? new Date(rawExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
     : 'Recently';
 
-  // Plans Config
-  const plans = {
-    weekly: {
-      id: 'weekly',
-      name: 'Weekly Learning Cycle',
-      badge: 'RENEWAL SPRINT',
-      subtitle: 'Sprint-based access • Automatic lock after 7 days',
-      originalPrice: 749,
-      offerPrice: 299,
-      validity: '7 Days Access',
-      finalPayable: Math.max(0, 299 - (couponDiscount || 0)),
-      features: [
-        '7 Days Unlocked Portal Access',
-        'Python & Advanced Python Modules',
-        'Machine Learning & SQL Foundations',
-        'Recorded Video Streaming in HD',
-        '5+ Industry-Level & Portfolio Projects',
-        'Weekly Learning Sprint & Assessments'
-      ]
-    },
-    annual: {
-      id: 'annual',
-      name: 'Machine Learning Engineer Internship',
-      badge: '★ BEST VALUE: SAVE UP TO ₹24,500',
-      subtitle: '3 Months Training + 9 Months Industrial Training',
-      callout: '✨ 1 Year Verified Internship Certificate with Industrial Experience',
-      originalPrice: 35999,
-      offerPrice: 11499,
-      validity: '365 Days (1 Full Year)',
-      finalPayable: Math.max(0, 11499 - (couponDiscount || 0)),
-      features: [
-        '365 Days Uninterrupted All-Access Pass',
-        'Python, Machine Learning & SQL Foundations',
-        '9+ Industry-Level Projects & 4 Production Portfolios',
-        'Verified Industry Internship Certificate',
-        'Placement Preparation Kit, Resume Builder & LinkedIn Optimizer',
-        'Live Doubt Support Sessions & Community Access'
-      ]
-    }
-  };
+  const weeklyFinalPayable = Math.max(0, 299 - weeklyDiscount);
+  const annualFinalPayable = Math.max(0, 11499 - annualDiscount);
 
-  const activePlan = plans[selectedPlan];
-
-  // Apply Coupon Handler
-  const handleApplyCoupon = async (e) => {
+  // Apply Coupon for Weekly Card
+  const handleApplyWeeklyCoupon = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    const cleanCode = couponCode.trim().toUpperCase();
+    const cleanCode = weeklyCoupon.trim().toUpperCase();
     if (!cleanCode) return;
-    setCouponError('');
-    setCouponMessage('');
-    setCouponLoading(true);
+    setWeeklyErr('');
+    setWeeklyMsg('');
+    setWeeklyLoading(true);
 
     try {
-      const res = await fetch(`/api/membership/verify-coupon?code=${encodeURIComponent(cleanCode)}&planId=${selectedPlan}&email=${encodeURIComponent(student.email || '')}`);
+      const res = await fetch(`/api/membership/verify-coupon?code=${encodeURIComponent(cleanCode)}&planId=weekly&email=${encodeURIComponent(student.email || '')}`);
       const data = await res.json();
       if (res.ok && data.valid) {
-        setCouponDiscount(data.discount);
-        setCouponMessage(`Coupon "${cleanCode}" applied! You save ₹${data.discount}.`);
+        setWeeklyDiscount(data.discount);
+        setWeeklyMsg(`Coupon "${cleanCode}" applied! You save ₹${data.discount}.`);
       } else {
-        setCouponDiscount(0);
-        setCouponError(data.error || 'Invalid or expired coupon code.');
+        setWeeklyDiscount(0);
+        setWeeklyErr(data.error || 'Invalid or expired coupon code.');
       }
     } catch {
-      setCouponDiscount(0);
-      setCouponError('Could not verify coupon.');
+      setWeeklyDiscount(0);
+      setWeeklyErr('Could not verify coupon.');
     } finally {
-      setCouponLoading(false);
+      setWeeklyLoading(false);
     }
   };
 
-  // Payment checkout handler for Weekly Sprint or 1-Year Pass via Razorpay Gateway
-  const handleRenewalPayment = async () => {
-    setLoading(true);
+  // Apply Coupon for Annual Card
+  const handleApplyAnnualCoupon = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const cleanCode = annualCoupon.trim().toUpperCase();
+    if (!cleanCode) return;
+    setAnnualErr('');
+    setAnnualMsg('');
+    setAnnualLoading(true);
+
+    try {
+      const res = await fetch(`/api/membership/verify-coupon?code=${encodeURIComponent(cleanCode)}&planId=annual&email=${encodeURIComponent(student.email || '')}`);
+      const data = await res.json();
+      if (res.ok && data.valid) {
+        setAnnualDiscount(data.discount);
+        setAnnualMsg(`Coupon "${cleanCode}" applied! You save ₹${data.discount}.`);
+      } else {
+        setAnnualDiscount(0);
+        setAnnualErr(data.error || 'Invalid or expired coupon code.');
+      }
+    } catch {
+      setAnnualDiscount(0);
+      setAnnualErr('Could not verify coupon.');
+    } finally {
+      setAnnualLoading(false);
+    }
+  };
+
+  // Live Gateway Checkout
+  const handleRenewalPayment = async (planId) => {
+    setLoadingPlan(planId);
     try {
       const email = student.email;
       const name = student.name || student.displayName || (student.email ? student.email.split('@')[0] : 'Student');
       const phone = (student.phone || '9876543210').replace(/\D/g, '').slice(-10) || '9876543210';
 
-      const effectivePlanId = selectedPlan;
-      const effectiveCoupon = couponDiscount > 0 ? couponCode.trim() : undefined;
+      const effectiveCoupon = planId === 'annual'
+        ? (annualDiscount > 0 ? annualCoupon.trim() : undefined)
+        : (weeklyDiscount > 0 ? weeklyCoupon.trim() : undefined);
 
-      // 1. Create Razorpay order on backend
       const orderRes = await fetch('/api/membership/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          planId: effectivePlanId,
+          planId,
           email,
           name,
           phone,
@@ -148,13 +123,12 @@ export default function MembershipRenewalModal({
         throw new Error(orderData.error || 'Failed to create payment order');
       }
 
-      // If payable amount is 0 (fully covered by discount)
       if (orderData.isZeroPayment) {
         await finalizeVerification({
           razorpay_order_id: orderData.orderId,
           razorpay_payment_id: `zero_pay_${Date.now()}`,
           razorpay_signature: 'zero_amount_free_pass',
-          planId: effectivePlanId,
+          planId,
           email,
           name,
           phone,
@@ -164,7 +138,6 @@ export default function MembershipRenewalModal({
         return;
       }
 
-      // 2. Load Razorpay script if not already present
       const loadRazorpayScript = () => {
         return new Promise((resolve) => {
           if (window.Razorpay) return resolve(true);
@@ -181,25 +154,24 @@ export default function MembershipRenewalModal({
         throw new Error('Payment gateway script could not be loaded. Please check your internet connection.');
       }
 
-      // 3. Open Razorpay live payment gateway modal
       const options = {
         key: orderData.key || orderData.keyId,
         amount: orderData.amount,
         currency: orderData.currency || 'INR',
         name: 'Levlox Academy',
-        description: selectedPlan === 'annual'
+        description: planId === 'annual'
           ? 'Machine Learning Engineer Internship (365 Days • 1 Full Year)'
           : 'Weekly Sprint Renewal (7 Days Validity)',
         order_id: orderData.orderId,
         prefill: { name, email, contact: phone },
-        theme: { color: selectedPlan === 'annual' ? '#7C3AED' : '#2563EB' },
+        theme: { color: planId === 'annual' ? '#7C3AED' : '#2563EB' },
         handler: async function (response) {
           try {
             await finalizeVerification({
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              planId: effectivePlanId,
+              planId,
               email,
               name,
               phone,
@@ -208,12 +180,12 @@ export default function MembershipRenewalModal({
             });
           } catch (verr) {
             alert('Verification issue: ' + verr.message);
-            setLoading(false);
+            setLoadingPlan(null);
           }
         },
         modal: {
           ondismiss: function () {
-            setLoading(false);
+            setLoadingPlan(null);
           }
         }
       };
@@ -221,29 +193,31 @@ export default function MembershipRenewalModal({
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', function (resp) {
         alert('Payment failed: ' + (resp.error?.description || 'Transaction was cancelled or declined.'));
-        setLoading(false);
+        setLoadingPlan(null);
       });
       rzp.open();
     } catch (err) {
       alert('Payment initialization failed: ' + err.message);
-      setLoading(false);
+      setLoadingPlan(null);
     }
   };
 
-  const handleSimulatedRenewal = async () => {
-    setLoading(true);
+  // Simulated Test Checkout
+  const handleSimulatedRenewal = async (planId) => {
+    setLoadingPlan(planId);
     try {
       const email = student.email;
       const name = student.name || student.email?.split('@')[0];
       const phone = student.phone || '';
-      const effectivePlanId = selectedPlan;
-      const effectiveCoupon = couponDiscount > 0 ? couponCode.trim() : undefined;
+      const effectiveCoupon = planId === 'annual'
+        ? (annualDiscount > 0 ? annualCoupon.trim() : undefined)
+        : (weeklyDiscount > 0 ? weeklyCoupon.trim() : undefined);
 
       await finalizeVerification({
         razorpay_order_id: `sim_ord_${Date.now()}`,
         razorpay_payment_id: `sim_pay_${Date.now()}`,
         razorpay_signature: 'simulated_valid_signature',
-        planId: effectivePlanId,
+        planId,
         email,
         name,
         phone,
@@ -253,7 +227,7 @@ export default function MembershipRenewalModal({
       });
     } catch (err) {
       alert('Simulated renewal failed: ' + err.message);
-      setLoading(false);
+      setLoadingPlan(null);
     }
   };
 
@@ -278,7 +252,7 @@ export default function MembershipRenewalModal({
     } catch (err) {
       alert('Verification error: ' + err.message);
     } finally {
-      setLoading(false);
+      setLoadingPlan(null);
     }
   };
 
@@ -287,20 +261,20 @@ export default function MembershipRenewalModal({
       position: 'fixed',
       inset: 0,
       zIndex: 999999,
-      background: 'rgba(15, 23, 42, 0.7)',
+      background: 'rgba(15, 23, 42, 0.75)',
       backdropFilter: 'blur(8px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '24px 16px',
+      padding: '20px 14px',
       overflowY: 'auto'
     }}>
       <div style={{
-        background: '#FFFFFF',
-        borderRadius: 22,
-        maxWidth: 640,
+        background: '#F8FAFC',
+        borderRadius: 24,
+        maxWidth: 960,
         width: '100%',
-        boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.35)',
+        boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.4)',
         border: '1px solid #E2E8F0',
         overflow: 'hidden',
         position: 'relative',
@@ -314,27 +288,27 @@ export default function MembershipRenewalModal({
             position: 'absolute',
             top: 18,
             right: 18,
-            width: 32,
-            height: 32,
+            width: 34,
+            height: 34,
             borderRadius: '50%',
-            background: '#F1F5F9',
-            border: 'none',
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             color: '#64748B',
             zIndex: 10,
-            transition: 'background 0.15s ease'
+            boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
           }}
           title="Close dialog"
         >
-          <X size={16} />
+          <X size={17} />
         </button>
 
         {paymentSuccess ? (
           /* SUCCESS STATE */
-          <div style={{ padding: '48px 32px', textAlign: 'center' }}>
+          <div style={{ padding: '48px 32px', textAlign: 'center', background: '#FFFFFF' }}>
             <div style={{
               width: 68, height: 68, borderRadius: '50%',
               background: '#ECFDF5', color: '#10B981',
@@ -348,7 +322,7 @@ export default function MembershipRenewalModal({
               Membership Successfully Renewed! 🎉
             </h2>
             <p style={{ fontSize: 14, color: '#64748B', margin: '0 0 22px', lineHeight: 1.5 }}>
-              Your <strong>{paymentSuccess.planName}</strong> is now fully active. All recorded courses, videos, and modules are immediately unlocked.
+              Your <strong>{paymentSuccess.planName}</strong> is now active. All recorded courses, videos, and modules are immediately unlocked.
             </p>
 
             <div style={{
@@ -358,7 +332,9 @@ export default function MembershipRenewalModal({
               textAlign: 'left',
               border: '1px solid #E2E8F0',
               marginBottom: 24,
-              fontSize: 13
+              fontSize: 13,
+              maxWidth: 460,
+              margin: '0 auto 24px'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ color: '#64748B' }}>Invoice Number:</span>
@@ -383,8 +359,7 @@ export default function MembershipRenewalModal({
                 window.location.reload();
               }}
               style={{
-                width: '100%',
-                padding: '14px 20px',
+                padding: '13px 32px',
                 borderRadius: 12,
                 background: '#2563EB',
                 color: '#FFFFFF',
@@ -399,14 +374,14 @@ export default function MembershipRenewalModal({
             </button>
           </div>
         ) : (
-          /* HIGH-CONVERTING RENEWAL CHECKOUT (MATCHING ACADEMY SHOWCASE DESIGN) */
+          /* TWO SEPARATE SIDE-BY-SIDE CARDS (MIRRORING ACADEMY SHOWCASE CARDS) */
           <div>
-            {/* Header Banner */}
+            {/* Top Header Banner */}
             <div style={{
               background: '#FFFFFF',
-              borderBottom: '1px solid #F1F5F9',
-              padding: '24px 26px 14px',
-              position: 'relative'
+              borderBottom: '1px solid #E2E8F0',
+              padding: '20px 28px 16px',
+              textAlign: 'center'
             }}>
               <div style={{
                 display: 'inline-flex',
@@ -415,7 +390,7 @@ export default function MembershipRenewalModal({
                 background: '#FFE4E6',
                 border: '1px solid #FECDD3',
                 borderRadius: 20,
-                padding: '3px 10px',
+                padding: '3px 12px',
                 color: '#BE123C',
                 fontSize: 11,
                 fontWeight: 800,
@@ -425,448 +400,528 @@ export default function MembershipRenewalModal({
                 <Lock size={12} /> SUBSCRIPTION CYCLE LAPSED
               </div>
 
-              <h2 style={{ fontSize: 21, fontWeight: 800, margin: '0 0 4px', color: '#0F172A', letterSpacing: '-0.3px' }}>
+              <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: '#0F172A', letterSpacing: '-0.3px' }}>
                 Renew Your Academy Membership
               </h2>
-              <p style={{ fontSize: 13, color: '#64748B', margin: 0, lineHeight: 1.5 }}>
-                Your learning validity period has expired. Select a renewal package below to unlock immediate access.
-              </p>
             </div>
 
-            {/* Expired Status Pill */}
+            {/* TWO SEPARATE CARDS GRID */}
             <div style={{
-              margin: '12px 24px 14px',
-              padding: '9px 14px',
-              background: '#FFF5F5',
-              border: '1px solid #FED7D7',
-              borderRadius: 10,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: 12.5
+              padding: '20px 22px 24px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+              gap: 20,
+              alignItems: 'stretch'
             }}>
-              <div>
-                <span style={{ color: '#991B1B', fontWeight: 600 }}>Previous Plan: </span>
-                <span style={{ color: '#7F1D1D', fontWeight: 700 }}>{previousPlanName}</span>
-              </div>
+              {/* ─────────────────────────────────────────────────────────── */}
+              {/* CARD 1: WEEKLY LEARNING CYCLE (₹299)                         */}
+              {/* ─────────────────────────────────────────────────────────── */}
               <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                background: '#E11D48',
-                color: '#FFFFFF',
-                borderRadius: 6,
-                padding: '2px 8px',
-                fontSize: 11,
-                fontWeight: 700
+                background: '#FFFFFF',
+                borderRadius: 18,
+                border: '2px solid #3B82F6',
+                boxShadow: '0 10px 25px -5px rgba(37, 99, 235, 0.1)',
+                padding: '22px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                position: 'relative'
               }}>
-                Expired On {expiredDateFormatted}
-              </div>
-            </div>
-
-            {/* Two Selectable Plans */}
-            <div style={{ padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {/* PLAN 1: Weekly Sprint Renewal (₹299) */}
-              <div
-                onClick={() => setSelectedPlan('weekly')}
-                style={{
-                  border: selectedPlan === 'weekly' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
-                  background: selectedPlan === 'weekly' ? '#F0F7FF' : '#FFFFFF',
-                  borderRadius: 14,
-                  padding: '14px 18px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  position: 'relative'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <div style={{
-                      width: 18, height: 18, borderRadius: '50%',
-                      border: selectedPlan === 'weekly' ? '5px solid #2563EB' : '2px solid #CBD5E1',
-                      background: '#FFFFFF', marginTop: 2, flexShrink: 0
-                    }} />
+                <div>
+                  {/* Card Title & Tag */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <strong style={{ fontSize: 14.5, color: '#0F172A' }}>
-                          Weekly Learning Cycle
-                        </strong>
-                        <span style={{
-                          fontSize: 10, fontWeight: 700, color: '#2563EB',
-                          background: '#EFF6FF', border: '1px solid #BFDBFE',
-                          padding: '1px 6px', borderRadius: 4
-                        }}>
-                          7 DAYS
-                        </span>
-                      </div>
-                      <span style={{ fontSize: 11.5, color: '#64748B' }}>
+                      <h3 style={{ fontSize: 17, fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                        Weekly Learning Cycle
+                      </h3>
+                      <span style={{ fontSize: 11.5, color: '#64748B', display: 'block', marginTop: 2 }}>
                         Sprint-based access • Automatic lock after 7 days
                       </span>
                     </div>
+                    <span style={{
+                      width: 18, height: 18, borderRadius: '50%',
+                      border: '5px solid #2563EB', background: '#FFFFFF', flexShrink: 0
+                    }} />
                   </div>
 
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: 4 }}>
-                      <span style={{ fontSize: 12, color: '#94A3B8', textDecoration: 'line-through' }}>₹749</span>
-                      <span style={{ fontSize: 20, fontWeight: 800, color: '#2563EB' }}>
-                        ₹{plans.weekly.finalPayable}
+                  {/* Pricing Header */}
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, margin: '14px 0 16px' }}>
+                    <span style={{ fontSize: 14, color: '#94A3B8', textDecoration: 'line-through' }}>₹749</span>
+                    <span style={{ fontSize: 30, fontWeight: 900, color: '#0F172A' }}>
+                      ₹{weeklyFinalPayable}
+                    </span>
+                    <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>/ 7 days access</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 800, color: '#047857',
+                      background: '#ECFDF5', border: '1px solid #A7F3D0',
+                      padding: '2px 7px', borderRadius: 4, marginLeft: 'auto'
+                    }}>
+                      RENEWAL SPECIAL
+                    </span>
+                  </div>
+
+                  {/* Feature Checklist */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
+                    {[
+                      '7 Days Unlocked Portal Access',
+                      'Python & Advance Python Modules',
+                      'Machine Learning & SQL Foundations',
+                      'Recorded Video Streaming in HD',
+                      '5+ Industry-Level & Portfolio Projects',
+                      'Weekly Learning Sprint & Assessments'
+                    ].map((feat, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#334155' }}>
+                        <CheckCircle2 size={14} color="#059669" style={{ flexShrink: 0 }} />
+                        <span>{feat}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Weekly Pricing Breakdown Box */}
+                  <div style={{
+                    background: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: 12,
+                    padding: '12px 14px',
+                    fontSize: 12,
+                    marginBottom: 16
+                  }}>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between',
+                      fontSize: 10.5, fontWeight: 800, color: '#475569',
+                      letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase'
+                    }}>
+                      <span>Weekly Cycle Breakdown</span>
+                      <span style={{ color: '#2563EB', background: '#EFF6FF', padding: '1px 6px', borderRadius: 4 }}>
+                        Renewal: ₹299
                       </span>
                     </div>
-                    <span style={{ fontSize: 11, color: '#64748B' }}>/ 7 days access</span>
-                  </div>
-                </div>
 
-                {/* Features Checklist */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                  gap: '4px 12px',
-                  margin: '8px 0 0 28px',
-                  fontSize: 11.5,
-                  color: '#475569'
-                }}>
-                  {plans.weekly.features.map((feat, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <CheckCircle2 size={13} color="#059669" style={{ flexShrink: 0 }} />
-                      <span>{feat}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Pricing Breakdown (when selected) */}
-                {selectedPlan === 'weekly' && (
-                  <div style={{
-                    marginTop: 12,
-                    marginLeft: 28,
-                    background: '#FFFFFF',
-                    border: '1px solid #BFDBFE',
-                    borderRadius: 10,
-                    padding: '10px 14px',
-                    fontSize: 12
-                  }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B', marginBottom: 4 }}>
-                      <span>Standard Weekly Fee:</span>
+                      <span>Standard Weekly Fee</span>
                       <span style={{ textDecoration: 'line-through' }}>₹749</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0F172A', fontWeight: 600, marginBottom: couponDiscount > 0 ? 4 : 0 }}>
-                      <span>Weekly Renewal Price:</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0F172A', fontWeight: 600, marginBottom: weeklyDiscount > 0 ? 4 : 0 }}>
+                      <span>Weekly Renewal Price</span>
                       <span>₹299</span>
                     </div>
-                    {couponDiscount > 0 && (
+                    {weeklyDiscount > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 700, marginBottom: 4 }}>
-                        <span>Coupon Discount ({couponCode}):</span>
-                        <span>-₹{couponDiscount}</span>
+                        <span>Coupon ({weeklyCoupon})</span>
+                        <span>- ₹{weeklyDiscount}</span>
                       </div>
                     )}
                     <div style={{
                       display: 'flex', justifyContent: 'space-between',
-                      borderTop: '1px dashed #CBD5E1', paddingTop: 6, marginTop: 4,
-                      fontWeight: 800, color: '#2563EB', fontSize: 13
+                      borderTop: '1px dashed #CBD5E1', paddingTop: 8, marginTop: 6,
+                      fontWeight: 800, color: '#0F172A', fontSize: 13
                     }}>
-                      <span>NET PAYABLE (7 DAYS):</span>
-                      <span>₹{plans.weekly.finalPayable}</span>
+                      <span>NET PAYABLE (7 DAYS)</span>
+                      <span style={{ color: '#2563EB', fontSize: 17 }}>₹{weeklyFinalPayable}</span>
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* PLAN 2: 1-Year Machine Learning Engineer Internship (₹11,499) */}
-              <div
-                onClick={() => setSelectedPlan('annual')}
-                style={{
-                  border: selectedPlan === 'annual' ? '2px solid #7C3AED' : '1.5px solid #E2E8F0',
-                  background: selectedPlan === 'annual' ? '#FAF5FF' : '#FFFFFF',
-                  borderRadius: 14,
-                  padding: '14px 18px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  position: 'relative'
-                }}
-              >
-                {/* Top Badge */}
-                <div style={{
-                  position: 'absolute', top: -10, right: 16,
-                  background: 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)',
-                  color: '#FFFFFF', fontSize: 10, fontWeight: 800,
-                  padding: '2px 10px', borderRadius: 999, letterSpacing: 0.5,
-                  boxShadow: '0 2px 8px rgba(124, 58, 237, 0.35)'
-                }}>
-                  BEST VALUE: SAVE UP TO ₹24,500
+                  {/* Coupon Input Section */}
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: '#334155', marginBottom: 5 }}>
+                      Have a Referral / Reference Code or Coupon?
+                    </div>
+                    <form onSubmit={handleApplyWeeklyCoupon} style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ position: 'relative', flex: 1 }}>
+                        <Tag size={13} color="#94A3B8" style={{ position: 'absolute', left: 9, top: 10 }} />
+                        <input
+                          type="text"
+                          placeholder="e.g. LVX400 or REF-..."
+                          value={weeklyCoupon}
+                          onChange={(e) => setWeeklyCoupon(e.target.value.toUpperCase())}
+                          style={{
+                            width: '100%',
+                            padding: '7px 8px 7px 28px',
+                            borderRadius: 7,
+                            border: '1px solid #CBD5E1',
+                            fontSize: 12,
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={weeklyLoading || !weeklyCoupon.trim()}
+                        style={{
+                          padding: '7px 14px',
+                          borderRadius: 7,
+                          background: weeklyDiscount > 0 ? '#10B981' : '#2563EB',
+                          border: 'none',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: '#FFFFFF',
+                          cursor: weeklyLoading || !weeklyCoupon.trim() ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4
+                        }}
+                      >
+                        {weeklyLoading ? <Loader2 size={12} className="animate-spin" /> : weeklyDiscount > 0 ? <Check size={13} /> : null}
+                        {weeklyDiscount > 0 ? 'Applied' : 'Apply'}
+                      </button>
+                    </form>
+
+                    {weeklyMsg && (
+                      <div style={{
+                        fontSize: 11.5, color: '#065F46', background: '#ECFDF5',
+                        border: '1px solid #A7F3D0', borderRadius: 6,
+                        padding: '4px 8px', marginTop: 5, fontWeight: 600,
+                        display: 'flex', alignItems: 'center', gap: 4
+                      }}>
+                        <CheckCircle2 size={12} color="#059669" />
+                        {weeklyMsg}
+                      </div>
+                    )}
+                    {weeklyErr && (
+                      <div style={{
+                        fontSize: 11.5, color: '#991B1B', background: '#FEF2F2',
+                        border: '1px solid #FECDD3', borderRadius: 6,
+                        padding: '4px 8px', marginTop: 5, fontWeight: 600
+                      }}>
+                        ✕ {weeklyErr}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <div style={{
-                      width: 18, height: 18, borderRadius: '50%',
-                      border: selectedPlan === 'annual' ? '5px solid #7C3AED' : '2px solid #CBD5E1',
-                      background: '#FFFFFF', marginTop: 2, flexShrink: 0
-                    }} />
+                {/* Bottom Action Area */}
+                <div>
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between',
+                    fontSize: 10.5, color: '#64748B', marginBottom: 8
+                  }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <Zap size={11} color="#D97706" /> Instant UPI: PhonePe • GPay • Cards
+                    </span>
+                    <span style={{ color: '#059669', fontWeight: 700 }}>✓ Zero Fee</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleRenewalPayment('weekly')}
+                    disabled={loadingPlan === 'weekly'}
+                    style={{
+                      width: '100%',
+                      background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                      color: '#FFFFFF',
+                      padding: '12px 18px',
+                      borderRadius: 10,
+                      fontSize: 14,
+                      fontWeight: 800,
+                      border: 'none',
+                      cursor: loadingPlan === 'weekly' ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 7,
+                      boxShadow: '0 6px 18px rgba(37, 99, 235, 0.3)'
+                    }}
+                  >
+                    {loadingPlan === 'weekly' ? (
+                      <><Loader2 size={15} className="animate-spin" /> Processing...</>
+                    ) : (
+                      <>Pay ₹{weeklyFinalPayable} to Renew Weekly Sprint →</>
+                    )}
+                  </button>
+
+                  <div style={{ textAlign: 'center', marginTop: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSimulatedRenewal('weekly')}
+                      disabled={loadingPlan === 'weekly'}
+                      style={{
+                        background: 'none', border: 'none', color: '#64748B',
+                        fontSize: 11, cursor: 'pointer', textDecoration: 'underline'
+                      }}
+                    >
+                      ⚡ Instant Test Checkout (Simulated)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ─────────────────────────────────────────────────────────── */}
+              {/* CARD 2: 1-YEAR MACHINE LEARNING INTERNSHIP (₹11,499)        */}
+              {/* ─────────────────────────────────────────────────────────── */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: 18,
+                border: '2px solid #7C3AED',
+                boxShadow: '0 10px 25px -5px rgba(124, 58, 237, 0.15)',
+                padding: '22px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                position: 'relative'
+              }}>
+                {/* Floating Top Value Badge */}
+                <div style={{
+                  position: 'absolute', top: -11, right: 18,
+                  background: 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)',
+                  color: '#FFFFFF', fontSize: 10, fontWeight: 800,
+                  padding: '3px 11px', borderRadius: 999, letterSpacing: 0.5,
+                  boxShadow: '0 3px 10px rgba(124, 58, 237, 0.35)'
+                }}>
+                  ★ BEST VALUE: SAVE UP TO ₹24,500
+                </div>
+
+                <div>
+                  {/* Card Title & Tag */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <strong style={{ fontSize: 14.5, color: '#0F172A' }}>
-                          Machine Learning Engineer Internship
-                        </strong>
-                        <span style={{
-                          fontSize: 10, fontWeight: 700, color: '#7C3AED',
-                          background: '#F5F3FF', border: '1px solid #DDD6FE',
-                          padding: '1px 6px', borderRadius: 4
-                        }}>
-                          1 FULL YEAR
-                        </span>
-                      </div>
-                      <span style={{ fontSize: 11.5, color: '#64748B' }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 800, color: '#7C3AED',
+                        letterSpacing: 0.5, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 4
+                      }}>
+                        <Sparkles size={11} /> FLAGSHIP 1-YEAR PROGRAM
+                      </span>
+                      <h3 style={{ fontSize: 17, fontWeight: 800, color: '#0F172A', margin: '3px 0 0' }}>
+                        Machine Learning Engineer Internship
+                      </h3>
+                      <span style={{ fontSize: 11.5, color: '#64748B', display: 'block', marginTop: 2 }}>
                         3 Months Training + 9 Months Industrial Training
                       </span>
                     </div>
+                    <span style={{
+                      width: 18, height: 18, borderRadius: '50%',
+                      border: '5px solid #7C3AED', background: '#FFFFFF', flexShrink: 0
+                    }} />
                   </div>
 
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: 4 }}>
-                      <span style={{ fontSize: 12, color: '#94A3B8', textDecoration: 'line-through' }}>₹35,999</span>
-                      <span style={{ fontSize: 20, fontWeight: 800, color: '#7C3AED' }}>
-                        ₹{plans.annual.finalPayable}
+                  {/* Verified Certificate Callout */}
+                  <div style={{
+                    margin: '10px 0 12px',
+                    background: '#FFFBEB',
+                    border: '1px solid #FDE68A',
+                    borderRadius: 7,
+                    padding: '6px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 11,
+                    color: '#92400E',
+                    fontWeight: 700
+                  }}>
+                    <Sparkles size={13} color="#D97706" style={{ flexShrink: 0 }} />
+                    <span>One year of verified internship certificate with industrial experience</span>
+                  </div>
+
+                  {/* Pricing Header */}
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, margin: '10px 0 14px' }}>
+                    <span style={{ fontSize: 14, color: '#94A3B8', textDecoration: 'line-through' }}>₹35,999</span>
+                    <span style={{ fontSize: 30, fontWeight: 900, color: '#0F172A' }}>
+                      ₹{annualFinalPayable}
+                    </span>
+                    <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>/ 1 full year</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 800, color: '#7C3AED',
+                      background: '#FAF5FF', border: '1px solid #DDD6FE',
+                      padding: '2px 7px', borderRadius: 4, marginLeft: 'auto'
+                    }}>
+                      APPLY DISCOUNTS
+                    </span>
+                  </div>
+
+                  {/* Feature Checklist (2-Column Compact Grid) */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '6px 10px',
+                    marginBottom: 16
+                  }}>
+                    {[
+                      'Python & Advance Python',
+                      'Machine Learning & SQL',
+                      'All Recorded Sessions HD',
+                      '9+ Industry Level Projects',
+                      '4+ Portfolio Projects',
+                      'Community & Peer Network',
+                      'Verified Industry Certificate',
+                      'Resume Builder & Optimizer'
+                    ].map((feat, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#334155' }}>
+                        <CheckCircle2 size={13} color="#059669" style={{ flexShrink: 0 }} />
+                        <span>{feat}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Annual Pricing Breakdown Box */}
+                  <div style={{
+                    background: '#FAF5FF',
+                    border: '1px solid #E9D5FF',
+                    borderRadius: 12,
+                    padding: '12px 14px',
+                    fontSize: 12,
+                    marginBottom: 16
+                  }}>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between',
+                      fontSize: 10.5, fontWeight: 800, color: '#6B21A8',
+                      letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase'
+                    }}>
+                      <span>Internship Pricing Breakdown</span>
+                      <span style={{ color: '#7C3AED', background: '#FFFFFF', padding: '1px 6px', borderRadius: 4, border: '1px solid #DDD6FE' }}>
+                        1 Full Year Program
                       </span>
                     </div>
-                    <span style={{ fontSize: 11, color: '#64748B' }}>/ 1 full year</span>
-                  </div>
-                </div>
 
-                {/* Highlight Callout */}
-                <div style={{
-                  marginLeft: 28,
-                  marginBottom: 8,
-                  background: '#FEF3C7',
-                  border: '1px solid #FDE68A',
-                  color: '#92400E',
-                  borderRadius: 6,
-                  padding: '4px 10px',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5
-                }}>
-                  <Sparkles size={12} color="#D97706" /> 1 Year Verified Internship Certificate with Industrial Experience
-                </div>
-
-                {/* Features Checklist */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                  gap: '4px 12px',
-                  margin: '4px 0 0 28px',
-                  fontSize: 11.5,
-                  color: '#475569'
-                }}>
-                  {plans.annual.features.map((feat, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <CheckCircle2 size={13} color="#059669" style={{ flexShrink: 0 }} />
-                      <span>{feat}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Pricing Breakdown (when selected) */}
-                {selectedPlan === 'annual' && (
-                  <div style={{
-                    marginTop: 12,
-                    marginLeft: 28,
-                    background: '#FFFFFF',
-                    border: '1px solid #DDD6FE',
-                    borderRadius: 10,
-                    padding: '10px 14px',
-                    fontSize: 12
-                  }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B', marginBottom: 4 }}>
-                      <span>Standard Annual Package:</span>
+                      <span>Standard Annual Package</span>
                       <span style={{ textDecoration: 'line-through' }}>₹35,999</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 600, marginBottom: 4 }}>
-                      <span>Academy Scholarship Discount:</span>
-                      <span>-₹24,500</span>
+                      <span>Academy Scholarship Discount</span>
+                      <span>- ₹24,500</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0F172A', fontWeight: 600, marginBottom: couponDiscount > 0 ? 4 : 0 }}>
-                      <span>Annual Offer Price:</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0F172A', fontWeight: 600, marginBottom: annualDiscount > 0 ? 4 : 0 }}>
+                      <span>Annual Package Net Offer</span>
                       <span>₹11,499</span>
                     </div>
-                    {couponDiscount > 0 && (
+                    {annualDiscount > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 700, marginBottom: 4 }}>
-                        <span>Coupon Discount ({couponCode}):</span>
-                        <span>-₹{couponDiscount}</span>
+                        <span>Coupon ({annualCoupon})</span>
+                        <span>- ₹{annualDiscount}</span>
                       </div>
                     )}
                     <div style={{
                       display: 'flex', justifyContent: 'space-between',
-                      borderTop: '1px dashed #DDD6FE', paddingTop: 6, marginTop: 4,
-                      fontWeight: 800, color: '#7C3AED', fontSize: 13
+                      borderTop: '1px dashed #DDD6FE', paddingTop: 8, marginTop: 6,
+                      fontWeight: 800, color: '#0F172A', fontSize: 13
                     }}>
-                      <span>NET PAYABLE (1 FULL YEAR):</span>
-                      <span>₹{plans.annual.finalPayable}</span>
+                      <span>NET PAYABLE (1 FULL YEAR)</span>
+                      <span style={{ color: '#7C3AED', fontSize: 17 }}>₹{annualFinalPayable}</span>
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
 
-            {/* Have a Referral / Coupon Code Section */}
-            <div style={{ padding: '14px 24px 0' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                Have a Referral / Reference Code or Coupon?
-              </div>
-              <form onSubmit={handleApplyCoupon} style={{ display: 'flex', gap: 8 }}>
-                <div style={{ position: 'relative', flex: 1 }}>
-                  <Tag size={14} color="#94A3B8" style={{ position: 'absolute', left: 10, top: 11 }} />
-                  <input
-                    type="text"
-                    placeholder="Enter coupon or referral code (e.g. LVX400 or REF-...)"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  {/* Coupon Input Section */}
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: '#334155', marginBottom: 5 }}>
+                      Have a Referral / Reference Code or Coupon?
+                    </div>
+                    <form onSubmit={handleApplyAnnualCoupon} style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ position: 'relative', flex: 1 }}>
+                        <Tag size={13} color="#94A3B8" style={{ position: 'absolute', left: 9, top: 10 }} />
+                        <input
+                          type="text"
+                          placeholder="e.g. LVX400 or REF-..."
+                          value={annualCoupon}
+                          onChange={(e) => setAnnualCoupon(e.target.value.toUpperCase())}
+                          style={{
+                            width: '100%',
+                            padding: '7px 8px 7px 28px',
+                            borderRadius: 7,
+                            border: '1px solid #CBD5E1',
+                            fontSize: 12,
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={annualLoading || !annualCoupon.trim()}
+                        style={{
+                          padding: '7px 14px',
+                          borderRadius: 7,
+                          background: annualDiscount > 0 ? '#10B981' : '#7C3AED',
+                          border: 'none',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: '#FFFFFF',
+                          cursor: annualLoading || !annualCoupon.trim() ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4
+                        }}
+                      >
+                        {annualLoading ? <Loader2 size={12} className="animate-spin" /> : annualDiscount > 0 ? <Check size={13} /> : null}
+                        {annualDiscount > 0 ? 'Applied' : 'Apply'}
+                      </button>
+                    </form>
+
+                    {annualMsg && (
+                      <div style={{
+                        fontSize: 11.5, color: '#065F46', background: '#ECFDF5',
+                        border: '1px solid #A7F3D0', borderRadius: 6,
+                        padding: '4px 8px', marginTop: 5, fontWeight: 600,
+                        display: 'flex', alignItems: 'center', gap: 4
+                      }}>
+                        <CheckCircle2 size={12} color="#059669" />
+                        {annualMsg}
+                      </div>
+                    )}
+                    {annualErr && (
+                      <div style={{
+                        fontSize: 11.5, color: '#991B1B', background: '#FEF2F2',
+                        border: '1px solid #FECDD3', borderRadius: 6,
+                        padding: '4px 8px', marginTop: 5, fontWeight: 600
+                      }}>
+                        ✕ {annualErr}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bottom Action Area */}
+                <div>
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between',
+                    fontSize: 10.5, color: '#64748B', marginBottom: 8
+                  }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <Zap size={11} color="#D97706" /> Instant UPI: PhonePe • GPay • Cards
+                    </span>
+                    <span style={{ color: '#059669', fontWeight: 700 }}>✓ Zero Fee</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleRenewalPayment('annual')}
+                    disabled={loadingPlan === 'annual'}
                     style={{
                       width: '100%',
-                      padding: '8px 10px 8px 30px',
-                      borderRadius: 8,
-                      border: '1px solid #CBD5E1',
-                      fontSize: 12.5,
-                      boxSizing: 'border-box'
+                      background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                      color: '#FFFFFF',
+                      padding: '12px 18px',
+                      borderRadius: 10,
+                      fontSize: 14,
+                      fontWeight: 800,
+                      border: 'none',
+                      cursor: loadingPlan === 'annual' ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 7,
+                      boxShadow: '0 6px 18px rgba(124, 58, 237, 0.35)'
                     }}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={couponLoading || !couponCode.trim()}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 8,
-                    background: couponDiscount > 0 ? '#10B981' : (selectedPlan === 'annual' ? '#7C3AED' : '#2563EB'),
-                    border: 'none',
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    color: '#FFFFFF',
-                    cursor: couponLoading || !couponCode.trim() ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5
-                  }}
-                >
-                  {couponLoading ? <Loader2 size={13} className="animate-spin" /> : couponDiscount > 0 ? <Check size={14} /> : null}
-                  {couponDiscount > 0 ? 'Applied' : 'Apply'}
-                </button>
-              </form>
+                  >
+                    {loadingPlan === 'annual' ? (
+                      <><Loader2 size={15} className="animate-spin" /> Processing...</>
+                    ) : (
+                      <>Pay ₹{annualFinalPayable} for 1-Year ML Internship →</>
+                    )}
+                  </button>
 
-              {couponMessage && (
-                <div style={{
-                  fontSize: 12, color: '#065F46', background: '#ECFDF5',
-                  border: '1px solid #A7F3D0', borderRadius: 6,
-                  padding: '5px 10px', marginTop: 6, fontWeight: 600,
-                  display: 'flex', alignItems: 'center', gap: 5
-                }}>
-                  <CheckCircle2 size={13} color="#059669" />
-                  {couponMessage}
+                  <div style={{ textAlign: 'center', marginTop: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSimulatedRenewal('annual')}
+                      disabled={loadingPlan === 'annual'}
+                      style={{
+                        background: 'none', border: 'none', color: '#64748B',
+                        fontSize: 11, cursor: 'pointer', textDecoration: 'underline'
+                      }}
+                    >
+                      ⚡ Instant Test Checkout (Simulated)
+                    </button>
+                  </div>
                 </div>
-              )}
-              {couponError && (
-                <div style={{
-                  fontSize: 12, color: '#991B1B', background: '#FEF2F2',
-                  border: '1px solid #FECDD3', borderRadius: 6,
-                  padding: '5px 10px', marginTop: 6, fontWeight: 600
-                }}>
-                  ✕ {couponError}
-                </div>
-              )}
-            </div>
-
-            {/* Instant Payment Trust Bar */}
-            <div style={{
-              margin: '12px 24px 0',
-              padding: '7px 12px',
-              background: '#F8FAFC',
-              border: '1px solid #E2E8F0',
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: 11,
-              color: '#64748B'
-            }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
-                <Zap size={12} color="#D97706" /> Instant UPI: PhonePe • Google Pay • Paytm • Cards / NetBanking
-              </span>
-              <span style={{ color: '#059669', fontWeight: 700 }}>
-                ✓ Zero Fee
-              </span>
-            </div>
-
-            {/* Bottom Actions CTA */}
-            <div style={{
-              padding: '14px 24px 18px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 14
-            }}>
-              <div>
-                <span style={{ fontSize: 11, color: '#64748B', display: 'block' }}>
-                  Total Payable:
-                </span>
-                <span style={{
-                  fontSize: 22, fontWeight: 800,
-                  color: selectedPlan === 'annual' ? '#7C3AED' : '#2563EB'
-                }}>
-                  ₹{activePlan.finalPayable}
-                </span>
               </div>
-
-              <button
-                type="button"
-                onClick={handleRenewalPayment}
-                disabled={loading}
-                style={{
-                  background: selectedPlan === 'annual'
-                    ? 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)'
-                    : 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-                  color: '#FFFFFF',
-                  padding: '13px 26px',
-                  borderRadius: 12,
-                  fontSize: 14.5,
-                  fontWeight: 800,
-                  border: 'none',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  boxShadow: selectedPlan === 'annual'
-                    ? '0 8px 20px rgba(124, 58, 237, 0.35)'
-                    : '0 8px 20px rgba(37, 99, 235, 0.3)',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" /> Processing Payment...
-                  </>
-                ) : (
-                  <>
-                    {selectedPlan === 'annual'
-                      ? `Pay ₹${plans.annual.finalPayable} for 1-Year Pass →`
-                      : `Pay ₹${plans.weekly.finalPayable} to Renew Weekly Sprint →`}
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Instant Test Simulated Renewal */}
-            <div style={{ textAlign: 'center', paddingBottom: 16 }}>
-              <button
-                type="button"
-                onClick={handleSimulatedRenewal}
-                disabled={loading}
-                style={{
-                  background: 'none', border: 'none', color: '#64748B',
-                  fontSize: 11.5, cursor: 'pointer', textDecoration: 'underline'
-                }}
-              >
-                ⚡ Instant Test Renewal (Simulated)
-              </button>
             </div>
           </div>
         )}

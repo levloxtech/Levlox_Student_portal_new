@@ -836,10 +836,44 @@ const DEFAULT_VAULT_MATERIALS = [
 
 function getVaultMaterials() {
   const materials = localDb.loadCollection('yearly_member_vault');
-  if (materials.length === 0) {
-    materials.push(...DEFAULT_VAULT_MATERIALS);
+  const indProjects = localDb.loadCollection('industrial_projects') || [];
+  const portProjects = localDb.loadCollection('portfolio_projects') || [];
+
+  // Live Sync: If admin uploaded or updated thumbnailUrl or videoUrl in industrial_projects or portfolio_projects, reflect it here
+  let modified = false;
+  materials.forEach(mat => {
+    if (mat.sourceType === 'industrial_project' || !mat.sourceType) {
+      const matched = indProjects.find(p => p.id === mat.id || p.id === mat.sourceId || (p.name && mat.title && p.name.trim().toLowerCase() === mat.title.trim().toLowerCase()));
+      if (matched) {
+        if (matched.thumbnailUrl && mat.thumbnailUrl !== matched.thumbnailUrl) {
+          mat.thumbnailUrl = matched.thumbnailUrl;
+          modified = true;
+        }
+        if (matched.videoUrl && mat.videoUrl !== matched.videoUrl) {
+          mat.videoUrl = matched.videoUrl;
+          modified = true;
+        }
+      }
+    }
+    if (mat.sourceType === 'portfolio_project' || !mat.sourceType) {
+      const matched = portProjects.find(p => p.id === mat.id || p.id === mat.sourceId || (p.name && mat.title && p.name.trim().toLowerCase() === mat.title.trim().toLowerCase()));
+      if (matched) {
+        if (matched.thumbnailUrl && mat.thumbnailUrl !== matched.thumbnailUrl) {
+          mat.thumbnailUrl = matched.thumbnailUrl;
+          modified = true;
+        }
+        if (matched.videoUrl && mat.videoUrl !== matched.videoUrl) {
+          mat.videoUrl = matched.videoUrl;
+          modified = true;
+        }
+      }
+    }
+  });
+
+  if (modified) {
     localDb.saveCollection('yearly_member_vault', materials);
   }
+
   return materials;
 }
 
@@ -856,24 +890,32 @@ router.get('/vault/materials', (req, res) => {
 // ─── 10. ADMIN: ADD MATERIAL TO YEARLY VAULT / INTERNSHIP HUB ───────────────
 router.post('/vault/admin/materials', uploadVaultFile.any(), (req, res) => {
   try {
-    const { title, type, category, section, description, externalUrl, videoUrl, codeUrl, duration, tags, fileSize: customFileSize } = req.body || {};
+    const {
+      title, type, category, section, description,
+      externalUrl, videoUrl, codeUrl, duration, tags,
+      fileSize: customFileSize, thumbnailUrl: customThumbnailUrl
+    } = req.body || {};
     if (!title) {
       return res.status(400).json({ error: 'Material title is required.' });
     }
 
     let fileUrl = codeUrl || externalUrl || '';
     let finalVideoUrl = videoUrl || (type === 'video' ? externalUrl : '') || '';
+    let finalThumbnailUrl = customThumbnailUrl || '';
     let fileSize = customFileSize || '';
 
     if (Array.isArray(req.files) && req.files.length > 0) {
       for (const f of req.files) {
         const isVideoFile = (f.mimetype && f.mimetype.startsWith('video/')) || f.fieldname === 'videoFile';
+        const isImageFile = (f.mimetype && f.mimetype.startsWith('image/')) || f.fieldname === 'thumbnailFile' || f.fieldname === 'thumbnail';
         const uploadedPath = `/uploads/yearly_vault/${f.filename}`;
         const calculatedSize = `${(f.size / (1024 * 1024)).toFixed(1)} MB`;
 
         if (isVideoFile) {
           finalVideoUrl = uploadedPath;
           if (!fileSize) fileSize = calculatedSize;
+        } else if (isImageFile) {
+          finalThumbnailUrl = uploadedPath;
         } else {
           fileUrl = uploadedPath;
           fileSize = calculatedSize;
@@ -898,6 +940,7 @@ router.post('/vault/admin/materials', uploadVaultFile.any(), (req, res) => {
       description: description ? description.trim() : '',
       fileUrl: fileUrl || (type === 'video' ? finalVideoUrl : ''),
       videoUrl: finalVideoUrl,
+      thumbnailUrl: finalThumbnailUrl,
       fileSize: fileSize || 'Available',
       duration: duration || '',
       tags: typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : (tags || []),
@@ -925,21 +968,29 @@ router.put('/vault/admin/materials/:id', uploadVaultFile.any(), (req, res) => {
     }
 
     const current = materials[index];
-    const { title, type, category, section, description, externalUrl, videoUrl, codeUrl, duration, tags, fileSize: customFileSize } = req.body || {};
+    const {
+      title, type, category, section, description,
+      externalUrl, videoUrl, codeUrl, duration, tags,
+      fileSize: customFileSize, thumbnailUrl: customThumbnailUrl
+    } = req.body || {};
 
     let fileUrl = codeUrl || externalUrl || current.fileUrl || '';
     let finalVideoUrl = videoUrl !== undefined ? videoUrl : (current.videoUrl || '');
+    let finalThumbnailUrl = customThumbnailUrl !== undefined ? customThumbnailUrl : (current.thumbnailUrl || '');
     let fileSize = customFileSize || current.fileSize || '';
 
     if (Array.isArray(req.files) && req.files.length > 0) {
       for (const f of req.files) {
         const isVideoFile = (f.mimetype && f.mimetype.startsWith('video/')) || f.fieldname === 'videoFile';
+        const isImageFile = (f.mimetype && f.mimetype.startsWith('image/')) || f.fieldname === 'thumbnailFile' || f.fieldname === 'thumbnail';
         const uploadedPath = `/uploads/yearly_vault/${f.filename}`;
         const calculatedSize = `${(f.size / (1024 * 1024)).toFixed(1)} MB`;
 
         if (isVideoFile) {
           finalVideoUrl = uploadedPath;
           if (!fileSize) fileSize = calculatedSize;
+        } else if (isImageFile) {
+          finalThumbnailUrl = uploadedPath;
         } else {
           fileUrl = uploadedPath;
           fileSize = calculatedSize;
@@ -956,6 +1007,7 @@ router.put('/vault/admin/materials/:id', uploadVaultFile.any(), (req, res) => {
       description: description !== undefined ? description.trim() : current.description,
       fileUrl: fileUrl,
       videoUrl: finalVideoUrl,
+      thumbnailUrl: finalThumbnailUrl,
       fileSize: fileSize,
       duration: duration !== undefined ? duration : current.duration,
       tags: typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : (tags || current.tags),
