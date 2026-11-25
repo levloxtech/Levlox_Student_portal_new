@@ -15,6 +15,21 @@ const Linkedin = (props) => (
   </svg>
 );
 
+// Clean and format vault titles so they don't break awkwardly with mid-word ellipsis
+const formatVaultTitle = (title) => {
+  if (!title) return '';
+  return String(title)
+    .replace(/\s*\(\s*PyTorch\s*\+\s*YOLOv8\s*\+\s*TensorRT\s*\)/gi, '')
+    .replace(/\s*\(\s*Apache\s*Kafka\s*\+\s*XGBoost\s*\+\s*Redis\s*\)/gi, '')
+    .replace(/\s*\(\s*Kafka\s*\+\s*XGBoost\s*\+\s*Redis\s*\)/gi, '')
+    .replace(/\s*\(\s*FastAPI\s*\+\s*AsyncIO\s*\+\s*Celery\s*\)/gi, '')
+    .replace(/Specification Manual/gi, 'Manual')
+    .replace(/Production Deployment Specification/gi, 'Production Deployment')
+    .replace(/\(ResNet50 \+ Grad-CAM Explainable AI\) Walkthrough/gi, '(ResNet50 + Grad-CAM)')
+    .replace(/\(ResNet50 \+ Grad-CAM Explainable AI\)/gi, '(ResNet50 + Grad-CAM)')
+    .trim();
+};
+
 export default function StudentYearlyVaultView({
   isYearlyMember = false,
   onOpenRenewal,
@@ -1015,19 +1030,24 @@ export default function StudentYearlyVaultView({
                 </div>
 
                 {/* Title */}
-                <h3 style={{
-                  fontSize: 14.5,
-                  fontWeight: 800,
-                  color: '#0F172A',
-                  margin: '0 0 6px',
-                  lineHeight: 1.4,
-                  minHeight: 40,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden'
-                }}>
-                  {mat.title}
+                <h3
+                  title={mat.title}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 800,
+                    color: '#0F172A',
+                    margin: '0 0 6px',
+                    lineHeight: 1.35,
+                    minHeight: 38,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    wordBreak: 'normal',
+                    overflowWrap: 'break-word'
+                  }}
+                >
+                  {formatVaultTitle(mat.title)}
                 </h3>
 
                 {/* Reduced Compact Description */}
@@ -1083,11 +1103,11 @@ export default function StudentYearlyVaultView({
                 <div
                   style={{
                     position: 'relative',
-                    height: 120,
-                    borderRadius: 10,
+                    height: 110,
+                    borderRadius: 8,
                     overflow: 'hidden',
                     background: '#0F172A',
-                    marginBottom: 14,
+                    marginBottom: 12,
                     cursor: 'pointer',
                     boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)'
                   }}

@@ -1016,18 +1016,7 @@ router.post('/create-order', async (req, res) => {
 
     let basePrice = isWeekly
       ? (isRenewal ? (plan.renewalPrice || 299) : (plan.promotionalPrice || 113))
-      : (plan.listedPrice || 35999);
-
-    if (planId === 'annual') {
-      const usersCheck = localDb.loadCollection('users');
-      const studentsCheck = localDb.loadCollection('students');
-      const existingUser = usersCheck.find(u => u.email?.toLowerCase() === normEmail);
-      const existingStudent = studentsCheck.find(s => s.email?.toLowerCase() === normEmail);
-      const isQualified = Boolean(existingUser?.hasPassedInternshipExam || existingStudent?.hasPassedInternshipExam || req.body.isQualified);
-      if (isQualified) {
-        basePrice = 11499;
-      }
-    }
+      : 11499;
 
     let couponDiscount = 0;
     if (couponCode) {
@@ -1050,9 +1039,7 @@ router.post('/create-order', async (req, res) => {
       }
     }
 
-    const userCredits = getUserCredits(email, planId);
-    const creditsDeducted = Math.max(0, Math.min(Number(applyCredits) || 0, userCredits.balance, basePrice - couponDiscount));
-    const payableAmount = Math.max(0, basePrice - couponDiscount - creditsDeducted);
+    const payableAmount = Math.max(0, basePrice - couponDiscount);
 
     const receipt = `rcpt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 

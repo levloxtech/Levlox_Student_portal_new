@@ -790,7 +790,7 @@ router.get('/admin/submissions', (req, res) => {
 const DEFAULT_VAULT_MATERIALS = [
   {
     id: 'vault_mat_1',
-    title: 'Autonomous Vehicle Obstacle Detection & Segmentation (PyTorch + YOLOv8 + TensorRT)',
+    title: 'Autonomous Vehicle Obstacle Detection & Segmentation',
     type: 'code',
     category: 'Industrial Capstone',
     description: 'Complete production repository with data loaders, synthetic augmentation scripts, FP16 quantization benchmarks, and REST API deployment pipeline.',
@@ -801,7 +801,7 @@ const DEFAULT_VAULT_MATERIALS = [
   },
   {
     id: 'vault_mat_2',
-    title: 'End-to-End Real-Time Financial Fraud Detection Architecture (Apache Kafka + XGBoost + Redis)',
+    title: 'Real-Time Financial Fraud Detection Architecture',
     type: 'code',
     category: 'Production ML System',
     description: 'Streaming event ingestion using Kafka consumer groups, online feature store synchronization in Redis, sub-15ms inference latency microservice.',
@@ -812,7 +812,7 @@ const DEFAULT_VAULT_MATERIALS = [
   },
   {
     id: 'vault_mat_3',
-    title: 'Enterprise MLOps Architecture & Production Deployment Specification Manual',
+    title: 'Enterprise MLOps Architecture & Production Deployment Manual',
     type: 'document',
     category: 'Architecture Guide',
     description: 'Comprehensive 84-page industrial handbook on CI/CD for machine learning, Docker containerization, Kubernetes HPA, MLflow registry, and automated drift alerts.',
@@ -823,7 +823,7 @@ const DEFAULT_VAULT_MATERIALS = [
   },
   {
     id: 'vault_mat_4',
-    title: 'Medical Image Diagnostic Classifier (ResNet50 + Grad-CAM Explainable AI) Walkthrough',
+    title: 'Medical Image Diagnostic Classifier (ResNet50 + Grad-CAM)',
     type: 'video',
     category: 'Capstone Walkthrough',
     description: 'Deep dive video session explaining DICOM image preprocessing, transfer learning optimization, class imbalance handling, and Grad-CAM heatmap visualization.',
