@@ -354,10 +354,10 @@ router.post('/calculate-price', (req, res) => {
     return res.status(400).json({ error: 'Invalid membership plan selected.' });
   }
 
+  const normEmail = (email || '').toLowerCase().trim();
   const isWeekly = (planId === 'weekly' || planId === 'monthly');
   let isRenewal = Boolean(reqRenewal);
-  if (!isRenewal && email) {
-    const normEmail = String(email).toLowerCase().trim();
+  if (!isRenewal && normEmail) {
     const users = localDb.loadCollection('users');
     const students = localDb.loadCollection('students');
     const existingUser = users.find(u => u.email?.toLowerCase() === normEmail);
@@ -374,9 +374,9 @@ router.post('/calculate-price', (req, res) => {
   if (planId === 'annual') {
     const usersCheck = localDb.loadCollection('users');
     const studentsCheck = localDb.loadCollection('students');
-    const existingUser = usersCheck.find(u => u.email?.toLowerCase() === normEmail);
-    const existingStudent = studentsCheck.find(s => s.email?.toLowerCase() === normEmail);
-    const isQualified = Boolean(existingUser?.hasPassedInternshipExam || existingStudent?.hasPassedInternshipExam || req.query.isQualified === 'true' || req.query.qualified === 'true');
+    const existingUser = normEmail ? usersCheck.find(u => u.email?.toLowerCase() === normEmail) : null;
+    const existingStudent = normEmail ? studentsCheck.find(s => s.email?.toLowerCase() === normEmail) : null;
+    const isQualified = Boolean(existingUser?.hasPassedInternshipExam || existingStudent?.hasPassedInternshipExam || req.query.isQualified === 'true' || req.query.qualified === 'true' || req.body.isQualified);
     if (isQualified) {
       basePrice = 11499;
     }
