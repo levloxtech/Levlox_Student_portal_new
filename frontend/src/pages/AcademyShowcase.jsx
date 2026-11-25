@@ -1065,9 +1065,12 @@ export default function AcademyShowcase() {
             box-shadow: 0 4px 14px rgba(16, 27, 51, 0.22);
           }
         }
-        @media (max-width: 640px) {
-          .carousel-nav-btn {
-            display: none !important;
+        @media (max-width: 480px) {
+          .carousel-nav-prev {
+            left: 2px;
+          }
+          .carousel-nav-next {
+            right: 2px;
           }
         }
         @media (max-width: 768px) {
@@ -1088,6 +1091,9 @@ export default function AcademyShowcase() {
           .academy-login-btn {
             padding: 5px 10px !important;
             font-size: 11.5px !important;
+          }
+          .carousel-nav-btn {
+            display: none !important;
           }
           .testimonials-carousel-row {
             gap: 14px !important;
@@ -1423,7 +1429,7 @@ export default function AcademyShowcase() {
 
             {/* Carousel Container with Floating Side Navigation Buttons */}
             <div style={{ position: 'relative' }}>
-              {/* Left Arrow Button (Only if multiple testimonials exist) */}
+              {/* Left Arrow Button (Vertically Centered at Left Side) */}
               {testimonials.length > 1 && (
                 <button
                   type="button"
@@ -1452,14 +1458,14 @@ export default function AcademyShowcase() {
                     position: 'relative',
                     width: 'min(280px, calc(100vw - 48px))',
                     minWidth: 'min(280px, calc(100vw - 48px))',
-                    maxWidth: 300,
-                    height: 385,
+                    maxWidth: 290,
+                    height: 380,
                     borderRadius: 22,
                     overflow: 'hidden',
                     cursor: 'pointer',
                     boxShadow: '0 12px 32px rgba(16, 27, 51, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.7)',
                     transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                    background: '#0B0F19',
+                    background: '#070E36',
                     flexShrink: 0,
                     scrollSnapAlign: 'center',
                     margin: '0 auto'
@@ -1481,7 +1487,7 @@ export default function AcademyShowcase() {
                   <div style={{
                     position: 'absolute',
                     inset: 0,
-                    background: 'radial-gradient(circle at 50% 25%, #1E2B4D 0%, #0D1424 100%)',
+                    background: 'radial-gradient(circle at 50% 25%, #1E2B4D 0%, #070E36 100%)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -1526,18 +1532,20 @@ export default function AcademyShowcase() {
                           width: '100%',
                           height: '100%',
                           objectFit: 'cover',
+                          transform: 'scale(1.05)',
                           zIndex: 1
                         }}
                       />
                     );
                   })()}
 
-                  {/* Gradient Overlay for high-contrast legibility */}
+                  {/* Gradient Overlay for seamless blend and high-contrast legibility */}
                   <div style={{
                     position: 'absolute',
                     inset: 0,
-                    background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(10,15,30,0.5) 40%, rgba(10,15,30,0.96) 80%)',
-                    pointerEvents: 'none'
+                    background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(7,14,54,0.15) 35%, rgba(7,14,54,0.7) 65%, rgba(7,14,54,0.95) 100%)',
+                    pointerEvents: 'none',
+                    zIndex: 2
                   }} />
 
                   {/* Card Bottom Content */}
@@ -1546,10 +1554,10 @@ export default function AcademyShowcase() {
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    padding: '16px 16px 18px',
+                    padding: '16px 16px 16px',
                     display: 'flex',
                     flexDirection: 'column',
-                    zIndex: 2
+                    zIndex: 3
                   }}>
                     {/* Top Row: Name, Role & Play Button */}
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
@@ -1683,7 +1691,7 @@ export default function AcademyShowcase() {
               ))}
               </div>
 
-              {/* Right Arrow Button (Only if multiple testimonials exist) */}
+              {/* Right Arrow Button (Vertically Centered at Right Side) */}
               {testimonials.length > 1 && (
                 <button
                   type="button"
