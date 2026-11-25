@@ -14,30 +14,11 @@ const Linkedin = (props) => (
   </svg>
 );
 
+import { getEmbedVideoUrl as utilGetEmbedVideoUrl, getGoogleDriveFileId } from '../utils/videoUtils';
+
 // Helper to convert Google Drive / YouTube / Vimeo links to embeddable player URLs
 const getEmbedVideoUrl = (rawUrl) => {
-  if (!rawUrl) return null;
-  const url = String(rawUrl).trim();
-
-  // Google Drive (view or open links)
-  const driveMatch = url.match(/(?:drive\.google\.com\/(?:file\/d\/|open\?id=))([a-zA-Z0-9_-]+)/);
-  if (driveMatch) {
-    return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
-  }
-
-  // YouTube (standard or short links)
-  const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-  if (ytMatch) {
-    return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&rel=0`;
-  }
-
-  // Vimeo
-  const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?([0-9]+)/);
-  if (vimeoMatch) {
-    return `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1`;
-  }
-
-  return null;
+  return utilGetEmbedVideoUrl(rawUrl);
 };
 
 export default function YearlyMembersVaultManager() {

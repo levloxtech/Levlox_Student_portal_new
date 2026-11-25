@@ -14,7 +14,7 @@ import supportHubImg from '../assets/support-hub-interface.png';
 import verifiedCertImg from '../assets/verified-certificate.png';
 import supportSystemImg from '../assets/support-system-24-7.png';
 import levloxCertImg from '../assets/levlox-completion-certificate.png';
-import { getResolvedThumbnail, resolveDirectImageUrl } from '../utils/videoUtils';
+import { getResolvedThumbnail, resolveDirectImageUrl, getEmbedVideoUrl } from '../utils/videoUtils';
 
 // Dedicated Authentic Brand Icons for Python, Machine Learning, and SQL
 function PythonBrandIcon({ size = 24 }) {
@@ -505,15 +505,7 @@ export default function AcademyShowcase() {
 
   const getEmbedUrl = (url) => {
     if (!url) return '';
-    const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-    if (ytMatch) {
-      return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`;
-    }
-    const gdriveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
-    if (gdriveMatch) {
-      return `https://drive.google.com/file/d/${gdriveMatch[1]}/preview`;
-    }
-    return url;
+    return getEmbedVideoUrl(url);
   };
 
   // Dynamic Coupon Validation against Admin-configured Coupons
@@ -5015,8 +5007,9 @@ export default function AcademyShowcase() {
               background: '#0F172A',
               flexShrink: 0
             }}>
-              {getEmbedUrl(selectedProjectVideoModal.videoUrl).includes('youtube.com/embed') ||
-              getEmbedUrl(selectedProjectVideoModal.videoUrl).includes('drive.google.com') ? (
+              {getEmbedUrl(selectedProjectVideoModal.videoUrl).includes('youtube') ||
+              getEmbedUrl(selectedProjectVideoModal.videoUrl).includes('drive.google.com') ||
+              getEmbedUrl(selectedProjectVideoModal.videoUrl).includes('vimeo') ? (
                 <iframe
                   src={getEmbedUrl(selectedProjectVideoModal.videoUrl)}
                   title={selectedProjectVideoModal.name}

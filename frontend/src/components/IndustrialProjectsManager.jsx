@@ -12,6 +12,11 @@ import {
   updatePortfolioProject
 } from '../services/firebaseService';
 import { uploadUniversalFile } from '../services/apiService';
+import {
+  getEmbedVideoUrl as utilGetEmbedVideoUrl,
+  getVideoSourceType,
+  getGoogleDriveFileId
+} from '../utils/videoUtils';
 
 const DEFAULT_INDUSTRIAL_PROJECTS = [
   {
@@ -167,29 +172,15 @@ const DEFAULT_PORTFOLIO_PROJECTS = [
   }
 ];
 
-// Helper to format YouTube / Vimeo embeds or direct video URLs
+// Helper to format Google Drive / YouTube / Vimeo embeds or direct video URLs
 export const getEmbedVideoUrl = (rawUrl) => {
-  if (!rawUrl) return null;
-  const clean = String(rawUrl).trim();
-  if (clean.includes('youtube.com/watch')) {
-    const v = new URL(clean).searchParams.get('v');
-    return v ? `https://www.youtube.com/embed/${v}` : clean;
-  }
-  if (clean.includes('youtu.be/')) {
-    const v = clean.split('youtu.be/')[1]?.split('?')[0];
-    return v ? `https://www.youtube.com/embed/${v}` : clean;
-  }
-  if (clean.includes('vimeo.com/')) {
-    const v = clean.split('vimeo.com/')[1]?.split('?')[0];
-    return v ? `https://player.vimeo.com/video/${v}` : clean;
-  }
-  return clean;
+  return utilGetEmbedVideoUrl(rawUrl);
 };
 
 export const isEmbeddableVideo = (url) => {
   if (!url) return false;
-  const c = url.toLowerCase();
-  return c.includes('youtube.com') || c.includes('youtu.be') || c.includes('vimeo.com');
+  const srcType = getVideoSourceType(url);
+  return srcType === 'drive' || srcType === 'youtube' || srcType === 'vimeo';
 };
 
 const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
@@ -259,6 +250,9 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
   const [formOutcome, setFormOutcome] = useState('');
   const [formThumbnailUrl, setFormThumbnailUrl] = useState('');
   const [formVideoUrl, setFormVideoUrl] = useState('');
+  const [showExternalVideo, setShowExternalVideo] = useState(false);
+  const [showExternalThumbnail, setShowExternalThumbnail] = useState(false);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -287,6 +281,9 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
     setFormOutcome(p.outcome || '');
     setFormThumbnailUrl(p.thumbnailUrl || '');
     setFormVideoUrl(p.videoUrl || '');
+    setShowExternalVideo(false);
+    setShowExternalThumbnail(false);
+    setVideoUploadProgress(0);
     setErrorMessage('');
   };
 
@@ -327,16 +324,20 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
 
     try {
       setIsUploadingVideo(true);
-      const res = await uploadUniversalFile(file, `${editingType}-projects/videos`);
+      setVideoUploadProgress(0);
+      const res = await uploadUniversalFile(file, `${editingType}-projects/videos`, (pct) => {
+        setVideoUploadProgress(pct);
+      });
       if (res?.url) {
         setFormVideoUrl(res.url);
-        showToast('Project video uploaded successfully!');
+        showToast('Project video uploaded to server successfully!');
       }
     } catch (err) {
       console.error('[Upload] Video upload failed:', err);
       alert('Video upload failed: ' + err.message);
     } finally {
       setIsUploadingVideo(false);
+      setVideoUploadProgress(0);
     }
   };
 
@@ -1118,23 +1119,24 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
                   )}
                 </div>
 
-                {/* Upload File Button + URL Input */}
+                {/* Upload Thumbnail Button */}
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
                   <label style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 6,
-                    padding: '8px 14px',
-                    borderRadius: 8,
-                    background: '#FFFFFF',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: 12.5,
+                    gap: 8,
+                    padding: '9px 18px',
+                    borderRadius: 9,
+                    background: isUploadingImage ? '#E2E8F0' : '#2563EB',
+                    border: 'none',
+                    fontSize: 13,
                     fontWeight: 700,
-                    color: '#334155',
-                    cursor: isUploadingImage ? 'wait' : 'pointer'
+                    color: '#FFFFFF',
+                    cursor: isUploadingImage ? 'wait' : 'pointer',
+                    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)'
                   }}>
                     <Upload size={14} />
-                    <span>{isUploadingImage ? 'Uploading Image...' : 'Choose Image File'}</span>
+                    <span>{isUploadingImage ? 'Uploading Image to Server...' : 'Upload Thumbnail to Server'}</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -1144,24 +1146,23 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
                     />
                   </label>
 
-                  <span style={{ fontSize: 12, color: '#94A3B8' }}>or paste URL:</span>
-
-                  <input
-                    type="url"
-                    placeholder="https://.../thumbnail.png"
-                    value={formThumbnailUrl}
-                    onChange={(e) => setFormThumbnailUrl(e.target.value)}
-                    style={{
-                      flex: 1,
-                      minWidth: 200,
-                      padding: '8px 12px',
-                      borderRadius: 8,
-                      border: '1.5px solid #CBD5E1',
-                      fontSize: 12.5,
-                      color: '#0F172A',
-                      boxSizing: 'border-box'
-                    }}
-                  />
+                  {formThumbnailUrl && (
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      background: '#ECFDF5',
+                      color: '#059669',
+                      border: '1px solid #A7F3D0',
+                      padding: '5px 10px',
+                      borderRadius: 7,
+                      fontSize: 12,
+                      fontWeight: 700
+                    }}>
+                      <Check size={13} />
+                      <span>Thumbnail Ready</span>
+                    </span>
+                  )}
                 </div>
 
                 {/* Thumbnail Preview */}
@@ -1170,7 +1171,7 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
                     marginTop: 10,
                     borderRadius: 10,
                     overflow: 'hidden',
-                    border: '1px solid #E2E8F0',
+                    border: '1.5px solid #CBD5E1',
                     maxHeight: 140,
                     display: 'flex',
                     alignItems: 'center',
@@ -1185,6 +1186,45 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
                     />
                   </div>
                 )}
+
+                {/* Collapsible External Image URL */}
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowExternalThumbnail(!showExternalThumbnail)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      color: '#64748B',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    {showExternalThumbnail ? '− Hide external image URL' : '+ Or paste external image URL'}
+                  </button>
+                  {showExternalThumbnail && (
+                    <div style={{ marginTop: 8 }}>
+                      <input
+                        type="url"
+                        placeholder="https://example.com/thumbnail.png"
+                        value={formThumbnailUrl}
+                        onChange={(e) => setFormThumbnailUrl(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: 8,
+                          border: '1.5px solid #CBD5E1',
+                          fontSize: 12.5,
+                          color: '#0F172A',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* ───────────────────────────────────────────────────────── */}
@@ -1198,45 +1238,57 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
                 marginBottom: 24
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <label style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
-                    <Video size={16} color="#2563EB" />
-                    <span>Project Demo Video</span>
-                  </label>
+                  <div>
+                    <label style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+                      <Video size={16} color="#7C3AED" />
+                      <span>Project Demo Video (Fast Server Upload or Drive Link)</span>
+                    </label>
+                    <p style={{ margin: '3px 0 0', fontSize: 12, color: '#64748B' }}>
+                      Upload directly to server for fastest loading, or enter a Google Drive / YouTube link.
+                    </p>
+                  </div>
                   {formVideoUrl && (
                     <button
                       type="button"
                       onClick={() => setFormVideoUrl('')}
                       style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#EF4444',
-                        fontSize: 12,
+                        background: '#FEE2E2',
+                        border: '1px solid #FECACA',
+                        color: '#DC2626',
+                        fontSize: 11.5,
                         fontWeight: 700,
+                        padding: '4px 10px',
+                        borderRadius: 6,
                         cursor: 'pointer'
                       }}
                     >
-                      Remove
+                      Remove Video
                     </button>
                   )}
                 </div>
 
-                {/* Upload File Button + URL Input */}
+                {/* Upload File Button */}
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
                   <label style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 6,
-                    padding: '8px 14px',
-                    borderRadius: 8,
-                    background: '#FFFFFF',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    color: '#334155',
-                    cursor: isUploadingVideo ? 'wait' : 'pointer'
+                    gap: 8,
+                    padding: '10px 20px',
+                    borderRadius: 9,
+                    background: isUploadingVideo ? '#E2E8F0' : 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                    border: 'none',
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: '#FFFFFF',
+                    cursor: isUploadingVideo ? 'wait' : 'pointer',
+                    boxShadow: '0 3px 10px rgba(124, 58, 237, 0.25)'
                   }}>
-                    <Upload size={14} />
-                    <span>{isUploadingVideo ? 'Uploading Video...' : 'Upload Video File (MP4/WebM)'}</span>
+                    <Upload size={15} />
+                    <span>
+                      {isUploadingVideo
+                        ? (videoUploadProgress > 0 ? `Uploading Video: ${videoUploadProgress}%` : 'Uploading Video...')
+                        : 'Upload Video File to Server'}
+                    </span>
                     <input
                       type="file"
                       accept="video/*"
@@ -1246,25 +1298,53 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
                     />
                   </label>
 
-                  <span style={{ fontSize: 12, color: '#94A3B8' }}>or paste URL:</span>
-
-                  <input
-                    type="url"
-                    placeholder="YouTube URL, Vimeo, or MP4 link"
-                    value={formVideoUrl}
-                    onChange={(e) => setFormVideoUrl(e.target.value)}
-                    style={{
-                      flex: 1,
-                      minWidth: 200,
-                      padding: '8px 12px',
+                  {formVideoUrl && !isUploadingVideo && (
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: isEmbeddableVideo(formVideoUrl) ? '#EFF6FF' : '#ECFDF5',
+                      color: isEmbeddableVideo(formVideoUrl) ? '#1D4ED8' : '#059669',
+                      border: isEmbeddableVideo(formVideoUrl) ? '1px solid #BFDBFE' : '1px solid #A7F3D0',
+                      padding: '5px 12px',
                       borderRadius: 8,
-                      border: '1.5px solid #CBD5E1',
-                      fontSize: 12.5,
-                      color: '#0F172A',
-                      boxSizing: 'border-box'
-                    }}
-                  />
+                      fontSize: 12,
+                      fontWeight: 700
+                    }}>
+                      <Check size={13} />
+                      <span>
+                        {getGoogleDriveFileId(formVideoUrl)
+                          ? 'Google Drive Video Linked (Ready)'
+                          : isEmbeddableVideo(formVideoUrl)
+                            ? 'External Video Linked'
+                            : 'Video Uploaded to Server (Ready)'}
+                      </span>
+                    </span>
+                  )}
                 </div>
+
+                {/* Upload Progress Bar */}
+                {isUploadingVideo && (
+                  <div style={{ marginTop: 8, marginBottom: 10 }}>
+                    <div style={{
+                      width: '100%',
+                      height: 7,
+                      background: '#E2E8F0',
+                      borderRadius: 999,
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        width: `${videoUploadProgress}%`,
+                        height: '100%',
+                        background: 'linear-gradient(90deg, #7C3AED 0%, #2563EB 100%)',
+                        transition: 'width 0.2s ease'
+                      }} />
+                    </div>
+                    <span style={{ fontSize: 11.5, color: '#64748B', display: 'block', marginTop: 3 }}>
+                      Fast chunked video upload in progress... {videoUploadProgress}%
+                    </span>
+                  </div>
+                )}
 
                 {/* Video In-Modal Preview Player */}
                 {formVideoUrl && (
@@ -1272,11 +1352,12 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
                     marginTop: 10,
                     borderRadius: 10,
                     overflow: 'hidden',
-                    border: '1px solid #E2E8F0',
+                    border: '1px solid #CBD5E1',
                     background: '#0F172A',
                     position: 'relative',
                     paddingBottom: '56.25%',
-                    height: 0
+                    height: 0,
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.18)'
                   }}>
                     {isEmbeddableVideo(formVideoUrl) ? (
                       <iframe
@@ -1295,6 +1376,48 @@ const IndustrialProjectsManager = ({ initialSection = 'industrial' }) => {
                     )}
                   </div>
                 )}
+
+                {/* Collapsible External Video Link */}
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowExternalVideo(!showExternalVideo)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      color: '#64748B',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    {showExternalVideo ? '− Hide external video link input' : '+ Or use Google Drive / YouTube link instead'}
+                  </button>
+                  {showExternalVideo && (
+                    <div style={{ marginTop: 8 }}>
+                      <input
+                        type="url"
+                        placeholder="https://drive.google.com/file/d/... or https://youtube.com/..."
+                        value={formVideoUrl}
+                        onChange={(e) => setFormVideoUrl(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: 8,
+                          border: '1.5px solid #CBD5E1',
+                          fontSize: 12.5,
+                          color: '#0F172A',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                      <span style={{ fontSize: 11, color: '#64748B', marginTop: 4, display: 'block' }}>
+                        Supports Google Drive sharing links (any view/open format), YouTube, and Vimeo. Streams seamlessly inside the portal.
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Action Buttons */}
