@@ -220,8 +220,9 @@ export default function CouponsManager() {
                   }}
                 >
                   <option value="all">All Membership Plans</option>
-                  <option value="monthly">Monthly Membership Only</option>
-                  <option value="annual">Annual Membership Only</option>
+                  <option value="weekly">Weekly Learning Sprint (Week 1)</option>
+                  <option value="monthly">Monthly / Weekly Cycle</option>
+                  <option value="annual">Annual Internship (1-Year)</option>
                 </select>
               </div>
             </div>

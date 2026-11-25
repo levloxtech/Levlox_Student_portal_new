@@ -340,21 +340,21 @@ export default function AcademyShowcase() {
   const [calcLoading, setCalcLoading] = useState(false);
 
   // Dynamic calculations for both plans
-  // Weekly Learning Cycle: Standard ₹749 cut to ₹99 for Week 1 (Auto-locks after 7 days; ₹299/week for Week 2+)
-  const weeklyBase = 99;
+  // Weekly Learning Cycle: Standard ₹749 cut to ₹113 for Week 1 (Auto-locks after 7 days; ₹299/week for Week 2+)
+  const weeklyBase = 113;
   const isWeeklyCouponApplied = appliedCouponPlan === 'weekly' && !!appliedCoupon;
   const weeklyCouponDiscount = isWeeklyCouponApplied ? couponDiscount : 0;
   const weeklyPayable = Math.max(0, weeklyBase - weeklyCouponDiscount);
 
   // Machine Learning Engineer Internship Program: Standard package ₹35,999.
-  // Apply Score Credits (₹20,000) and Enrolly Coupon (₹6,000) -> Net fee ₹9,999!
+  // Apply Score Credits (₹20,000) and Enrolly Coupon (₹4,500) -> Net fee ₹11,499!
   // Once applied, discounts are fixed (no remove option).
   const [isAnnualCreditsApplied, setIsAnnualCreditsApplied] = useState(false);
   const [isAnnualCouponApplied, setIsAnnualCouponApplied] = useState(false);
 
   const annualBase = 35999;
   const annualCreditsAmount = 20000;
-  const annualCouponAmount = 6000;
+  const annualCouponAmount = 4500;
 
   const annualCreditsDeduction = isAnnualCreditsApplied ? annualCreditsAmount : 0;
   const annualEnrollyDeduction = isAnnualCouponApplied ? annualCouponAmount : 0;
@@ -508,7 +508,7 @@ export default function AcademyShowcase() {
 
       // Automatically launch fullscreen for optimal mobile phone and desktop viewing
       if (videoEl.requestFullscreen) {
-        videoEl.requestFullscreen().catch(() => {});
+        videoEl.requestFullscreen().catch(() => { });
       } else if (videoEl.webkitEnterFullscreen) {
         // iOS Safari native fullscreen on HTMLVideoElement
         try {
@@ -519,25 +519,25 @@ export default function AcademyShowcase() {
       } else if (videoEl.webkitRequestFullscreen) {
         try {
           videoEl.webkitRequestFullscreen();
-        } catch (e) {}
+        } catch (e) { }
       } else if (videoEl.mozRequestFullScreen) {
         try {
           videoEl.mozRequestFullScreen();
-        } catch (e) {}
+        } catch (e) { }
       } else if (videoEl.msRequestFullscreen) {
         try {
           videoEl.msRequestFullscreen();
-        } catch (e) {}
+        } catch (e) { }
       } else if (containerEl && containerEl.requestFullscreen) {
-        containerEl.requestFullscreen().catch(() => {});
+        containerEl.requestFullscreen().catch(() => { });
       }
     } else if (containerEl) {
       if (containerEl.requestFullscreen) {
-        containerEl.requestFullscreen().catch(() => {});
+        containerEl.requestFullscreen().catch(() => { });
       } else if (containerEl.webkitRequestFullscreen) {
         try {
           containerEl.webkitRequestFullscreen();
-        } catch (e) {}
+        } catch (e) { }
       }
     }
   };
@@ -845,7 +845,7 @@ export default function AcademyShowcase() {
         if (appliedCouponPlan === 'annual' && appliedCoupon) {
           activeCoupon = appliedCoupon;
         } else if (isAnnualCouponApplied) {
-          activeCoupon = 'ENROLL6000';
+          activeCoupon = 'ENROLL4500';
         }
       } else {
         activeCoupon = (appliedCouponPlan === 'weekly') ? appliedCoupon : '';
@@ -1264,12 +1264,12 @@ export default function AcademyShowcase() {
                         background: '#000000'
                       }}
                     />
-                )}
+                  )}
 
                 {/* If it's an iframe (YouTube or Google Drive embed), render when playing */}
                 {isPlayingHeroVideo && heroBannerData?.videoUrl &&
                   (getEmbedUrl(heroBannerData.videoUrl).includes('youtube.com/embed') ||
-                   getEmbedUrl(heroBannerData.videoUrl).includes('drive.google.com')) && (
+                    getEmbedUrl(heroBannerData.videoUrl).includes('drive.google.com')) && (
                     <iframe
                       src={getEmbedUrl(heroBannerData.videoUrl)}
                       title="Levlox Academy Company Overview"
@@ -1285,7 +1285,7 @@ export default function AcademyShowcase() {
                         zIndex: 2
                       }}
                     />
-                )}
+                  )}
 
                 {/* Cover Thumbnail Overlay with Play Button - Hidden when playing */}
                 {!isPlayingHeroVideo && (
@@ -1587,108 +1587,108 @@ export default function AcademyShowcase() {
                             {item.role}
                           </p>
                         )}
-                      </div>
+                        </div>
 
-                      {/* Floating Round White Play Button */}
-                      <div
-                        className="story-play-btn"
-                        style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: '50%',
-                          background: '#FFFFFF',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)',
-                          transition: 'transform 0.2s ease'
-                        }}
-                      >
-                        <Play size={15} fill="#101B33" color="#101B33" style={{ marginLeft: 2 }} />
-                      </div>
-                    </div>
-
-                    {/* Star Rating */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, margin: '6px 0 4px' }}>
-                      {[...Array(5)].map((_, si) => (
-                        <span
-                          key={si}
+                        {/* Floating Round White Play Button */}
+                        <div
+                          className="story-play-btn"
                           style={{
-                            color: si < (item.rating || 5) ? '#FBBF24' : 'rgba(255, 255, 255, 0.3)',
-                            fontSize: 13,
-                            lineHeight: 1
-                          }}
-                        >
-                          ★
-                        </span>
-                      ))}
-                      <span style={{ color: '#FBBF24', fontSize: 11, fontWeight: 700, marginLeft: 4 }}>
-                        {(item.rating || 5)}.0
-                      </span>
-                    </div>
-
-                    {/* Feedback / Review Text right at the bottom of the stars */}
-                    {item.feedback ? (
-                      <p style={{
-                        color: 'rgba(255, 255, 255, 0.92)',
-                        fontSize: 12,
-                        lineHeight: 1.45,
-                        margin: '2px 0 8px',
-                        fontStyle: 'italic',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}>
-                        "{item.feedback}"
-                      </p>
-                    ) : (
-                      <p style={{
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        fontSize: 12,
-                        lineHeight: 1.4,
-                        margin: '2px 0 8px',
-                        fontStyle: 'italic'
-                      }}>
-                        "Cracked IT interview successfully with Levlox Academy."
-                      </p>
-                    )}
-
-                    {/* LinkedIn Button at the bottom */}
-                    {item.linkedinUrl && (
-                      <div style={{ marginTop: 2 }}>
-                        <a
-                          href={item.linkedinUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          title={`Verify ${item.studentName} on LinkedIn`}
-                          style={{
-                            display: 'inline-flex',
+                            width: 38,
+                            height: 38,
+                            borderRadius: '50%',
+                            background: '#FFFFFF',
+                            display: 'flex',
                             alignItems: 'center',
-                            gap: 4,
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: '#FFFFFF',
-                            background: 'rgba(10, 102, 194, 0.85)',
-                            backdropFilter: 'blur(4px)',
-                            padding: '3px 8px',
-                            borderRadius: 4,
-                            textDecoration: 'none'
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)',
+                            transition: 'transform 0.2s ease'
                           }}
                         >
-                          <svg fill="#FFFFFF" viewBox="0 0 24 24" style={{ width: 10, height: 10 }}>
-                            <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.53 1.53 0 1 0 0-3.06 1.53 1.53 0 0 0 0 3.06m1.39 9.74v-8.37H5.07v8.37h2.78Z" />
-                          </svg>
-                          LinkedIn
-                        </a>
+                          <Play size={15} fill="#101B33" color="#101B33" style={{ marginLeft: 2 }} />
+                        </div>
                       </div>
-                    )}
+
+                      {/* Star Rating */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, margin: '6px 0 4px' }}>
+                        {[...Array(5)].map((_, si) => (
+                          <span
+                            key={si}
+                            style={{
+                              color: si < (item.rating || 5) ? '#FBBF24' : 'rgba(255, 255, 255, 0.3)',
+                              fontSize: 13,
+                              lineHeight: 1
+                            }}
+                          >
+                            ★
+                          </span>
+                        ))}
+                        <span style={{ color: '#FBBF24', fontSize: 11, fontWeight: 700, marginLeft: 4 }}>
+                          {(item.rating || 5)}.0
+                        </span>
+                      </div>
+
+                      {/* Feedback / Review Text right at the bottom of the stars */}
+                      {item.feedback ? (
+                        <p style={{
+                          color: 'rgba(255, 255, 255, 0.92)',
+                          fontSize: 12,
+                          lineHeight: 1.45,
+                          margin: '2px 0 8px',
+                          fontStyle: 'italic',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          "{item.feedback}"
+                        </p>
+                      ) : (
+                        <p style={{
+                          color: 'rgba(255, 255, 255, 0.7)',
+                          fontSize: 12,
+                          lineHeight: 1.4,
+                          margin: '2px 0 8px',
+                          fontStyle: 'italic'
+                        }}>
+                          "Cracked IT interview successfully with Levlox Academy."
+                        </p>
+                      )}
+
+                      {/* LinkedIn Button at the bottom */}
+                      {item.linkedinUrl && (
+                        <div style={{ marginTop: 2 }}>
+                          <a
+                            href={item.linkedinUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title={`Verify ${item.studentName} on LinkedIn`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: '#FFFFFF',
+                              background: 'rgba(10, 102, 194, 0.85)',
+                              backdropFilter: 'blur(4px)',
+                              padding: '3px 8px',
+                              borderRadius: 4,
+                              textDecoration: 'none'
+                            }}
+                          >
+                            <svg fill="#FFFFFF" viewBox="0 0 24 24" style={{ width: 10, height: 10 }}>
+                              <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.53 1.53 0 1 0 0-3.06 1.53 1.53 0 0 0 0 3.06m1.39 9.74v-8.37H5.07v8.37h2.78Z" />
+                            </svg>
+                            LinkedIn
+                          </a>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
               </div>
 
               {/* Right Arrow Button (Vertically Centered at Right Side) */}
@@ -2600,7 +2600,7 @@ export default function AcademyShowcase() {
               gap: 12,
               transition: 'all 0.2s ease'
             }}
-            className="portfolio-project-card"
+              className="portfolio-project-card"
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: '#D97706', background: '#FEF3C7', border: '1px solid #FDE68A', padding: '3px 8px', borderRadius: 6 }}>
@@ -3232,7 +3232,7 @@ export default function AcademyShowcase() {
 
               <div style={{ marginBottom: 16 }}>
                 <span style={{ fontSize: 14, color: '#94A3B8', textDecoration: 'line-through', marginRight: 8 }}>₹749</span>
-                <span style={{ fontSize: 32, fontWeight: 800, color: '#0F172A' }}>₹99</span>
+                <span style={{ fontSize: 32, fontWeight: 800, color: '#0F172A' }}>₹{weeklyPayable.toLocaleString('en-IN')}</span>
                 <span style={{ fontSize: 13, color: '#64748B' }}> / Week 1 access</span>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#059669', background: '#D1FAE5', padding: '2px 8px', borderRadius: 4, marginLeft: 8 }}>
                   FIRST WEEK SPECIAL
@@ -3282,7 +3282,7 @@ export default function AcademyShowcase() {
                     padding: '2px 8px',
                     borderRadius: 12
                   }}>
-                    Week 1 Access: ₹99
+                    Week 1 Access: ₹113
                   </span>
                 </div>
 
@@ -3293,7 +3293,7 @@ export default function AcademyShowcase() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0F172A', fontWeight: 600 }}>
                     <span>Week 1 Promotional Price</span>
-                    <span>₹99</span>
+                    <span>₹113</span>
                   </div>
 
                   {/* Dynamic Workshop Coupon Line */}
@@ -3581,7 +3581,7 @@ export default function AcademyShowcase() {
                   borderRadius: 4,
                   marginLeft: 8
                 }}>
-                  {(isAnnualCreditsApplied && isAnnualCouponApplied) ? '₹26,000 SAVINGS APPLIED' : 'APPLY DISCOUNTS BELOW'}
+                  {(isAnnualCreditsApplied && isAnnualCouponApplied) ? '₹24,500 SAVINGS APPLIED' : 'APPLY DISCOUNTS BELOW'}
                 </span>
               </div>
 
@@ -3735,7 +3735,7 @@ export default function AcademyShowcase() {
                     </div>
                   </div>
 
-                  {/* Enrolly Coupon ₹6,000 Row with Fixed Applied State & Shining Apply Button */}
+                  {/* Enrolly Coupon ₹4,500 Row with Fixed Applied State & Shining Apply Button */}
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -3749,16 +3749,16 @@ export default function AcademyShowcase() {
                     <div>
                       <div style={{ fontWeight: 700, color: isAnnualCouponApplied ? '#15803D' : '#334155', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 5 }}>
                         <Gift size={13} color={isAnnualCouponApplied ? '#16A34A' : '#7C3AED'} />
-                        Enrolly Coupon (₹6,000)
+                        Enrolly Coupon (₹4,500)
                       </div>
                       <div style={{ fontSize: 11, color: '#64748B' }}>
-                        {isAnnualCouponApplied ? '✓ ₹6,000 coupon discount applied' : 'Special enrollment voucher'}
+                        {isAnnualCouponApplied ? '✓ ₹4,500 coupon discount applied' : 'Special enrollment voucher'}
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {isAnnualCouponApplied ? (
                         <>
-                          <span style={{ fontWeight: 800, color: '#16A34A', fontSize: 13 }}>- ₹6,000</span>
+                          <span style={{ fontWeight: 800, color: '#16A34A', fontSize: 13 }}>- ₹4,500</span>
                           <span style={{
                             padding: '4px 10px',
                             borderRadius: 6,
@@ -3879,7 +3879,7 @@ export default function AcademyShowcase() {
                           ? '✓ Score Credits + Enrolly Coupon Applied'
                           : (isAnnualCreditsApplied || isAnnualCouponApplied)
                             ? 'Discount Applied'
-                            : 'Press Apply above to reduce to ₹9,999'}
+                            : 'Press Apply above to reduce to ₹11,499'}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -4229,10 +4229,10 @@ export default function AcademyShowcase() {
                           border: otpError
                             ? '2px solid #EF4444'
                             : isCurrentActive
-                            ? '2px solid #2563EB'
-                            : isFilled
-                            ? '1.5px solid #94A3B8'
-                            : '1.5px solid #CBD5E1',
+                              ? '2px solid #2563EB'
+                              : isFilled
+                                ? '1.5px solid #94A3B8'
+                                : '1.5px solid #CBD5E1',
                           boxShadow: isCurrentActive
                             ? '0 0 0 4px rgba(37, 99, 235, 0.12), 0 2px 8px rgba(37, 99, 235, 0.08)'
                             : 'none',
@@ -4421,7 +4421,7 @@ export default function AcademyShowcase() {
                 Start with Week 1 Sprint First
               </h3>
               <p style={{ fontSize: 13.5, color: '#64748B', lineHeight: 1.55, margin: '0 auto', maxWidth: 420 }}>
-                To guarantee student success, Levlox requires all new members to first experience <strong>Week 1 (7-Day Sprint for ₹99)</strong>. Once you try Week 1, the full <strong>1-Year Machine Learning Engineer Internship</strong> unlocks in your portal!
+                To guarantee student success, Levlox requires all new members to first experience <strong>Week 1 (7-Day Sprint for ₹113)</strong>. Once you try Week 1, the full <strong>1-Year Machine Learning Engineer Internship</strong> unlocks in your portal!
               </p>
             </div>
 
@@ -4438,7 +4438,7 @@ export default function AcademyShowcase() {
                   1
                 </div>
                 <div style={{ fontSize: 13, color: '#0F172A', fontWeight: 600 }}>
-                  <span style={{ color: '#2563EB', fontWeight: 800 }}>Week 1 Sprint (₹99):</span> Hands-on Python, ML, SQL &amp; capstone projects.
+                  <span style={{ color: '#2563EB', fontWeight: 800 }}>Week 1 Sprint (₹113):</span> Hands-on Python, ML, SQL &amp; capstone projects.
                 </div>
               </div>
 
@@ -4471,7 +4471,7 @@ export default function AcademyShowcase() {
                 gap: 8, boxShadow: '0 8px 20px rgba(37, 99, 235, 0.3)'
               }}
             >
-              Unlock Week 1 Sprint for ₹99 Now →
+              Unlock Week 1 Sprint for ₹113 Now →
             </button>
           </div>
         </div>
@@ -5091,8 +5091,8 @@ export default function AcademyShowcase() {
               flexShrink: 0
             }}>
               {getEmbedUrl(selectedProjectVideoModal.videoUrl).includes('youtube') ||
-              getEmbedUrl(selectedProjectVideoModal.videoUrl).includes('drive.google.com') ||
-              getEmbedUrl(selectedProjectVideoModal.videoUrl).includes('vimeo') ? (
+                getEmbedUrl(selectedProjectVideoModal.videoUrl).includes('drive.google.com') ||
+                getEmbedUrl(selectedProjectVideoModal.videoUrl).includes('vimeo') ? (
                 <iframe
                   src={getEmbedUrl(selectedProjectVideoModal.videoUrl)}
                   title={selectedProjectVideoModal.name}

@@ -28,8 +28,8 @@ const PLANS = {
     id: 'weekly',
     name: 'Weekly Learning Cycle',
     cycleLabel: 'Weekly Learning Cycle',
-    listedPrice: 749, // 749 canceled, now ₹99
-    promotionalPrice: 99, // Week 1 promotional access
+    listedPrice: 749, // 749 canceled, now ₹113
+    promotionalPrice: 113, // Week 1 promotional access
     renewalPrice: 299,   // Week 2+ renewals
     durationDays: 7,
     features: [
@@ -46,7 +46,7 @@ const PLANS = {
     name: 'Weekly Learning Cycle',
     cycleLabel: 'Weekly Learning Cycle',
     listedPrice: 749,
-    promotionalPrice: 99,
+    promotionalPrice: 113,
     renewalPrice: 299,
     durationDays: 7,
     features: [
@@ -66,8 +66,8 @@ const PLANS = {
     listedPrice: 35999,
     promotionalPrice: 35999,
     offerHeadline: 'Machine Learning Engineer Internship Program',
-    savingsLabel: 'Save ₹26,000 with Score Credits & Enrolly Coupon',
-    bonusCreditNotice: 'Score credits ₹20,000 and Enrolly coupon ₹6,000 applicable.',
+    savingsLabel: 'Save ₹24,500 with Score Credits & Enrolly Coupon',
+    bonusCreditNotice: 'Score credits ₹20,000 and Enrolly coupon ₹4,500 applicable.',
     durationDays: 365,
     features: [
       'Python & Advance Python Modules',
@@ -90,8 +90,9 @@ function getCoupons() {
   let coupons = localDb.loadCollection('coupons');
   if (!coupons || coupons.length === 0) {
     coupons = [
-      { id: 'coup_enroll', code: 'ENROLL6000', discount: 6000, minPlan: 'annual', description: '₹6,000 Early Enrolly Discount', expiryDate: '2028-12-31', isActive: true },
-      { id: 'coup_enrolly', code: 'ENROLLY', discount: 6000, minPlan: 'annual', description: '₹6,000 Enrolly Coupon', expiryDate: '2028-12-31', isActive: true },
+      { id: 'coup_enroll4500', code: 'ENROLL4500', discount: 4500, minPlan: 'annual', description: '₹4,500 Early Enrolly Discount', expiryDate: '2028-12-31', isActive: true },
+      { id: 'coup_enroll', code: 'ENROLL6000', discount: 4500, minPlan: 'annual', description: '₹4,500 Early Enrolly Discount', expiryDate: '2028-12-31', isActive: true },
+      { id: 'coup_enrolly', code: 'ENROLLY', discount: 4500, minPlan: 'annual', description: '₹4,500 Enrolly Coupon', expiryDate: '2028-12-31', isActive: true },
       { id: 'coup_1', code: 'LEVLOX400', discount: 400, minPlan: 'weekly', description: '₹400 instant promotional discount', expiryDate: '2027-12-31', isActive: true },
       { id: 'coup_2', code: 'ACADEMY1400', discount: 1400, minPlan: 'annual', description: '₹1,400 special academy discount', expiryDate: '2027-12-31', isActive: true },
       { id: 'coup_3', code: 'TAMILIT1000', discount: 1000, minPlan: 'annual', description: '₹1,000 community credit discount', expiryDate: '2027-12-31', isActive: true },
@@ -100,14 +101,21 @@ function getCoupons() {
     localDb.saveCollection('coupons', coupons);
   } else {
     let modified = false;
-    if (!coupons.find(c => c.code?.toUpperCase() === 'ENROLL6000')) {
-      coupons.push({ id: 'coup_enroll', code: 'ENROLL6000', discount: 6000, minPlan: 'annual', description: '₹6,000 Early Enrolly Discount', expiryDate: '2028-12-31', isActive: true });
+    // Ensure ENROLL4500 exists
+    if (!coupons.find(c => c.code?.toUpperCase() === 'ENROLL4500')) {
+      coupons.push({ id: 'coup_enroll4500', code: 'ENROLL4500', discount: 4500, minPlan: 'annual', description: '₹4,500 Early Enrolly Discount', expiryDate: '2028-12-31', isActive: true });
       modified = true;
     }
-    if (!coupons.find(c => c.code?.toUpperCase() === 'ENROLLY')) {
-      coupons.push({ id: 'coup_enrolly', code: 'ENROLLY', discount: 6000, minPlan: 'annual', description: '₹6,000 Enrolly Coupon', expiryDate: '2028-12-31', isActive: true });
-      modified = true;
-    }
+    // Update ENROLL6000 and ENROLLY to 4500 discount for 11499 net price
+    coupons.forEach(c => {
+      if (c.code?.toUpperCase() === 'ENROLL6000' || c.code?.toUpperCase() === 'ENROLLY') {
+        if (c.discount !== 4500) {
+          c.discount = 4500;
+          c.description = '₹4,500 Early Enrolly Discount';
+          modified = true;
+        }
+      }
+    });
     if (modified) localDb.saveCollection('coupons', coupons);
   }
   return coupons;
@@ -359,9 +367,20 @@ router.post('/calculate-price', (req, res) => {
     }
   }
 
-  const basePrice = isWeekly
-    ? (isRenewal ? (plan.renewalPrice || 299) : (plan.promotionalPrice || 99))
+  let basePrice = isWeekly
+    ? (isRenewal ? (plan.renewalPrice || 299) : (plan.promotionalPrice || 113))
     : (plan.listedPrice || 35999);
+
+  if (planId === 'annual') {
+    const usersCheck = localDb.loadCollection('users');
+    const studentsCheck = localDb.loadCollection('students');
+    const existingUser = usersCheck.find(u => u.email?.toLowerCase() === normEmail);
+    const existingStudent = studentsCheck.find(s => s.email?.toLowerCase() === normEmail);
+    const isQualified = Boolean(existingUser?.hasPassedInternshipExam || existingStudent?.hasPassedInternshipExam || req.query.isQualified === 'true' || req.query.qualified === 'true');
+    if (isQualified) {
+      basePrice = 11499;
+    }
+  }
 
   let couponDiscount = 0;
   let appliedCoupon = null;
@@ -625,14 +644,14 @@ router.post('/create-order', async (req, res) => {
       const hasWeeklyAccess = Boolean(existingUser?.membership?.planId || existingStudent?.membership?.planId);
       if (!hasWeeklyAccess) {
         return res.status(403).json({
-          error: 'First-time members must start with the Weekly Learning Sprint (Week 1 for ₹99) before unlocking the full 1-Year Machine Learning Engineer Internship.',
+          error: 'First-time members must start with the Weekly Learning Sprint (Week 1 for ₹113) before unlocking the full 1-Year Machine Learning Engineer Internship.',
           requiresWeeklyFirst: true
         });
       }
     }
 
     let basePrice = isWeekly
-      ? (isRenewal ? (plan.renewalPrice || 299) : (plan.promotionalPrice || 99))
+      ? (isRenewal ? (plan.renewalPrice || 299) : (plan.promotionalPrice || 113))
       : (plan.listedPrice || 35999);
 
     if (planId === 'annual') {
@@ -642,7 +661,7 @@ router.post('/create-order', async (req, res) => {
       const existingStudent = studentsCheck.find(s => s.email?.toLowerCase() === normEmail);
       const isQualified = Boolean(existingUser?.hasPassedInternshipExam || existingStudent?.hasPassedInternshipExam || req.body.isQualified);
       if (isQualified) {
-        basePrice = 9999;
+        basePrice = 11499;
       }
     }
 
@@ -809,13 +828,13 @@ router.post('/verify-payment', async (req, res) => {
       const hasWeeklyAccess = Boolean(existingUser?.membership?.planId || existingStudent?.membership?.planId);
       if (!hasWeeklyAccess) {
         return res.status(403).json({
-          error: 'First-time members must start with the Weekly Learning Sprint (Week 1 for ₹99) before unlocking the full 1-Year Machine Learning Engineer Internship.',
+          error: 'First-time members must start with the Weekly Learning Sprint (Week 1 for ₹113) before unlocking the full 1-Year Machine Learning Engineer Internship.',
           requiresWeeklyFirst: true
         });
       }
     }
     let basePrice = isWeekly
-      ? (isRenewal ? (plan.renewalPrice || 299) : (plan.promotionalPrice || 99))
+      ? (isRenewal ? (plan.renewalPrice || 299) : (plan.promotionalPrice || 113))
       : (plan.listedPrice || 35999);
 
     if (planId === 'annual') {
@@ -825,7 +844,7 @@ router.post('/verify-payment', async (req, res) => {
       const existingStudent = studentsCheck.find(s => s.email?.toLowerCase() === normEmail);
       const isQualified = Boolean(existingUser?.hasPassedInternshipExam || existingStudent?.hasPassedInternshipExam || req.body.isQualified);
       if (isQualified) {
-        basePrice = 9999;
+        basePrice = 11499;
       }
     }
     let couponDiscount = 0;

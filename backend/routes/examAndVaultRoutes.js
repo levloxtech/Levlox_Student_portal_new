@@ -656,7 +656,7 @@ router.post('/submit', async (req, res) => {
                 </div>
               </div>
               <p style="color: #E2E8F0; font-size: 14px; margin-bottom: 20px;">
-                You are now eligible to complete your enrollment for the <strong>Machine Learning Engineer Internship (365 Days • ₹9,999)</strong>.
+                You are now eligible to complete your enrollment for the <strong>Machine Learning Engineer Internship (365 Days • ₹11,499)</strong>.
               </p>
               <a href="${enrollmentLink}" style="display: inline-block; background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #FFFFFF; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 800; font-size: 15px; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);">
                 Enroll for Machine Learning Internship Now →

@@ -499,7 +499,7 @@ export default function InternshipExamPage() {
               You Have Already Qualified!
             </h2>
             <p style={{ fontSize: 14, color: '#64748B', margin: '0 0 24px', lineHeight: 1.55 }}>
-              You previously passed the Qualifying Exam with a score of <strong style={{ color: '#059669' }}>{eligibilityData.latestAttempt?.scorePercent || 100}%</strong> and unlocked the 1-Year {examConfig?.courseName || 'Machine Learning Engineer Internship'} for ₹9,999.
+              You previously passed the Qualifying Exam with a score of <strong style={{ color: '#059669' }}>{eligibilityData.latestAttempt?.scorePercent || 100}%</strong> and unlocked the 1-Year {examConfig?.courseName || 'Machine Learning Engineer Internship'} for ₹11,499.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button
@@ -519,7 +519,7 @@ export default function InternshipExamPage() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
                 }}
               >
-                <Award size={18} /> Activate 1-Year Pass • Pay ₹9,999 Now →
+                <Award size={18} /> Activate 1-Year Pass • Pay ₹11,499 Now →
               </button>
               <button
                 type="button"
@@ -1810,7 +1810,7 @@ export default function InternshipExamPage() {
                     gap: 8
                   }}
                 >
-                  <Award size={18} /> Enroll in 1-Year {examConfig?.courseName || 'ML Internship'} for ₹9,999 Now →
+                  <Award size={18} /> Enroll in 1-Year {examConfig?.courseName || 'ML Internship'} for ₹11,499 Now →
                 </button>
 
                 <button

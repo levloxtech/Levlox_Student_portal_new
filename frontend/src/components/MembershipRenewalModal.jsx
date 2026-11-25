@@ -100,9 +100,9 @@ export default function MembershipRenewalModal({
       name: `${examConfig?.courseName || 'Machine Learning Engineer Internship'} (365 Days • 1 Full Year)`,
       validity: '365 Days (1 Full Year)',
       originalPrice: 35999,
-      offerPrice: 9999,
-      finalPayable: Math.max(0, 9999 - (couponDiscount || 0)),
-      badge: 'SAVE OVER ₹26,000 • 1 FULL YEAR',
+      offerPrice: 11499,
+      finalPayable: Math.max(0, 11499 - (couponDiscount || 0)),
+      badge: 'SAVE OVER ₹24,500 • 1 FULL YEAR',
       features: [
         `Attend exam to enroll ${examConfig?.courseName || 'Machine Learning Internship'} with certification`,
         '365 Days uninterrupted access',
@@ -148,7 +148,7 @@ export default function MembershipRenewalModal({
 
       const effectivePlanId = selectedPlan === 'monthly' ? 'weekly' : selectedPlan;
       const creditsToApply = selectedPlan === 'annual' ? 20000 : 0;
-      const effectiveCoupon = selectedPlan === 'annual' ? (couponCode.trim() || 'ENROLL6000') : (couponDiscount > 0 ? couponCode : undefined);
+      const effectiveCoupon = selectedPlan === 'annual' ? (couponCode.trim() || 'ENROLL4500') : (couponDiscount > 0 ? couponCode : undefined);
 
       // 1. Create Razorpay order on backend
       const orderRes = await fetch('/api/membership/create-order', {
@@ -248,7 +248,7 @@ export default function MembershipRenewalModal({
       const phone = student.phone || '';
       const effectivePlanId = selectedPlan === 'monthly' ? 'weekly' : selectedPlan;
       const creditsToDeduct = selectedPlan === 'annual' ? 20000 : 0;
-      const effectiveCoupon = selectedPlan === 'annual' ? (couponCode.trim() || 'ENROLL6000') : (couponDiscount > 0 ? couponCode : undefined);
+      const effectiveCoupon = selectedPlan === 'annual' ? (couponCode.trim() || 'ENROLL4500') : (couponDiscount > 0 ? couponCode : undefined);
 
       await finalizeVerification({
         razorpay_order_id: `sim_ord_${Date.now()}`,
@@ -604,7 +604,7 @@ export default function MembershipRenewalModal({
                             cursor: 'pointer'
                           }}
                         >
-                          Activate Pass (₹9,999) →
+                          Activate Pass (₹11,499) →
                         </button>
                       </div>
                     )}
