@@ -1319,88 +1319,41 @@ export default function AcademyShowcase() {
                       }} />
                     )}
 
-                    {/* Gradient Overlay for Cinematic Legibility */}
-                    <div style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: 'linear-gradient(180deg, rgba(15,23,42,0.45) 0%, rgba(15,23,42,0.15) 50%, rgba(15,23,42,0.85) 100%)',
-                      pointerEvents: 'none'
-                    }} />
-
-                    {/* Top-Left Badge */}
-                    <div style={{
-                      position: 'absolute',
-                      top: 14,
-                      left: 14,
-                      background: 'rgba(15, 23, 42, 0.78)',
-                      backdropFilter: 'blur(8px)',
-                      border: '1px solid rgba(255, 255, 255, 0.18)',
-                      padding: '4px 12px',
-                      borderRadius: 20,
-                      fontSize: 11,
-                      fontWeight: 800,
-                      color: '#FFFFFF',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      zIndex: 3
-                    }}>
-                      <Sparkles size={12} color="#60A5FA" />
-                      <span>{heroBannerData?.badge || 'Official Company Overview'}</span>
-                    </div>
-
-                    {/* Top-Right HD Badge */}
-                    <div style={{
-                      position: 'absolute',
-                      top: 14,
-                      right: 14,
-                      background: 'rgba(15, 23, 42, 0.78)',
-                      backdropFilter: 'blur(8px)',
-                      border: '1px solid rgba(255, 255, 255, 0.18)',
-                      padding: '4px 10px',
-                      borderRadius: 20,
-                      fontSize: 10.5,
-                      fontWeight: 700,
-                      color: '#E2E8F0',
-                      zIndex: 3
-                    }}>
-                      Full HD Video
-                    </div>
-
-                    {/* Centered Glowing Play Button */}
-                    <div style={{
-                      position: 'relative',
-                      zIndex: 3,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 10
-                    }}>
-                      <div
-                        style={{
-                          width: 66,
-                          height: 66,
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-                          color: '#FFFFFF',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 0 0 8px rgba(37, 99, 235, 0.28), 0 10px 30px rgba(0,0,0,0.5)',
-                          paddingLeft: 4
-                        }}
-                      >
-                        <Play size={26} fill="#FFFFFF" />
-                      </div>
-                      <span style={{
-                        fontSize: 13,
-                        fontWeight: 700,
+                    {/* Centered Transparent Frosted Glass Play Button */}
+                    <div
+                      style={{
+                        position: 'relative',
+                        zIndex: 3,
+                        width: 72,
+                        height: 72,
+                        borderRadius: '50%',
+                        background: 'rgba(15, 23, 42, 0.45)',
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
+                        border: '2.5px solid rgba(255, 255, 255, 0.9)',
                         color: '#FFFFFF',
-                        textShadow: '0 2px 8px rgba(0,0,0,0.85)',
-                        letterSpacing: '-0.2px'
-                      }}>
-                        {heroBannerData?.videoUrl ? 'Watch Company Video' : 'Company Overview Video'}
-                      </span>
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.2)',
+                        paddingLeft: 4,
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.1)';
+                        e.currentTarget.style.background = 'rgba(37, 99, 235, 0.6)';
+                        e.currentTarget.style.borderColor = '#FFFFFF';
+                        e.currentTarget.style.boxShadow = '0 12px 36px rgba(37, 99, 235, 0.5), 0 0 0 6px rgba(255, 255, 255, 0.2)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.background = 'rgba(15, 23, 42, 0.45)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.9)';
+                        e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.2)';
+                      }}
+                    >
+                      <Play size={28} fill="#FFFFFF" color="#FFFFFF" />
                     </div>
                   </div>
                 )}

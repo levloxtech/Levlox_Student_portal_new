@@ -742,67 +742,25 @@ const HeroBannerVideoManager = () => {
               }} />
             )}
 
-            {/* Dark Gradient Overlay for Contrast */}
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.65) 100%)',
-              pointerEvents: 'none'
-            }} />
-
-            {/* Top-Left Badge */}
-            <div style={{
-              position: 'absolute',
-              top: 12,
-              left: 12,
-              background: 'rgba(15, 23, 42, 0.75)',
-              backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              padding: '4px 10px',
-              borderRadius: 20,
-              fontSize: 11,
-              fontWeight: 800,
-              color: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              zIndex: 2
-            }}>
-              <Sparkles size={12} color="#60A5FA" />
-              <span>{formBadge || 'Company Video'}</span>
-            </div>
-
-            {/* Centered Glowing Play Button */}
+            {/* Centered Transparent Frosted Glass Play Button */}
             <div style={{
               position: 'relative',
               zIndex: 2,
+              width: 58,
+              height: 58,
+              borderRadius: '50%',
+              background: 'rgba(15, 23, 42, 0.45)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              border: '2px solid rgba(255, 255, 255, 0.9)',
+              color: '#FFFFFF',
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              gap: 8
+              justifyContent: 'center',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.4)',
+              paddingLeft: 3
             }}>
-              <div style={{
-                width: 54,
-                height: 54,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 0 0 6px rgba(37, 99, 235, 0.28), 0 10px 25px rgba(0,0,0,0.4)',
-                paddingLeft: 3
-              }}>
-                <Play size={22} fill="#FFFFFF" />
-              </div>
-              <span style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: '#FFFFFF',
-                textShadow: '0 2px 6px rgba(0,0,0,0.8)'
-              }}>
-                Watch Company Overview
-              </span>
+              <Play size={24} fill="#FFFFFF" color="#FFFFFF" />
             </div>
           </div>
 
