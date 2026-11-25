@@ -9,7 +9,7 @@ import {
   Clock, CheckCircle, AlertCircle, PlayCircle, Zap, TrendingUp,
   Award, Star, ArrowRight, Plus, X, Eye, Users, Menu,
   Crown, Medal, Flame, Activity, Trophy, TriangleAlert, XCircle, RefreshCw,
-  MessageSquare, Sparkles, Play, Shield, Monitor, Laptop, Smartphone, UploadCloud, Mail
+  MessageSquare, Sparkles, Play, Shield, Monitor, Laptop, Smartphone, UploadCloud, Mail, Share2, Gift
 } from 'lucide-react';
 
 import CustomModal from '../components/Modal';
@@ -18,6 +18,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import DesktopOnlyGate from '../components/DesktopOnlyGate';
 import MembershipRenewalModal from '../components/MembershipRenewalModal';
 import StudentYearlyVaultView from '../components/StudentYearlyVaultView';
+import StudentReferralView from '../components/StudentReferralView';
 import { isMobileDevice } from '../utils/device';
 import { CardSkeleton, DashboardSkeleton } from '../components/Skeleton';
 import levloxLogo from '../assets/levlox-logo.png';
@@ -1139,6 +1140,7 @@ const StudentDashboard = () => {
     ? [
         { id: 'recorded-classes-tab', icon: <BookOpen size={18} strokeWidth={2} />, label: 'Courses' },
         { id: 'yearly-vault-tab', icon: <Award size={18} strokeWidth={2} />, label: 'Internship Hub' },
+        { id: 'referral-tab', icon: <Share2 size={18} strokeWidth={2} />, label: 'Refer & Earn (15%)' },
         { id: 'profile', icon: <User size={18} strokeWidth={2} />, label: 'Profile' },
         { id: 'dashboard', icon: <Bookmark size={18} strokeWidth={2} />, label: 'Dashboard' },
         { id: 'my-courses', icon: <Video size={18} strokeWidth={2} />, label: 'Live Classes' },
@@ -1150,6 +1152,7 @@ const StudentDashboard = () => {
         { id: 'dashboard', icon: <Bookmark size={18} strokeWidth={2} />, label: 'Dashboard' },
         { id: 'recorded-classes-tab', icon: <BookOpen size={18} strokeWidth={2} />, label: 'Courses' },
         { id: 'yearly-vault-tab', icon: <Award size={18} strokeWidth={2} />, label: 'Internship Hub' },
+        { id: 'referral-tab', icon: <Share2 size={18} strokeWidth={2} />, label: 'Refer & Earn (15%)' },
         { id: 'my-courses', icon: <Video size={18} strokeWidth={2} />, label: 'Live Classes' },
         { id: 'assignments-tab', icon: <FileText size={18} strokeWidth={2} />, label: 'Assignments' },
         { id: 'attendance-tab', icon: <CalendarCheck size={18} strokeWidth={2} />, label: 'Attendance' },
@@ -3290,6 +3293,14 @@ const StudentDashboard = () => {
               onOpenRenewal={() => setShowRenewalModal(true)}
               userProfile={userProfile || studentDoc}
               currentUser={user}
+            />
+          )}
+
+          {/* STUDENT REFERRAL & 15% CASHBACK PROGRAM TAB */}
+          {activeTab === 'referral-tab' && (
+            <StudentReferralView
+              currentUser={currentUser || user}
+              userProfile={userProfile || studentDoc}
             />
           )}
 

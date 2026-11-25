@@ -277,6 +277,32 @@ router.get('/config/:email', handleConfigGet);
 
 // ── ADMIN COUPON MANAGEMENT ROUTES ──────────────────────────────────────────
 // GET /api/membership/coupons
+// Helper to calculate coupon discount whether flat ₹ or percentage %
+function getCouponDiscountAmount(matchedCoupon, basePrice, planId = 'weekly') {
+  if (!matchedCoupon) return 0;
+  const isPercent = matchedCoupon.discountType === 'percentage' || matchedCoupon.isPercentage === true;
+  const val = Number(matchedCoupon.discount) || 0;
+  if (isPercent) {
+    // If annual and basePrice is the 35999 list price, calculate percentage on the net offer base (₹11,499)
+    const effectiveBase = (planId === 'annual' && basePrice > 11499) ? 11499 : basePrice;
+    return Math.min(basePrice, Math.round((effectiveBase * val) / 100));
+  }
+  return Math.min(basePrice, val);
+}
+
+// Helper to generate a clean, unique referral code
+function generateReferralCode(name, rollNumber) {
+  const cleanName = (name || 'LEVLOX')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 8);
+  const suffix = rollNumber
+    ? rollNumber.replace(/[^A-Z0-9]/gi, '').slice(-4).toUpperCase()
+    : Math.floor(100 + Math.random() * 900);
+  return `REF-${cleanName}-${suffix}`;
+}
+
+// ── GET /api/membership/coupons
 router.get('/coupons', (req, res) => {
   try {
     const coupons = getCoupons();
@@ -286,16 +312,16 @@ router.get('/coupons', (req, res) => {
   }
 });
 
-// POST /api/membership/coupons (Create or Update Coupon with Promoter / Beneficiary Details)
+// POST /api/membership/coupons (Create or Update Coupon with Flat ₹ or % Percentage & Promoter Details)
 router.post('/coupons', (req, res) => {
   try {
     const {
-      code, discount, minPlan, expiryDate, description, isActive,
+      code, discount, discountType, minPlan, expiryDate, description, isActive,
       promoterName, promoterPhone, promoterEmail, promoterWhatsapp, promoterUpiId,
       name, phone, email, whatsapp, upiId
     } = req.body || {};
 
-    if (!code || !discount) {
+    if (!code || discount === undefined || discount === null || discount === '') {
       return res.status(400).json({ error: 'Coupon code and discount amount are required.' });
     }
 
@@ -305,6 +331,11 @@ router.post('/coupons', (req, res) => {
       return res.status(400).json({ error: 'Discount must be a valid positive number.' });
     }
 
+    const isPercentage = (discountType === 'percentage');
+    if (isPercentage && cleanDiscount > 100) {
+      return res.status(400).json({ error: 'Percentage discount cannot exceed 100%.' });
+    }
+
     let coupons = localDb.loadCollection('coupons');
     const existingIndex = coupons.findIndex(c => c.code.toUpperCase() === cleanCode);
 
@@ -312,9 +343,10 @@ router.post('/coupons', (req, res) => {
       id: existingIndex >= 0 ? coupons[existingIndex].id : `coup_${Date.now()}`,
       code: cleanCode,
       discount: cleanDiscount,
+      discountType: isPercentage ? 'percentage' : 'fixed',
       minPlan: minPlan || 'all',
       expiryDate: expiryDate || null,
-      description: description || `₹${cleanDiscount} promotional discount`,
+      description: description || (isPercentage ? `${cleanDiscount}% promotional discount` : `₹${cleanDiscount} promotional discount`),
       isActive: isActive !== false,
       // Promoter / Beneficiary / Affiliate details:
       promoterName: (promoterName || name || '').trim(),
@@ -372,6 +404,222 @@ router.delete('/coupons/:code', (req, res) => {
     res.json({ success: true, message: `Coupon ${codeToDelete} deleted successfully.` });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete coupon: ' + err.message });
+  }
+});
+
+// ── STUDENT REFERRAL & 15% CASHBACK PAYOUT ROUTES ───────────────────────────
+
+// GET /api/membership/referral/profile/:email
+router.get('/referral/profile/:email', (req, res) => {
+  try {
+    const rawEmail = req.params.email || '';
+    const normEmail = rawEmail.toLowerCase().trim();
+    if (!normEmail) {
+      return res.status(400).json({ error: 'Student email is required.' });
+    }
+
+    const referralProfiles = localDb.loadCollection('referral_profiles') || [];
+    let profile = referralProfiles.find(p => p.email?.toLowerCase() === normEmail);
+
+    // Look up existing student / user record to prefill data
+    const students = localDb.loadCollection('students') || [];
+    const users = localDb.loadCollection('users') || [];
+    const student = students.find(s => s.email?.toLowerCase() === normEmail) ||
+                    users.find(u => u.email?.toLowerCase() === normEmail);
+
+    if (!profile) {
+      const generatedCode = generateReferralCode(student?.name, student?.rollNumber);
+      profile = {
+        id: `refp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        email: normEmail,
+        name: student?.name || normEmail.split('@')[0],
+        phone: student?.phone || '',
+        upiId: '',
+        referralCode: generatedCode,
+        isRegistered: false,
+        createdAt: new Date().toISOString()
+      };
+      referralProfiles.push(profile);
+      localDb.saveCollection('referral_profiles', referralProfiles);
+    }
+
+    // Load referral payouts for this student
+    const allPayouts = localDb.loadCollection('referral_payouts') || [];
+    const studentReferrals = allPayouts.filter(p =>
+      p.referrerEmail?.toLowerCase() === normEmail ||
+      (profile.referralCode && p.referralCode?.toUpperCase() === profile.referralCode.toUpperCase())
+    );
+
+    // Sort newest first
+    studentReferrals.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    const totalEarned = studentReferrals.reduce((sum, r) => sum + (Number(r.cashbackAmount) || 0), 0);
+    const pendingPayout = studentReferrals
+      .filter(r => r.status === 'pending')
+      .reduce((sum, r) => sum + (Number(r.cashbackAmount) || 0), 0);
+    const completedPayout = studentReferrals
+      .filter(r => r.status === 'paid')
+      .reduce((sum, r) => sum + (Number(r.cashbackAmount) || 0), 0);
+
+    res.json({
+      success: true,
+      profile,
+      stats: {
+        totalReferred: studentReferrals.length,
+        totalEarned,
+        pendingPayout,
+        completedPayout
+      },
+      referrals: studentReferrals
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch referral profile: ' + err.message });
+  }
+});
+
+// POST /api/membership/referral/register (Save Name, Phone, and UPI ID for 15% cashback payout)
+router.post('/referral/register', (req, res) => {
+  try {
+    const { email, name, phone, upiId } = req.body || {};
+    const normEmail = (email || '').toLowerCase().trim();
+    if (!normEmail || !name || !phone || !upiId) {
+      return res.status(400).json({ error: 'Full Name, Phone Number, and UPI ID are required to activate referral cashback.' });
+    }
+
+    let referralProfiles = localDb.loadCollection('referral_profiles') || [];
+    let profile = referralProfiles.find(p => p.email?.toLowerCase() === normEmail);
+
+    if (!profile) {
+      const generatedCode = generateReferralCode(name);
+      profile = {
+        id: `refp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        email: normEmail,
+        name: String(name).trim(),
+        phone: String(phone).trim(),
+        upiId: String(upiId).trim(),
+        referralCode: generatedCode,
+        isRegistered: true,
+        createdAt: new Date().toISOString()
+      };
+      referralProfiles.push(profile);
+    } else {
+      profile.name = String(name).trim();
+      profile.phone = String(phone).trim();
+      profile.upiId = String(upiId).trim();
+      profile.isRegistered = true;
+      profile.updatedAt = new Date().toISOString();
+    }
+    localDb.saveCollection('referral_profiles', referralProfiles);
+
+    // Sync referral code to coupons collection so friends get 15% discount when using it
+    let coupons = localDb.loadCollection('coupons') || [];
+    const codeUpper = profile.referralCode.toUpperCase();
+    let coupon = coupons.find(c => c.code.toUpperCase() === codeUpper);
+    if (!coupon) {
+      coupon = {
+        id: `coup_ref_${Date.now()}`,
+        code: codeUpper,
+        discountType: 'percentage',
+        discount: 15,
+        minPlan: 'all',
+        expiryDate: '2030-12-31',
+        description: `15% Referral Discount by ${profile.name}`,
+        isActive: true,
+        promoterName: profile.name,
+        promoterPhone: profile.phone,
+        promoterWhatsapp: profile.phone,
+        promoterEmail: profile.email,
+        promoterUpiId: profile.upiId,
+        redemptionCount: 0,
+        totalDiscountGiven: 0,
+        createdAt: new Date().toISOString()
+      };
+      coupons.push(coupon);
+    } else {
+      coupon.discountType = 'percentage';
+      coupon.discount = 15;
+      coupon.promoterName = profile.name;
+      coupon.promoterPhone = profile.phone;
+      coupon.promoterWhatsapp = profile.phone;
+      coupon.promoterEmail = profile.email;
+      coupon.promoterUpiId = profile.upiId;
+      coupon.isActive = true;
+      coupon.updatedAt = new Date().toISOString();
+    }
+    localDb.saveCollection('coupons', coupons);
+
+    res.json({
+      success: true,
+      message: 'Referral profile activated successfully! Your unique 15% referral code is ready to share.',
+      profile
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to register referral: ' + err.message });
+  }
+});
+
+// GET /api/membership/referrals/admin-list (Admin: all student referrers and cashback payouts)
+router.get('/referrals/admin-list', (req, res) => {
+  try {
+    const payouts = localDb.loadCollection('referral_payouts') || [];
+    const profiles = localDb.loadCollection('referral_profiles') || [];
+
+    payouts.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    const totalReferrals = payouts.length;
+    const totalCashback = payouts.reduce((s, p) => s + (Number(p.cashbackAmount) || 0), 0);
+    const pendingCashback = payouts
+      .filter(p => p.status === 'pending')
+      .reduce((s, p) => s + (Number(p.cashbackAmount) || 0), 0);
+    const paidCashback = payouts
+      .filter(p => p.status === 'paid')
+      .reduce((s, p) => s + (Number(p.cashbackAmount) || 0), 0);
+
+    res.json({
+      success: true,
+      stats: {
+        totalReferrers: profiles.filter(p => p.isRegistered).length,
+        totalReferrals,
+        totalCashback,
+        pendingCashback,
+        paidCashback
+      },
+      payouts,
+      profiles
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch admin referral list: ' + err.message });
+  }
+});
+
+// POST /api/membership/referrals/mark-paid (Admin: Mark 15% cashback as paid via UPI with UTR)
+router.post('/referrals/mark-paid', (req, res) => {
+  try {
+    const { payoutId, utr, note } = req.body || {};
+    if (!payoutId) {
+      return res.status(400).json({ error: 'payoutId is required.' });
+    }
+
+    let payouts = localDb.loadCollection('referral_payouts') || [];
+    const payout = payouts.find(p => p.id === payoutId);
+    if (!payout) {
+      return res.status(404).json({ error: 'Payout record not found.' });
+    }
+
+    payout.status = 'paid';
+    payout.utr = (utr || '').trim();
+    payout.note = (note || '').trim();
+    payout.paidAt = new Date().toISOString();
+
+    localDb.saveCollection('referral_payouts', payouts);
+
+    res.json({
+      success: true,
+      message: 'Referral cashback payout marked as Paid via UPI.',
+      payout
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to mark payout as paid: ' + err.message });
   }
 });
 
@@ -438,7 +686,7 @@ router.post('/calculate-price', (req, res) => {
         planId === 'annual';
 
       if (isPlanMatch) {
-        couponDiscount = matched.discount;
+        couponDiscount = getCouponDiscountAmount(matched, basePrice, planId);
         appliedCoupon = matched.code;
       } else {
         return res.status(400).json({ error: `Coupon ${couponCode} is not applicable on this plan.` });
@@ -712,7 +960,7 @@ router.post('/create-order', async (req, res) => {
           planId === 'annual';
 
         if (!isExpired && isPlanMatch) {
-          couponDiscount = matched.discount;
+          couponDiscount = getCouponDiscountAmount(matched, basePrice, planId);
         }
       }
     }
@@ -882,7 +1130,7 @@ router.post('/verify-payment', async (req, res) => {
     if (couponCode) {
       const coupons = getCoupons();
       matchedCoupon = coupons.find(c => c.code.toUpperCase() === String(couponCode).trim().toUpperCase());
-      if (matchedCoupon) couponDiscount = matchedCoupon.discount;
+      if (matchedCoupon) couponDiscount = getCouponDiscountAmount(matchedCoupon, basePrice, planId);
     }
 
     const storeCreditsList = localDb.loadCollection('store_credits');
@@ -976,6 +1224,45 @@ router.post('/verify-payment', async (req, res) => {
         localDb.saveCollection('coupon_redemptions', redemptions);
       } catch (redErr) {
         console.warn('[Membership] Failed to log coupon redemption:', redErr.message);
+      }
+    }
+
+    // 4c. Log 15% Student Referral Cashback if coupon used has promoter details / UPI ID
+    if (matchedCoupon && (matchedCoupon.promoterUpiId || matchedCoupon.code?.startsWith('REF-'))) {
+      try {
+        const referralPayouts = localDb.loadCollection('referral_payouts') || [];
+        const alreadyLogged = referralPayouts.some(p => p.paymentId === (razorpay_payment_id || '') && p.paymentId);
+        if (!alreadyLogged) {
+          const cashbackAmt = Math.max(0, Math.round(paidAmount * 0.15));
+          referralPayouts.push({
+            id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            referralCode: String(couponCode).trim().toUpperCase(),
+            referrerName: matchedCoupon.promoterName || '',
+            referrerPhone: matchedCoupon.promoterPhone || '',
+            referrerEmail: matchedCoupon.promoterEmail || '',
+            referrerUpiId: matchedCoupon.promoterUpiId || '',
+            studentName: name || normEmail.split('@')[0],
+            studentEmail: normEmail,
+            studentPhone: phone || '',
+            planId,
+            planName: plan.name,
+            basePrice,
+            paidAmount,
+            cashbackPercent: 15,
+            cashbackAmount: cashbackAmt,
+            status: 'pending',
+            invoiceNumber,
+            orderId: razorpay_order_id || `sim_ord_${Date.now()}`,
+            paymentId: razorpay_payment_id || `sim_pay_${Date.now()}`,
+            createdAt: new Date().toISOString(),
+            paidAt: null,
+            utr: null,
+            note: null
+          });
+          localDb.saveCollection('referral_payouts', referralPayouts);
+        }
+      } catch (refErr) {
+        console.warn('[Membership] Failed to record referral payout:', refErr.message);
       }
     }
 
