@@ -40,7 +40,7 @@ const STORAGE_ROOT = process.env.STORAGE_ROOT || path.join(__dirname, '..', 'sto
 // Ensure storage directories exist
 const storageDirs = [
   'learning', 'learning/videos', 'learning/thumbnails', 'learning/documents',
-  'profiles', 'assignments', 'submissions', 'certificates', 'temp'
+  'profiles', 'assignments', 'submissions', 'certificates', 'temp', 'student_backups'
 ];
 storageDirs.forEach(dir => {
   const fullPath = path.join(STORAGE_ROOT, dir);
@@ -49,6 +49,44 @@ storageDirs.forEach(dir => {
     console.info(`[Storage] Created directory: ${fullPath}`);
   }
 });
+
+// Permanent Student Ledger (Safe Copy Mechanism for Student Records)
+function recordPermanentStudentBackup(studentData, password) {
+  try {
+    const backupsDir = path.join(STORAGE_ROOT, 'student_backups');
+    if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+    const ledgerFile = path.join(backupsDir, 'permanent_student_ledger.json');
+    let ledger = [];
+    if (fs.existsSync(ledgerFile)) {
+      try {
+        ledger = JSON.parse(fs.readFileSync(ledgerFile, 'utf8') || '[]');
+      } catch (_) { ledger = []; }
+    }
+    const email = (studentData.email || '').toLowerCase().trim();
+    const entry = {
+      id: studentData.id || studentData.uid,
+      name: studentData.name,
+      email: studentData.email,
+      phone: studentData.phone || studentData.mobile || '',
+      course: studentData.course || '',
+      batch: studentData.batch_name || studentData.batch || '',
+      rollNumber: studentData.rollNumber || '',
+      feesStatus: studentData.feesStatus || 'Pending',
+      password: password || studentData.rawPassword || studentData.tempPassword || studentData.password || '',
+      createdAt: studentData.createdAt || new Date().toISOString(),
+      lastBackupDate: new Date().toISOString()
+    };
+    const idx = ledger.findIndex(x => (x.id && x.id === entry.id) || (x.email && x.email.toLowerCase().trim() === email));
+    if (idx !== -1) {
+      ledger[idx] = { ...ledger[idx], ...entry };
+    } else {
+      ledger.unshift(entry);
+    }
+    fs.writeFileSync(ledgerFile, JSON.stringify(ledger, null, 2), 'utf8');
+  } catch (e) {
+    console.error('[StudentLedger] Failed to write backup:', e.message);
+  }
+}
 
 // ── Multer Storage Engine ───────────────────────────────────────────────────
 const createStorage = (subdir) => multer.diskStorage({
@@ -1138,6 +1176,11 @@ app.post('/api/data/:collection', (req, res) => {
     const data = req.body || {};
     const created = localDb.addDocument(collection, data);
 
+    // If a student is created, automatically record a permanent safe copy
+    if (collection === 'students') {
+      recordPermanentStudentBackup(created, data.password || data.tempPassword);
+    }
+
     // If a student or trainer is created with a password, sync into users.json
     if ((collection === 'students' || collection === 'trainers') && (data.password || data.tempPassword) && data.email) {
       const pwd = data.password || data.tempPassword;
@@ -1664,6 +1707,20 @@ app.delete('/api/notifications/user/:userId', (req, res) => {
     notifs = notifs.filter(n => String(n.userId) !== String(userId));
     localDb.saveCollection('notifications', notifs);
     res.json({ success: true, cleared: initialCount - notifs.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── PERMANENT STUDENT LEDGER (SAFE HISTORICAL BACKUP) ──────────────────────
+app.get('/api/admin/student-ledger', (req, res) => {
+  try {
+    const ledgerFile = path.join(STORAGE_ROOT, 'student_backups', 'permanent_student_ledger.json');
+    let ledger = [];
+    if (fs.existsSync(ledgerFile)) {
+      ledger = JSON.parse(fs.readFileSync(ledgerFile, 'utf8') || '[]');
+    }
+    res.json({ success: true, count: ledger.length, ledger });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
