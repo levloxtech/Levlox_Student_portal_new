@@ -660,6 +660,8 @@ app.post('/api/auth/login', (req, res) => {
       accessExpiresAt: user.accessExpiresAt,
       internshipHubAccess: Boolean(profile?.internshipHubAccess ?? user.internshipHubAccess),
       hasInternshipHubAccess: Boolean(profile?.hasInternshipHubAccess ?? user.hasInternshipHubAccess),
+      isYearlyMember: Boolean(profile?.isYearlyMember ?? user.isYearlyMember),
+      membership: profile?.membership || user.membership,
     },
     profile,
   });
