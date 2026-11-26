@@ -480,6 +480,163 @@ function purgeUserCompletely(identifier, explicitEmail) {
   };
 }
 
+function moveToRecycleBin(idOrEmail) {
+  if (!idOrEmail) return null;
+  const norm = String(idOrEmail).toLowerCase().trim();
+  const students = loadCollection('students');
+  const student = students.find(s =>
+    (s.id && String(s.id).toLowerCase() === norm) ||
+    (s.uid && String(s.uid).toLowerCase() === norm) ||
+    (s.email && String(s.email).toLowerCase().trim() === norm)
+  );
+
+  if (!student) return null;
+
+  const users = loadCollection('users');
+  const user = users.find(u =>
+    (u.id && String(u.id).toLowerCase() === norm) ||
+    (u.uid && String(u.uid).toLowerCase() === norm) ||
+    (student.email && u.email && String(u.email).toLowerCase().trim() === String(student.email).toLowerCase().trim())
+  );
+
+  const bin = loadCollection('recycle_bin');
+  const binItem = {
+    id: student.id || student.uid,
+    uid: student.uid || student.id,
+    name: student.name || 'Student',
+    email: student.email || '',
+    phone: student.phone || '',
+    rollNumber: student.rollNumber || '',
+    batch_name: student.batch_name || student.batch || '',
+    course: student.course || '',
+    feesStatus: student.feesStatus || 'Unpaid',
+    deletedAt: new Date().toISOString(),
+    originalStudent: student,
+    originalUser: user || null
+  };
+
+  const updatedBin = bin.filter(b => b.id !== binItem.id && (!b.email || b.email.toLowerCase() !== binItem.email.toLowerCase()));
+  updatedBin.unshift(binItem);
+  cache['recycle_bin'] = updatedBin;
+  saveCollection('recycle_bin', updatedBin);
+
+  // Remove from active students
+  const updatedStudents = students.filter(s => s.id !== student.id && s.uid !== student.uid && (!s.email || s.email.toLowerCase() !== student.email?.toLowerCase()));
+  cache['students'] = updatedStudents;
+  saveCollection('students', updatedStudents);
+
+  // Remove from active users so they cannot log in while in bin
+  if (user) {
+    const updatedUsers = users.filter(u => u.id !== user.id && (!u.email || u.email.toLowerCase() !== user.email.toLowerCase()));
+    cache['users'] = updatedUsers;
+    saveCollection('users', updatedUsers);
+  }
+
+  // Unlink from active batches
+  try {
+    const batches = loadCollection('batches');
+    let batchesChanged = false;
+    batches.forEach(b => {
+      if (Array.isArray(b.student_ids)) {
+        const origLen = b.student_ids.length;
+        b.student_ids = b.student_ids.filter(sid => String(sid) !== String(student.id) && String(sid) !== String(student.uid));
+        if (b.student_ids.length !== origLen) batchesChanged = true;
+      }
+    });
+    if (batchesChanged) {
+      cache['batches'] = batches;
+      saveCollection('batches');
+    }
+  } catch (_) {}
+
+  // Revoke active sessions
+  if (student.email) revokeUserSessions(null, student.email);
+  if (student.id) revokeUserSessions(student.id, null);
+
+  return binItem;
+}
+
+function restoreFromRecycleBin(idOrEmail) {
+  if (!idOrEmail) return null;
+  const norm = String(idOrEmail).toLowerCase().trim();
+  const bin = loadCollection('recycle_bin');
+  const binIndex = bin.findIndex(b =>
+    (b.id && String(b.id).toLowerCase() === norm) ||
+    (b.email && String(b.email).toLowerCase().trim() === norm)
+  );
+  if (binIndex === -1) return null;
+
+  const binItem = bin[binIndex];
+  const { originalStudent, originalUser } = binItem;
+
+  if (originalStudent) {
+    const students = loadCollection('students');
+    const filtered = students.filter(s => s.id !== originalStudent.id && (!s.email || s.email.toLowerCase() !== originalStudent.email?.toLowerCase()));
+    filtered.unshift(originalStudent);
+    cache['students'] = filtered;
+    saveCollection('students', filtered);
+
+    // Relink to batch if batch exists
+    if (originalStudent.batch_id || originalStudent.batchId) {
+      const bId = originalStudent.batch_id || originalStudent.batchId;
+      try {
+        const batches = loadCollection('batches');
+        const batch = batches.find(b => b.id === bId);
+        if (batch) {
+          if (!Array.isArray(batch.student_ids)) batch.student_ids = [];
+          if (!batch.student_ids.includes(originalStudent.id)) {
+            batch.student_ids.push(originalStudent.id);
+            cache['batches'] = batches;
+            saveCollection('batches');
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  if (originalUser) {
+    const users = loadCollection('users');
+    const filtered = users.filter(u => u.id !== originalUser.id && (!u.email || u.email.toLowerCase() !== originalUser.email?.toLowerCase()));
+    filtered.unshift(originalUser);
+    cache['users'] = filtered;
+    saveCollection('users', filtered);
+  }
+
+  bin.splice(binIndex, 1);
+  cache['recycle_bin'] = bin;
+  saveCollection('recycle_bin', bin);
+
+  return { student: originalStudent, user: originalUser };
+}
+
+function permanentDeleteFromRecycleBin(idOrEmail) {
+  if (!idOrEmail) return null;
+  const norm = String(idOrEmail).toLowerCase().trim();
+  const bin = loadCollection('recycle_bin');
+  const binItem = bin.find(b =>
+    (b.id && String(b.id).toLowerCase() === norm) ||
+    (b.email && String(b.email).toLowerCase().trim() === norm)
+  );
+  if (binItem) {
+    purgeUserCompletely(binItem.id, binItem.email);
+    const updatedBin = bin.filter(b => b.id !== binItem.id);
+    cache['recycle_bin'] = updatedBin;
+    saveCollection('recycle_bin', updatedBin);
+    return true;
+  }
+  return false;
+}
+
+function emptyRecycleBin() {
+  const bin = loadCollection('recycle_bin');
+  for (const item of bin) {
+    purgeUserCompletely(item.id, item.email);
+  }
+  cache['recycle_bin'] = [];
+  saveCollection('recycle_bin', []);
+  return true;
+}
+
 ensureSuperAdmin();
 
 module.exports = {
@@ -492,6 +649,10 @@ module.exports = {
   updateDocument,
   deleteDocument,
   purgeUserCompletely,
+  moveToRecycleBin,
+  restoreFromRecycleBin,
+  permanentDeleteFromRecycleBin,
+  emptyRecycleBin,
   hashPassword,
   verifyPassword,
   ensureSuperAdmin,

@@ -3338,6 +3338,69 @@ const AdminDashboard = () => {
   };
 
   const [isDeletingStudent, setIsDeletingStudent] = useState(false);
+  const [showRecycleBinModal, setShowRecycleBinModal] = useState(false);
+  const [recycleBinItems, setRecycleBinItems] = useState([]);
+  const [loadingRecycleBin, setLoadingRecycleBin] = useState(false);
+
+  const fetchRecycleBin = async () => {
+    setLoadingRecycleBin(true);
+    try {
+      const res = await fetch('/api/admin/recycle-bin');
+      const data = await res.json();
+      if (data.success) {
+        setRecycleBinItems(data.items || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch recycle bin:', e);
+    } finally {
+      setLoadingRecycleBin(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecycleBin();
+  }, []);
+
+  const restoreStudentFromBin = async (id) => {
+    try {
+      const res = await fetch(`/api/admin/recycle-bin/restore/${id}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to restore student');
+      showModal('Restored Successfully', 'Student has been restored to active students.', 'success');
+      fetchRecycleBin();
+      fetchStudents();
+      fetchStats();
+      if (typeof refetchAdminData === 'function') refetchAdminData();
+    } catch (e) {
+      showModal('Restore Failed', e.message, 'error');
+    }
+  };
+
+  const permanentDeleteStudentFromBin = async (id) => {
+    if (!window.confirm('Are you sure you want to permanently delete this student? This action cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/admin/recycle-bin/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to permanently delete student');
+      showModal('Permanently Deleted', 'Student record has been permanently purged.', 'success');
+      fetchRecycleBin();
+    } catch (e) {
+      showModal('Delete Failed', e.message, 'error');
+    }
+  };
+
+  const handleEmptyRecycleBin = async () => {
+    if (!window.confirm('Are you sure you want to permanently delete ALL students in the Recycle Bin? This action cannot be undone.')) return;
+    try {
+      const res = await fetch('/api/admin/recycle-bin', { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to empty recycle bin');
+      showModal('Recycle Bin Emptied', 'All items in the Recycle Bin have been permanently deleted.', 'success');
+      fetchRecycleBin();
+    } catch (e) {
+      showModal('Empty Bin Failed', e.message, 'error');
+    }
+  };
 
   const deleteStudent = (studentId) => {
     setStudentToDelete(studentId);
@@ -3357,10 +3420,9 @@ const AdminDashboard = () => {
         }
       }
 
-      // 2. Permanently delete student and linked user records across all collections
+      // 2. Move student to recycle bin via backend delete endpoint
       const studentEmail = studentObj?.email || '';
       await deleteStudentDoc('students', studentToDelete, studentEmail ? { email: studentEmail } : {});
-      await deleteStudentDoc('users', studentToDelete, studentEmail ? { email: studentEmail } : {}).catch(() => { });
 
       // 3. Refresh students & stats
       if (typeof refetchAdminData === 'function') refetchAdminData();
@@ -3368,11 +3430,12 @@ const AdminDashboard = () => {
       queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
       fetchStudents();
       fetchStats();
-      showModal('Deleted Permanently', 'Student and user account have been permanently deleted. The email address can now be re-registered or re-created.', 'success');
+      fetchRecycleBin();
+      showModal('Moved to Recycle Bin', 'Student has been safely moved to the Recycle Bin. You can restore them anytime or permanently delete them from the Recycle Bin.', 'success');
     } catch (error) {
       console.error('[Admin] Delete student error:', error);
       const errInfo = classifyFirestoreError(error);
-      showModal('Delete Failed', errInfo.message || 'Could not delete student record from database.', 'error');
+      showModal('Delete Failed', errInfo.message || 'Could not move student to Recycle Bin.', 'error');
     } finally {
       setIsDeletingStudent(false);
       setStudentToDelete(null);
@@ -5615,7 +5678,33 @@ const AdminDashboard = () => {
 
             <div className="dashboard-card-section" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div className="section-header-premium" style={{ gap: '16px', flexWrap: 'wrap', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 className="section-title-premium" style={{ margin: 0 }}>Student Accounts Registry</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <h3 className="section-title-premium" style={{ margin: 0 }}>Student Accounts Registry</h3>
+                  <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                    ({students.length} Active Students)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { fetchRecycleBin(); setShowRecycleBinModal(true); }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    padding: '8px 14px',
+                    borderRadius: '9px',
+                    background: recycleBinItems.length > 0 ? '#FEF2F2' : '#F8FAFC',
+                    border: recycleBinItems.length > 0 ? '1px solid #FECACA' : '1px solid #CBD5E1',
+                    color: recycleBinItems.length > 0 ? '#DC2626' : '#64748B',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Trash2 size={15} />
+                  <span>Recycle Bin ({recycleBinItems.length})</span>
+                </button>
               </div>
               <div className="table-container-scrollable table-desktop-view">
                 <table className="table-premium compact-tablet">
@@ -9975,12 +10064,12 @@ const AdminDashboard = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="confirm-modal-icon">
-              <TriangleAlert size={28} />
+              <Trash2 size={28} />
             </div>
-            <h3 className="confirm-modal-title">Delete Student</h3>
+            <h3 className="confirm-modal-title">Move Student to Recycle Bin</h3>
             <p className="confirm-modal-text">
-              Are you sure you want to delete this student?<br />
-              This action cannot be undone.
+              Are you sure you want to move this student to the Recycle Bin?<br />
+              The student will be hidden from active cohorts and can be restored anytime, or deleted permanently from the Recycle Bin.
             </p>
             <div className="confirm-modal-actions">
               <button
@@ -9997,7 +10086,170 @@ const AdminDashboard = () => {
                 disabled={isDeletingStudent}
                 onClick={executeDeleteStudent}
               >
-                {isDeletingStudent ? 'Deleting...' : 'Delete'}
+                {isDeletingStudent ? 'Moving...' : 'Move to Bin'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── RECYCLE BIN MODAL ─── */}
+      {showRecycleBinModal && (
+        <div className="modal-overlay" onClick={() => setShowRecycleBinModal(false)}>
+          <div className="modal-content modal-lg" style={{ maxWidth: '850px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#DC2626' }}>
+                  <Trash2 size={22} />
+                </div>
+                <div>
+                  <h3 className="modal-title" style={{ margin: 0, fontSize: '18px', fontWeight: 800 }}>
+                    Students Recycle Bin
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                    Deleted students are kept here safely. You can restore them back to active courses anytime or permanently purge them.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close-red"
+                onClick={() => setShowRecycleBinModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+              {loadingRecycleBin ? (
+                <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  Loading Recycle Bin...
+                </div>
+              ) : recycleBinItems.length === 0 ? (
+                <div style={{ padding: '48px 20px', textAlign: 'center', background: '#F8FAFC', borderRadius: '12px', border: '1.5px dashed #CBD5E1' }}>
+                  <Trash2 size={40} color="#94A3B8" style={{ margin: '0 auto 12px' }} />
+                  <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#334155', margin: '0 0 4px' }}>
+                    Recycle Bin is Empty
+                  </h4>
+                  <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
+                    No students currently in the Recycle Bin. Any deleted students will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {recycleBinItems.length} Student{recycleBinItems.length > 1 ? 's' : ''} in Bin
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleEmptyRecycleBin}
+                      style={{
+                        padding: '6px 12px',
+                        background: '#FEF2F2',
+                        border: '1px solid #FECACA',
+                        borderRadius: '8px',
+                        color: '#DC2626',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Empty Entire Bin
+                    </button>
+                  </div>
+
+                  <div className="table-container-scrollable">
+                    <table className="table-premium" style={{ width: '100%', fontSize: '13px' }}>
+                      <thead>
+                        <tr>
+                          <th>Student Name</th>
+                          <th>Email & Mobile</th>
+                          <th>Course / Batch</th>
+                          <th>Deleted Date</th>
+                          <th style={{ textAlign: 'center' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recycleBinItems.map(item => (
+                          <tr key={item.id}>
+                            <td>
+                              <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{item.name || 'Student'}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>ID: {item.rollNumber || item.id}</div>
+                            </td>
+                            <td>
+                              <div>{item.email}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{item.phone || '-'}</div>
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 600 }}>{item.course || 'Course'}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{item.batch_name || '-'}</div>
+                            </td>
+                            <td>
+                              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                {item.deletedAt ? new Date(item.deletedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => restoreStudentFromBin(item.id)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    padding: '5px 10px',
+                                    background: '#ECFDF5',
+                                    border: '1px solid #A7F3D0',
+                                    borderRadius: '6px',
+                                    color: '#059669',
+                                    fontSize: '11.5px',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Restore Student to Active Registry"
+                                >
+                                  <RefreshCw size={12} /> Restore
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => permanentDeleteStudentFromBin(item.id)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    padding: '5px 10px',
+                                    background: '#FEF2F2',
+                                    border: '1px solid #FECACA',
+                                    borderRadius: '6px',
+                                    color: '#DC2626',
+                                    fontSize: '11.5px',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Permanently Purge Record"
+                                >
+                                  <Trash2 size={12} /> Delete Forever
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ padding: '16px 24px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowRecycleBinModal(false)}
+              >
+                Close
               </button>
             </div>
           </div>

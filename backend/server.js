@@ -1669,12 +1669,60 @@ app.delete('/api/notifications/user/:userId', (req, res) => {
   }
 });
 
+// ─── RECYCLE BIN / SOFT-DELETE MANAGEMENT ROUTES ─────────────────────────────
+app.get('/api/admin/recycle-bin', (req, res) => {
+  try {
+    const items = localDb.loadCollection('recycle_bin') || [];
+    res.json({ success: true, items });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/recycle-bin/restore/:id', (req, res) => {
+  try {
+    const result = localDb.restoreFromRecycleBin(req.params.id);
+    if (!result) return res.status(404).json({ error: 'Item not found in Recycle Bin.' });
+    res.json({ success: true, message: 'Student restored successfully.', result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/recycle-bin/:id', (req, res) => {
+  try {
+    const success = localDb.permanentDeleteFromRecycleBin(req.params.id);
+    if (!success) return res.status(404).json({ error: 'Item not found in Recycle Bin.' });
+    res.json({ success: true, message: 'Student permanently deleted from database.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/recycle-bin', (req, res) => {
+  try {
+    localDb.emptyRecycleBin();
+    res.json({ success: true, message: 'Recycle Bin emptied successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/data/:collection/:id', (req, res) => {
   try {
     const { collection, id } = req.params;
     const explicitEmail = req.query.email || req.body?.email || null;
+    const isPermanent = req.query.permanent === 'true';
 
-    if (collection === 'students' || collection === 'trainers' || collection === 'users' || collection === 'leads') {
+    if (collection === 'students') {
+      if (isPermanent) {
+        const purgeResult = localDb.purgeUserCompletely(id, explicitEmail);
+        console.log(`[LocalDb] Purged student ${id}:`, purgeResult);
+      } else {
+        const binResult = localDb.moveToRecycleBin(id || explicitEmail);
+        console.log(`[LocalDb] Moved student to recycle bin ${id}:`, binResult);
+      }
+    } else if (collection === 'trainers' || collection === 'users' || collection === 'leads') {
       const purgeResult = localDb.purgeUserCompletely(id, explicitEmail);
       console.log(`[LocalDb] Purged ${collection} ${id}:`, purgeResult);
     } else {
