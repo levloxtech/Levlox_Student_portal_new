@@ -126,14 +126,6 @@ const RecordedClassesPage = ({
 
   const handlePlayLesson = (lesson, course = null) => {
     if (!lesson) return;
-    if (!isPaid || isMembershipExpired) {
-      if (typeof onOpenRenewal === 'function') {
-        onOpenRenewal();
-      } else {
-        alert('Your Academy Membership cycle has expired. Please renew your plan to unlock course recordings.');
-      }
-      return;
-    }
     const targetCourse = course || selectedCourse;
     const rawMaterials = lesson.study_materials || lesson.studyMaterials || [];
     const normalized = {
@@ -156,14 +148,6 @@ const RecordedClassesPage = ({
 
   const openCourseViewer = (course, lesson = null) => {
     if (!course) return;
-    if (!isPaid || isMembershipExpired) {
-      if (typeof onOpenRenewal === 'function') {
-        onOpenRenewal();
-      } else {
-        alert('Your Academy Membership cycle has lapsed. Please renew your plan to unlock course recordings.');
-      }
-      return;
-    }
     setSelectedCourse(course);
     if (lesson) {
       handlePlayLesson(lesson, course);

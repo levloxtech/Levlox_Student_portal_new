@@ -661,11 +661,9 @@ const StudentDashboard = () => {
     299
   );
 
+  // Auto-renewal prompt on mount removed so courses and recordings remain open without blocking popups
   useEffect(() => {
-    if (isMembershipExpired && !autoRenewalPromptedRef.current) {
-      autoRenewalPromptedRef.current = true;
-      setShowRenewalModal(true);
-    }
+    // Only opened when student clicks to renew or views locked Internship Hub
   }, [isMembershipExpired]);
 
   // For Portal Students (self-paced), directly open Courses & Recorded Sessions
@@ -789,7 +787,7 @@ const StudentDashboard = () => {
       },
       isAttended,
       recordedClasses: rawRecordings,
-      latestReplays: rawRecordings.slice(0, 6).map(r => ({ ...(r || {}), access: isPaid })),
+      latestReplays: rawRecordings.slice(0, 6).map(r => ({ ...(r || {}), access: true })),
       leaderboard: Array.isArray(extrasData?.leaderboard) ? extrasData.leaderboard : [],
       learningRanking: extrasData?.learningRanking || null,
       submissions: Array.isArray(extrasData?.submissions) ? extrasData.submissions : [],
@@ -3282,13 +3280,13 @@ const StudentDashboard = () => {
             Loading content...
           </div>
         }>
-          {/* RECORDED CLASSES TAB */}
+          {/* RECORDED CLASSES TAB - Open for all students */}
           {activeTab === 'recorded-classes-tab' && (
             <RecordedClassesPage
               recordedClasses={dashboardData?.recordedClasses || null}
               customPlaylists={extrasData?.playlists || null}
-              isPaid={isPaid}
-              isMembershipExpired={isMembershipExpired}
+              isPaid={true}
+              isMembershipExpired={false}
               onOpenRenewal={() => setShowRenewalModal(true)}
               initialCourseId={replayTarget?.courseId || null}
               initialLessonId={replayTarget?.lessonId || null}
