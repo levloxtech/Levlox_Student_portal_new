@@ -177,6 +177,20 @@ export default function YearlyMembersVaultManager() {
     }
   };
 
+  const handleDeleteAllMaterials = async () => {
+    if (!window.confirm('Are you sure you want to delete ALL resources from the Internship Hub? This action cannot be undone.')) return;
+    try {
+      const res = await fetch('/api/yearly-vault/vault/admin/materials', {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to clear all materials');
+      setMaterials([]);
+    } catch (err) {
+      alert('Error deleting all materials: ' + err.message);
+    }
+  };
+
   const getItemSection = (mat) => {
     if (mat.section) return mat.section;
     const cat = (mat.category || '').toLowerCase();
@@ -233,6 +247,28 @@ export default function YearlyMembersVaultManager() {
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
+          {materials.length > 0 && (
+            <button
+              type="button"
+              onClick={handleDeleteAllMaterials}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '9px 14px',
+                borderRadius: 10,
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                color: '#DC2626',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              <Trash2 size={14} /> Clear All ({materials.length})
+            </button>
+          )}
+
           <button
             type="button"
             onClick={fetchMaterials}

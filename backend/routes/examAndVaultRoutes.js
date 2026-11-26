@@ -835,46 +835,7 @@ const DEFAULT_VAULT_MATERIALS = [
 ];
 
 function getVaultMaterials() {
-  const materials = localDb.loadCollection('yearly_member_vault');
-  const indProjects = localDb.loadCollection('industrial_projects') || [];
-  const portProjects = localDb.loadCollection('portfolio_projects') || [];
-
-  // Live Sync: If admin uploaded or updated thumbnailUrl or videoUrl in industrial_projects or portfolio_projects, reflect it here
-  let modified = false;
-  materials.forEach(mat => {
-    if (mat.sourceType === 'industrial_project' || !mat.sourceType) {
-      const matched = indProjects.find(p => p.id === mat.id || p.id === mat.sourceId || (p.name && mat.title && p.name.trim().toLowerCase() === mat.title.trim().toLowerCase()));
-      if (matched) {
-        if (matched.thumbnailUrl && mat.thumbnailUrl !== matched.thumbnailUrl) {
-          mat.thumbnailUrl = matched.thumbnailUrl;
-          modified = true;
-        }
-        if (matched.videoUrl && mat.videoUrl !== matched.videoUrl) {
-          mat.videoUrl = matched.videoUrl;
-          modified = true;
-        }
-      }
-    }
-    if (mat.sourceType === 'portfolio_project' || !mat.sourceType) {
-      const matched = portProjects.find(p => p.id === mat.id || p.id === mat.sourceId || (p.name && mat.title && p.name.trim().toLowerCase() === mat.title.trim().toLowerCase()));
-      if (matched) {
-        if (matched.thumbnailUrl && mat.thumbnailUrl !== matched.thumbnailUrl) {
-          mat.thumbnailUrl = matched.thumbnailUrl;
-          modified = true;
-        }
-        if (matched.videoUrl && mat.videoUrl !== matched.videoUrl) {
-          mat.videoUrl = matched.videoUrl;
-          modified = true;
-        }
-      }
-    }
-  });
-
-  if (modified) {
-    localDb.saveCollection('yearly_member_vault', materials);
-  }
-
-  return materials;
+  return localDb.loadCollection('yearly_member_vault') || [];
 }
 
 // ─── 9. GET YEARLY VAULT MATERIALS ───────────────────────────────────────────
@@ -1023,11 +984,25 @@ router.put('/vault/admin/materials/:id', uploadVaultFile.any(), (req, res) => {
   }
 });
 
-// ─── 11. ADMIN: DELETE MATERIAL FROM VAULT ───────────────────────────────────
+// ─── 11. ADMIN: DELETE ALL MATERIALS FROM VAULT / INTERNSHIP HUB ────────────
+router.delete('/vault/admin/materials', (req, res) => {
+  try {
+    localDb.saveCollection('yearly_member_vault', []);
+    res.json({ success: true, message: 'All materials cleared from Internship Hub.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── 11B. ADMIN: DELETE SINGLE MATERIAL FROM VAULT ────────────────────────────
 router.delete('/vault/admin/materials/:id', (req, res) => {
   try {
     const matId = req.params.id;
-    let materials = localDb.loadCollection('yearly_member_vault');
+    if (matId === 'ALL' || matId === 'all') {
+      localDb.saveCollection('yearly_member_vault', []);
+      return res.json({ success: true, message: 'All materials cleared from Internship Hub.' });
+    }
+    let materials = localDb.loadCollection('yearly_member_vault') || [];
     const initialLen = materials.length;
     materials = materials.filter(m => m.id !== matId);
 
