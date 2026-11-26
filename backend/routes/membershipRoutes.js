@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const localDb = require('../localDb');
 
 // Razorpay SDK initialization (with graceful fallback for local testing if keys not provided)
@@ -85,40 +87,29 @@ const PLANS = {
   }
 };
 
-// ── SEED INITIAL COUPONS IF NOT PRESENT ───────────────────────────────────────
-function getCoupons() {
-  let coupons = localDb.loadCollection('coupons');
-  if (!coupons || coupons.length === 0) {
-    coupons = [
-      { id: 'coup_enroll4500', code: 'ENROLL4500', discount: 4500, minPlan: 'annual', description: '₹4,500 Early Enrolly Discount', expiryDate: '2028-12-31', isActive: true },
-      { id: 'coup_enroll', code: 'ENROLL6000', discount: 4500, minPlan: 'annual', description: '₹4,500 Early Enrolly Discount', expiryDate: '2028-12-31', isActive: true },
-      { id: 'coup_enrolly', code: 'ENROLLY', discount: 4500, minPlan: 'annual', description: '₹4,500 Enrolly Coupon', expiryDate: '2028-12-31', isActive: true },
-      { id: 'coup_1', code: 'LEVLOX400', discount: 400, minPlan: 'weekly', description: '₹400 instant promotional discount', expiryDate: '2027-12-31', isActive: true },
-      { id: 'coup_2', code: 'ACADEMY1400', discount: 1400, minPlan: 'annual', description: '₹1,400 special academy discount', expiryDate: '2027-12-31', isActive: true },
-      { id: 'coup_3', code: 'TAMILIT1000', discount: 1000, minPlan: 'annual', description: '₹1,000 community credit discount', expiryDate: '2027-12-31', isActive: true },
-      { id: 'coup_4', code: 'WELCOME100', discount: 100, minPlan: 'weekly', description: '₹100 welcome coupon', expiryDate: '2027-12-31', isActive: true }
-    ];
-    localDb.saveCollection('coupons', coupons);
-  } else {
-    let modified = false;
-    // Ensure ENROLL4500 exists
-    if (!coupons.find(c => c.code?.toUpperCase() === 'ENROLL4500')) {
-      coupons.push({ id: 'coup_enroll4500', code: 'ENROLL4500', discount: 4500, minPlan: 'annual', description: '₹4,500 Early Enrolly Discount', expiryDate: '2028-12-31', isActive: true });
-      modified = true;
+// ── SEED INITIAL COUPONS ONLY ONCE IF FILE DOES NOT EXIST ───────────────────
+function ensureInitialCouponsSeeded() {
+  try {
+    const STORAGE_ROOT = process.env.STORAGE_ROOT || path.join(__dirname, '..', '..', 'storage');
+    const couponsFilePath = path.join(STORAGE_ROOT, 'data', 'coupons.json');
+    if (!fs.existsSync(couponsFilePath)) {
+      const initialCoupons = [
+        { id: 'coup_enroll4500', code: 'ENROLL4500', discount: 4500, minPlan: 'annual', description: '₹4,500 Early Enrolly Discount', expiryDate: '2028-12-31', isActive: true },
+        { id: 'coup_1', code: 'LEVLOX400', discount: 400, minPlan: 'weekly', description: '₹400 instant promotional discount', expiryDate: '2027-12-31', isActive: true },
+        { id: 'coup_4', code: 'WELCOME100', discount: 100, minPlan: 'weekly', description: '₹100 welcome coupon', expiryDate: '2027-12-31', isActive: true }
+      ];
+      localDb.saveCollection('coupons', initialCoupons);
     }
-    // Update ENROLL6000 and ENROLLY to 4500 discount for 11499 net price
-    coupons.forEach(c => {
-      if (c.code?.toUpperCase() === 'ENROLL6000' || c.code?.toUpperCase() === 'ENROLLY') {
-        if (c.discount !== 4500) {
-          c.discount = 4500;
-          c.description = '₹4,500 Early Enrolly Discount';
-          modified = true;
-        }
-      }
-    });
-    if (modified) localDb.saveCollection('coupons', coupons);
+  } catch (e) {
+    console.error('[Membership] Initial coupon seed check error:', e.message);
   }
-  return coupons;
+}
+ensureInitialCouponsSeeded();
+
+// ── GET STORED COUPONS (PRESERVING EXPLICIT DELETIONS) ──────────────────────
+function getCoupons() {
+  const coupons = localDb.loadCollection('coupons');
+  return Array.isArray(coupons) ? coupons : [];
 }
 
 // ── GET USER STORE CREDITS ───────────────────────────────────────────────────
@@ -477,20 +468,38 @@ router.get('/coupon-redemptions', (req, res) => {
   }
 });
 
-// DELETE /api/membership/coupons/:code
+// DELETE /api/membership/coupons/:code (or id, or 'ALL')
 router.delete('/coupons/:code', (req, res) => {
   try {
-    const codeToDelete = String(req.params.code).trim().toUpperCase();
-    let coupons = localDb.loadCollection('coupons');
+    const target = String(req.params.code).trim().toUpperCase();
+    if (target === 'ALL' || target === '__ALL__') {
+      localDb.saveCollection('coupons', []);
+      return res.json({ success: true, message: 'All coupons deleted successfully.', remaining: 0 });
+    }
+
+    let coupons = localDb.loadCollection('coupons') || [];
     const initialLen = coupons.length;
-    coupons = coupons.filter(c => c.code.toUpperCase() !== codeToDelete);
+    coupons = coupons.filter(c => 
+      (!c.code || c.code.toUpperCase() !== target) &&
+      (!c.id || c.id.toUpperCase() !== target)
+    );
     if (coupons.length === initialLen) {
-      return res.status(404).json({ error: 'Coupon code not found.' });
+      return res.status(404).json({ error: 'Coupon not found.' });
     }
     localDb.saveCollection('coupons', coupons);
-    res.json({ success: true, message: `Coupon ${codeToDelete} deleted successfully.` });
+    res.json({ success: true, message: `Coupon deleted successfully.`, remaining: coupons.length });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete coupon: ' + err.message });
+  }
+});
+
+// DELETE /api/membership/coupons (Clear all coupons)
+router.delete('/coupons', (req, res) => {
+  try {
+    localDb.saveCollection('coupons', []);
+    res.json({ success: true, message: 'All coupons deleted successfully.', remaining: 0 });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete all coupons: ' + err.message });
   }
 });
 
@@ -512,7 +521,7 @@ router.get('/referral/profile/:email', (req, res) => {
     const students = localDb.loadCollection('students') || [];
     const users = localDb.loadCollection('users') || [];
     const student = students.find(s => s.email?.toLowerCase() === normEmail) ||
-                    users.find(u => u.email?.toLowerCase() === normEmail);
+      users.find(u => u.email?.toLowerCase() === normEmail);
 
     if (!profile) {
       const generatedCode = generateReferralCode(student?.name, student?.rollNumber);

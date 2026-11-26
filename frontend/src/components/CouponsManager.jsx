@@ -152,7 +152,7 @@ export default function CouponsManager() {
   const handleDeleteCoupon = async (code) => {
     if (!window.confirm(`Are you sure you want to delete coupon '${code}'?`)) return;
     try {
-      const res = await fetch(`/api/membership/coupons/${code}`, {
+      const res = await fetch(`/api/membership/coupons/${encodeURIComponent(code)}`, {
         method: 'DELETE'
       });
       const data = await res.json();
@@ -160,6 +160,20 @@ export default function CouponsManager() {
       fetchAllData();
     } catch (err) {
       alert('Error deleting coupon: ' + err.message);
+    }
+  };
+
+  const handleDeleteAllCoupons = async () => {
+    if (!window.confirm('Are you sure you want to delete ALL coupons? This cannot be undone.')) return;
+    try {
+      const res = await fetch('/api/membership/coupons', {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete coupons');
+      fetchAllData();
+    } catch (err) {
+      alert('Error deleting coupons: ' + err.message);
     }
   };
 
@@ -636,9 +650,35 @@ export default function CouponsManager() {
             flexDirection: 'column',
             gap: 14
           }}>
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
               <span>Active Coupons ({coupons.length})</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>Live on Levlox Academy</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {coupons.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteAllCoupons}
+                    style={{
+                      background: '#FEE2E2',
+                      color: '#DC2626',
+                      border: '1px solid #FECDD3',
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      transition: 'background 0.15s ease'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = '#FCA5A5'}
+                    onMouseOut={(e) => e.currentTarget.style.background = '#FEE2E2'}
+                  >
+                    <Trash2 size={12} /> Clear All
+                  </button>
+                )}
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>Live on Levlox Academy</span>
+              </div>
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 680, overflowY: 'auto', paddingRight: 4 }}>
