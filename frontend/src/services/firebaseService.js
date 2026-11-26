@@ -204,7 +204,7 @@ export const updateDocumentFields = async (collectionName, id, data) => {
 /** Delete a document */
 export const deleteDocument = async (collectionName, id, extraParams = {}) => {
   try {
-    let url = `${API_BASE}/api/data/${collectionName}/${id}`;
+    let url = `${API_BASE}/api/data/${collectionName}/${encodeURIComponent(id)}`;
     if (extraParams && typeof extraParams === 'object' && Object.keys(extraParams).length > 0) {
       const q = new URLSearchParams(extraParams).toString();
       if (q) url += `?${q}`;
@@ -213,7 +213,11 @@ export const deleteDocument = async (collectionName, id, extraParams = {}) => {
       method: 'DELETE',
       headers: getHeaders(),
     });
-    return res.ok;
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Failed to delete document: HTTP ${res.status}`);
+    }
+    return true;
   } catch (error) {
     console.error(`[LocalDB] deleteDocument(${collectionName}/${id}):`, error);
     throw error;

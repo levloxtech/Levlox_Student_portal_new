@@ -168,12 +168,16 @@ function deleteDocument(name, id) {
     const iUid = String(item.uid || '').trim();
     const iUnderscoreId = String(item._id || '').trim();
     const iTrainerId = String(item.trainerId || item.trainer_id || '').trim();
+    const iCode = String(item.code || '').trim();
     const iEmail = String(item.email || '').trim().toLowerCase();
     const isTargetEmail = targetId.includes('@');
-    if (iId === targetId || iUid === targetId || iUnderscoreId === targetId || iTrainerId === targetId) {
+    if (iId === targetId || iUid === targetId || iUnderscoreId === targetId || iTrainerId === targetId || iCode === targetId) {
       return false;
     }
     if (isTargetEmail && iEmail === targetId.toLowerCase()) {
+      return false;
+    }
+    if (iEmail && iEmail === targetId.toLowerCase()) {
       return false;
     }
     return true;
@@ -324,78 +328,100 @@ function purgeUserCompletely(identifier, explicitEmail) {
     }
   }
 
-  // 1. Scan students to discover linked email and IDs
-  try {
-    const students = loadCollection('students');
-    students.forEach((s) => {
-      const matchId = (s.id && idsToPurge.has(String(s.id))) || (s.uid && idsToPurge.has(String(s.uid))) || (s.rollNumber && idsToPurge.has(String(s.rollNumber)));
-      const matchEmail = s.email && emailsToPurge.has(String(s.email).trim().toLowerCase());
-      if (matchId || matchEmail) {
-        if (s.id) idsToPurge.add(String(s.id));
-        if (s.uid) idsToPurge.add(String(s.uid));
-        if (s.rollNumber) idsToPurge.add(String(s.rollNumber));
-        if (s.email) emailsToPurge.add(String(s.email).trim().toLowerCase());
-      }
-    });
-  } catch (_) {}
+  // Iterative discovery: up to 3 passes to resolve linked accounts across collections
+  for (let pass = 0; pass < 3; pass++) {
+    const prevIdCount = idsToPurge.size;
+    const prevEmailCount = emailsToPurge.size;
 
-  // 2. Scan users
-  try {
-    const users = loadCollection('users');
-    users.forEach((u) => {
-      const matchId = (u.id && idsToPurge.has(String(u.id))) || (u.uid && idsToPurge.has(String(u.uid)));
-      const matchEmail = u.email && emailsToPurge.has(String(u.email).trim().toLowerCase());
-      if (matchId || matchEmail) {
-        if (u.id) idsToPurge.add(String(u.id));
-        if (u.uid) idsToPurge.add(String(u.uid));
-        if (u.email) emailsToPurge.add(String(u.email).trim().toLowerCase());
-      }
-    });
-  } catch (_) {}
+    // 1. Scan students to discover linked email and IDs
+    try {
+      const students = loadCollection('students');
+      students.forEach((s) => {
+        const matchId = (s.id && idsToPurge.has(String(s.id))) || (s.uid && idsToPurge.has(String(s.uid))) || (s.rollNumber && idsToPurge.has(String(s.rollNumber)));
+        const matchEmail = s.email && emailsToPurge.has(String(s.email).trim().toLowerCase());
+        if (matchId || matchEmail) {
+          if (s.id) idsToPurge.add(String(s.id));
+          if (s.uid) idsToPurge.add(String(s.uid));
+          if (s.rollNumber) idsToPurge.add(String(s.rollNumber));
+          if (s.email) emailsToPurge.add(String(s.email).trim().toLowerCase());
+        }
+      });
+    } catch (_) {}
 
-  // 3. Scan leads
-  try {
-    const leads = loadCollection('leads');
-    leads.forEach((l) => {
-      const matchId = (l.id && idsToPurge.has(String(l.id))) || (l.studentId && idsToPurge.has(String(l.studentId)));
-      const matchEmail = l.email && emailsToPurge.has(String(l.email).trim().toLowerCase());
-      if (matchId || matchEmail) {
-        if (l.id) idsToPurge.add(String(l.id));
-        if (l.studentId) idsToPurge.add(String(l.studentId));
-        if (l.email) emailsToPurge.add(String(l.email).trim().toLowerCase());
-      }
-    });
-  } catch (_) {}
+    // 2. Scan users
+    try {
+      const users = loadCollection('users');
+      users.forEach((u) => {
+        const matchId = (u.id && idsToPurge.has(String(u.id))) || 
+                        (u.uid && idsToPurge.has(String(u.uid))) ||
+                        (u.trainerId && idsToPurge.has(String(u.trainerId))) ||
+                        (u.trainer_id && idsToPurge.has(String(u.trainer_id))) ||
+                        (u.code && idsToPurge.has(String(u.code)));
+        const matchEmail = u.email && emailsToPurge.has(String(u.email).trim().toLowerCase());
+        if (matchId || matchEmail) {
+          if (u.id) idsToPurge.add(String(u.id));
+          if (u.uid) idsToPurge.add(String(u.uid));
+          if (u.trainerId) idsToPurge.add(String(u.trainerId));
+          if (u.trainer_id) idsToPurge.add(String(u.trainer_id));
+          if (u.code) idsToPurge.add(String(u.code));
+          if (u.email) emailsToPurge.add(String(u.email).trim().toLowerCase());
+        }
+      });
+    } catch (_) {}
 
-  // 4. Scan memberships
-  try {
-    const memberships = loadCollection('memberships');
-    memberships.forEach((m) => {
-      const matchId = (m.id && idsToPurge.has(String(m.id))) || (m.studentId && idsToPurge.has(String(m.studentId)));
-      const matchEmail = m.email && emailsToPurge.has(String(m.email).trim().toLowerCase());
-      if (matchId || matchEmail) {
-        if (m.id) idsToPurge.add(String(m.id));
-        if (m.studentId) idsToPurge.add(String(m.studentId));
-        if (m.email) emailsToPurge.add(String(m.email).trim().toLowerCase());
-      }
-    });
-  } catch (_) {}
+    // 3. Scan leads
+    try {
+      const leads = loadCollection('leads');
+      leads.forEach((l) => {
+        const matchId = (l.id && idsToPurge.has(String(l.id))) || (l.studentId && idsToPurge.has(String(l.studentId)));
+        const matchEmail = l.email && emailsToPurge.has(String(l.email).trim().toLowerCase());
+        if (matchId || matchEmail) {
+          if (l.id) idsToPurge.add(String(l.id));
+          if (l.studentId) idsToPurge.add(String(l.studentId));
+          if (l.email) emailsToPurge.add(String(l.email).trim().toLowerCase());
+        }
+      });
+    } catch (_) {}
 
-  // 5. Scan trainers
-  try {
-    const trainers = loadCollection('trainers');
-    trainers.forEach((t) => {
-      const matchId = (t.id && idsToPurge.has(String(t.id))) || (t.uid && idsToPurge.has(String(t.uid))) || (t.trainerId && idsToPurge.has(String(t.trainerId))) || (t.trainer_id && idsToPurge.has(String(t.trainer_id)));
-      const matchEmail = t.email && emailsToPurge.has(String(t.email).trim().toLowerCase());
-      if (matchId || matchEmail) {
-        if (t.id) idsToPurge.add(String(t.id));
-        if (t.uid) idsToPurge.add(String(t.uid));
-        if (t.trainerId) idsToPurge.add(String(t.trainerId));
-        if (t.trainer_id) idsToPurge.add(String(t.trainer_id));
-        if (t.email) emailsToPurge.add(String(t.email).trim().toLowerCase());
-      }
-    });
-  } catch (_) {}
+    // 4. Scan memberships
+    try {
+      const memberships = loadCollection('memberships');
+      memberships.forEach((m) => {
+        const matchId = (m.id && idsToPurge.has(String(m.id))) || (m.studentId && idsToPurge.has(String(m.studentId)));
+        const matchEmail = m.email && emailsToPurge.has(String(m.email).trim().toLowerCase());
+        if (matchId || matchEmail) {
+          if (m.id) idsToPurge.add(String(m.id));
+          if (m.studentId) idsToPurge.add(String(m.studentId));
+          if (m.email) emailsToPurge.add(String(m.email).trim().toLowerCase());
+        }
+      });
+    } catch (_) {}
+
+    // 5. Scan trainers
+    try {
+      const trainers = loadCollection('trainers');
+      trainers.forEach((t) => {
+        const matchId = (t.id && idsToPurge.has(String(t.id))) || 
+                        (t.uid && idsToPurge.has(String(t.uid))) || 
+                        (t.trainerId && idsToPurge.has(String(t.trainerId))) || 
+                        (t.trainer_id && idsToPurge.has(String(t.trainer_id))) ||
+                        (t.code && idsToPurge.has(String(t.code)));
+        const matchEmail = t.email && emailsToPurge.has(String(t.email).trim().toLowerCase());
+        if (matchId || matchEmail) {
+          if (t.id) idsToPurge.add(String(t.id));
+          if (t.uid) idsToPurge.add(String(t.uid));
+          if (t.trainerId) idsToPurge.add(String(t.trainerId));
+          if (t.trainer_id) idsToPurge.add(String(t.trainer_id));
+          if (t.code) idsToPurge.add(String(t.code));
+          if (t.email) emailsToPurge.add(String(t.email).trim().toLowerCase());
+        }
+      });
+    } catch (_) {}
+
+    if (idsToPurge.size === prevIdCount && emailsToPurge.size === prevEmailCount) {
+      break;
+    }
+  }
 
   // Perform permanent cleanups across collections:
   // students
@@ -418,6 +444,9 @@ function purgeUserCompletely(identifier, explicitEmail) {
     const filtered = users.filter(u => {
       if (u.id && idsToPurge.has(String(u.id))) return false;
       if (u.uid && idsToPurge.has(String(u.uid))) return false;
+      if (u.trainerId && idsToPurge.has(String(u.trainerId))) return false;
+      if (u.trainer_id && idsToPurge.has(String(u.trainer_id))) return false;
+      if (u.code && idsToPurge.has(String(u.code))) return false;
       if (u.email && emailsToPurge.has(String(u.email).trim().toLowerCase())) return false;
       return true;
     });
@@ -470,6 +499,7 @@ function purgeUserCompletely(identifier, explicitEmail) {
       if (t.uid && idsToPurge.has(String(t.uid))) return false;
       if (t.trainerId && idsToPurge.has(String(t.trainerId))) return false;
       if (t.trainer_id && idsToPurge.has(String(t.trainer_id))) return false;
+      if (t.code && idsToPurge.has(String(t.code))) return false;
       if (t.email && emailsToPurge.has(String(t.email).trim().toLowerCase())) return false;
       return true;
     });
@@ -489,7 +519,7 @@ function purgeUserCompletely(identifier, explicitEmail) {
     saveCollection('deletedUsers');
   } catch (_) {}
 
-  // batches - remove from student_ids list
+  // batches - remove student assignments and trainer assignments
   try {
     const batches = loadCollection('batches');
     let batchesChanged = false;
@@ -498,6 +528,21 @@ function purgeUserCompletely(identifier, explicitEmail) {
         const origLen = b.student_ids.length;
         b.student_ids = b.student_ids.filter(sid => !idsToPurge.has(String(sid)));
         if (b.student_ids.length !== origLen) batchesChanged = true;
+      }
+      if (b.trainer_id && idsToPurge.has(String(b.trainer_id))) {
+        b.trainer_id = '';
+        b.trainer_name = '';
+        batchesChanged = true;
+      }
+      if (b.trainer_uid && idsToPurge.has(String(b.trainer_uid))) {
+        b.trainer_uid = '';
+        b.trainer_name = '';
+        batchesChanged = true;
+      }
+      if (Array.isArray(b.assigned_trainer_ids)) {
+        const origLen = b.assigned_trainer_ids.length;
+        b.assigned_trainer_ids = b.assigned_trainer_ids.filter(tid => !idsToPurge.has(String(tid)));
+        if (b.assigned_trainer_ids.length !== origLen) batchesChanged = true;
       }
     });
     if (batchesChanged) {

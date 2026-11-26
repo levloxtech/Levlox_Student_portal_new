@@ -1064,6 +1064,64 @@ app.get('/api/data/:collection', (req, res) => {
     const { collection } = req.params;
     let items = localDb.loadCollection(collection);
 
+    // Consolidate trainers from trainers.json and users.json (role: 'trainer')
+    if (collection === 'trainers') {
+      const trainersList = localDb.loadCollection('trainers');
+      const usersList = localDb.loadCollection('users');
+      const trainerUsers = usersList.filter(u => u && u.role === 'trainer');
+
+      const mergedMap = new Map();
+
+      // Seed from existing trainers.json
+      for (const t of trainersList) {
+        if (!t) continue;
+        const key = String(t.id || t.uid || t.email || '').trim().toLowerCase();
+        if (key) mergedMap.set(key, { ...t });
+      }
+
+      // Merge and enrich with trainer user accounts
+      for (const u of trainerUsers) {
+        const idKey = String(u.id || u.uid || '').trim().toLowerCase();
+        const emailKey = String(u.email || '').trim().toLowerCase();
+        const existing = (idKey && mergedMap.get(idKey)) || (emailKey && mergedMap.get(emailKey)) || {};
+
+        const trainerId = existing.trainerId || existing.trainer_id || existing.code || u.trainerId || u.trainer_id || u.code || u.id || u.uid;
+        const profile = {
+          ...existing,
+          id: u.id || u.uid || existing.id || `trainer_${Date.now()}`,
+          uid: u.uid || u.id || existing.uid,
+          trainerId,
+          trainer_id: trainerId,
+          code: trainerId,
+          name: existing.name || u.name || '',
+          email: existing.email || u.email || '',
+          phone: existing.phone || u.phone || u.mobile || '',
+          mobile: existing.mobile || u.mobile || u.phone || '',
+          role: 'trainer',
+          status: existing.status || u.status || 'Active',
+          designation: existing.designation || u.designation || u.role_title || u.specialization || 'Faculty Trainer',
+          specialization: existing.specialization || u.specialization || existing.designation || 'Faculty Trainer',
+          assigned_batch_ids: existing.assigned_batch_ids || u.assigned_batch_ids || [],
+          profilePic: existing.profilePic || existing.profile_pic || u.profilePic || u.profile_pic || '',
+          profile_pic: existing.profilePic || existing.profile_pic || u.profilePic || u.profile_pic || '',
+          tempPassword: u.tempPassword || u.rawPassword || u.password || existing.tempPassword || '',
+          password: u.password || u.tempPassword || existing.password || '',
+          createdAt: existing.createdAt || u.createdAt || new Date().toISOString(),
+          updatedAt: u.updatedAt || existing.updatedAt || new Date().toISOString(),
+          profileCompleted: Boolean(existing.profileCompleted !== undefined ? existing.profileCompleted : u.profileCompleted)
+        };
+
+        const primaryKey = String(profile.id || profile.email).trim().toLowerCase();
+        mergedMap.set(primaryKey, profile);
+      }
+
+      items = Array.from(mergedMap.values());
+      // Keep trainers.json synchronized
+      try {
+        localDb.saveCollection('trainers', items);
+      } catch (_) {}
+    }
+
     // Apply query filters
     const queryKeys = Object.keys(req.query).filter((k) => !['limit', 'orderBy', 'orderDir', '_t'].includes(k));
     if (queryKeys.length > 0) {
@@ -1780,9 +1838,81 @@ app.delete('/api/data/:collection/:id', (req, res) => {
         console.log(`[LocalDb] Moved student to recycle bin ${id}:`, binResult);
       }
     } else if (collection === 'trainers') {
+      const explicitEmail = req.query.email || req.body?.email || null;
+      const explicitTrainerId = req.query.trainerId || req.body?.trainerId || null;
+
+      // 1. Delete from trainers.json
       localDb.deleteDocument('trainers', id);
-      const purgeResult = localDb.purgeUserCompletely(id, explicitEmail);
-      console.log(`[LocalDb] Purged trainer ${id}:`, purgeResult);
+
+      // 2. Resolve matching trainer to extract full credentials / IDs
+      const allTrainers = localDb.loadCollection('trainers');
+      const allUsers = localDb.loadCollection('users');
+      const matchedTrainer = allTrainers.find(t =>
+        String(t.id) === String(id) || String(t.uid) === String(id) ||
+        String(t.trainerId) === String(id) || String(t.trainer_id) === String(id) ||
+        String(t.code) === String(id) ||
+        (explicitEmail && String(t.email).toLowerCase() === String(explicitEmail).toLowerCase())
+      ) || allUsers.find(u =>
+        u.role === 'trainer' && (
+          String(u.id) === String(id) || String(u.uid) === String(id) ||
+          String(u.trainerId) === String(id) || String(u.trainer_id) === String(id) ||
+          String(u.code) === String(id) ||
+          (explicitEmail && String(u.email).toLowerCase() === String(explicitEmail).toLowerCase())
+        )
+      );
+
+      const targetEmail = explicitEmail || matchedTrainer?.email || (id && id.includes('@') ? id : null);
+      const targetUid = matchedTrainer?.id || matchedTrainer?.uid || id;
+
+      // 3. Purge user completely across all collections and revoke sessions
+      const purgeResult = localDb.purgeUserCompletely(targetUid, targetEmail);
+      console.log(`[LocalDb] Purged trainer ${id} (${targetEmail}):`, purgeResult);
+
+      // 4. Also delete directly from users collection if still present
+      if (targetUid) localDb.deleteDocument('users', targetUid);
+      if (targetEmail) localDb.deleteDocument('users', targetEmail);
+
+      // 5. Unassign trainer from all batches in batches.json
+      try {
+        const batches = localDb.loadCollection('batches');
+        let bChanged = false;
+        const idsToRemove = new Set([
+          String(id),
+          String(targetUid),
+          String(explicitTrainerId || ''),
+          String(matchedTrainer?.trainerId || ''),
+          String(matchedTrainer?.trainer_id || ''),
+          String(matchedTrainer?.code || '')
+        ].filter(Boolean));
+
+        batches.forEach(b => {
+          if (b.trainer_id && idsToRemove.has(String(b.trainer_id))) {
+            b.trainer_id = '';
+            b.trainer_name = '';
+            bChanged = true;
+          }
+          if (b.trainer_uid && idsToRemove.has(String(b.trainer_uid))) {
+            b.trainer_uid = '';
+            b.trainer_name = '';
+            bChanged = true;
+          }
+          if (matchedTrainer?.name && b.trainer_name === matchedTrainer.name) {
+            b.trainer_name = '';
+            bChanged = true;
+          }
+          if (Array.isArray(b.assigned_trainer_ids)) {
+            const orig = b.assigned_trainer_ids.length;
+            b.assigned_trainer_ids = b.assigned_trainer_ids.filter(tid => !idsToRemove.has(String(tid)));
+            if (b.assigned_trainer_ids.length !== orig) bChanged = true;
+          }
+        });
+
+        if (bChanged) {
+          localDb.saveCollection('batches', batches);
+        }
+      } catch (e) {
+        console.warn('[LocalDb] Failed to unassign trainer from batches:', e.message);
+      }
     } else if (collection === 'users' || collection === 'leads') {
       localDb.deleteDocument(collection, id);
       const purgeResult = localDb.purgeUserCompletely(id, explicitEmail);

@@ -3026,19 +3026,32 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteTrainer = async (trainer) => {
-    const trainerId = typeof trainer === 'object' ? (trainer.id || trainer.uid || trainer.trainerId) : trainer;
+    const trainerId = typeof trainer === 'object' ? (trainer.id || trainer.uid || trainer.trainerId || trainer.code) : trainer;
     const trainerEmail = typeof trainer === 'object' ? trainer.email : undefined;
+    const trainerCode = typeof trainer === 'object' ? (trainer.trainerId || trainer.trainer_id || trainer.code) : undefined;
     const trainerName = typeof trainer === 'object' ? (trainer.name || 'this trainer') : 'this trainer';
     if (!window.confirm(`Are you sure you want to delete ${trainerName}?`)) return;
     try {
-      await deleteTrainer(trainerId, trainerEmail ? { email: trainerEmail } : {});
+      await deleteTrainer(trainerId, { email: trainerEmail || '', trainerId: trainerCode || '' });
+      // Optimistically update React Query cache immediately for instant UI feedback
+      queryClient.setQueryData(['adminDashboardAll'], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          trainerList: (old.trainerList || []).filter(t =>
+            String(t.id) !== String(trainerId) &&
+            String(t.uid) !== String(trainerId) &&
+            (!trainerEmail || String(t.email).toLowerCase() !== String(trainerEmail).toLowerCase())
+          )
+        };
+      });
       queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
       refetchAdminData();
-      showModal('Success', 'Trainer deleted successfully.', 'success');
+      showModal('Success', `${trainerName} deleted successfully.`, 'success');
       fetchStats();
     } catch (err) {
       console.error(err);
-      showModal('Error', classifyFirestoreError(err).message, 'error');
+      showModal('Error', classifyFirestoreError(err)?.message || err?.message || 'Failed to delete trainer.', 'error');
     }
   };
 
