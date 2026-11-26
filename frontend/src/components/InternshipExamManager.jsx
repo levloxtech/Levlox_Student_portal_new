@@ -78,6 +78,46 @@ export default function InternshipExamManager() {
     }
   };
 
+  // Delete Proctoring Video
+  const handleDeleteVideo = async (subId, studentName = 'candidate') => {
+    if (!window.confirm(`Delete proctoring recording for ${studentName}? This will permanently remove the recorded video file.`)) return;
+    try {
+      const res = await fetch(`/api/internship-exam/admin/submission/${subId}/video`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete video');
+
+      setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, proctoringVideoUrl: null } : s));
+      if (selectedVideoModal && selectedVideoModal.id === subId) {
+        setSelectedVideoModal(null);
+      }
+      alert('Proctoring video deleted successfully.');
+    } catch (err) {
+      alert('Error deleting video: ' + err.message);
+    }
+  };
+
+  // Delete Entire Submission Record
+  const handleDeleteSubmission = async (subId, studentName = 'candidate') => {
+    if (!window.confirm(`Delete entire exam submission record for ${studentName}? This action cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/internship-exam/admin/submission/${subId}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete submission');
+
+      setSubmissions(prev => prev.filter(s => s.id !== subId));
+      if (selectedVideoModal && selectedVideoModal.id === subId) {
+        setSelectedVideoModal(null);
+      }
+      alert('Exam submission record deleted successfully.');
+    } catch (err) {
+      alert('Error deleting submission: ' + err.message);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -291,29 +331,64 @@ export default function InternshipExamManager() {
                           }) : 'Recent'}
                         </td>
                         <td style={{ padding: '14px 18px', textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
                             {sub.proctoringVideoUrl ? (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedVideoModal(sub)}
-                                style={{
-                                  background: '#7C3AED',
-                                  color: '#FFFFFF',
-                                  border: 'none',
-                                  padding: '6px 12px',
-                                  borderRadius: 8,
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 5,
-                                  boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)'
-                                }}
-                              >
-                                <Play size={13} fill="#FFF" /> Watch Video
-                              </button>
-                            ) : null}
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedVideoModal(sub)}
+                                  style={{
+                                    background: '#7C3AED',
+                                    color: '#FFFFFF',
+                                    border: 'none',
+                                    padding: '6px 12px',
+                                    borderRadius: 8,
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                    boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)'
+                                  }}
+                                >
+                                  <Play size={13} fill="#FFF" /> Watch Video
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteVideo(sub.id, sub.studentName)}
+                                  title="Delete proctoring recording"
+                                  style={{
+                                    background: '#FEF2F2',
+                                    color: '#DC2626',
+                                    border: '1px solid #FECACA',
+                                    padding: '6px 10px',
+                                    borderRadius: 8,
+                                    fontSize: 11.5,
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4
+                                  }}
+                                >
+                                  <Trash2 size={12} /> Delete Video
+                                </button>
+                              </>
+                            ) : (
+                              <span style={{
+                                fontSize: 11,
+                                color: '#94A3B8',
+                                background: '#F8FAFC',
+                                border: '1px solid #E2E8F0',
+                                padding: '5px 9px',
+                                borderRadius: 7,
+                                fontWeight: 600
+                              }}>
+                                No Video
+                              </span>
+                            )}
 
                             <button
                               type="button"
@@ -334,6 +409,24 @@ export default function InternshipExamManager() {
                               }}
                             >
                               <RefreshCw size={12} /> Reset Cooldown
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSubmission(sub.id, sub.studentName)}
+                              title="Delete submission record"
+                              style={{
+                                background: 'transparent',
+                                color: '#94A3B8',
+                                border: 'none',
+                                padding: '6px',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center'
+                              }}
+                            >
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </td>
@@ -796,13 +889,34 @@ export default function InternshipExamManager() {
 
             <div style={{ padding: '14px 20px', background: '#131D31', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5, color: '#94A3B8' }}>
               <span>Exam Duration: {selectedVideoModal.timeTakenSeconds || 120}s</span>
-              <a
-                href={selectedVideoModal.proctoringVideoUrl}
-                download
-                style={{ color: '#38BDF8', fontWeight: 700, textDecoration: 'none' }}
-              >
-                Download Recording WebM ↓
-              </a>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <a
+                  href={selectedVideoModal.proctoringVideoUrl}
+                  download
+                  style={{ color: '#38BDF8', fontWeight: 700, textDecoration: 'none' }}
+                >
+                  Download Recording WebM ↓
+                </a>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteVideo(selectedVideoModal.id, selectedVideoModal.studentName)}
+                  style={{
+                    background: '#EF4444',
+                    color: '#FFF',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: 7,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5
+                  }}
+                >
+                  <Trash2 size={13} /> Delete Video
+                </button>
+              </div>
             </div>
           </div>
         </div>

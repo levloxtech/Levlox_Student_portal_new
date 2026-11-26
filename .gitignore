@@ -48,6 +48,7 @@ database-debug.log
 
 # Backups and Storage
 storage/backups/
+storage/student_backups/
 storage/data/
 storage/uploads/
 storage/profiles/

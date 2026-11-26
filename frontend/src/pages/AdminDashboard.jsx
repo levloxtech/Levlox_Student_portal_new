@@ -3025,10 +3025,13 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleDeleteTrainer = async (trainerId) => {
-    if (!window.confirm('Are you sure you want to delete this trainer record?')) return;
+  const handleDeleteTrainer = async (trainer) => {
+    const trainerId = typeof trainer === 'object' ? (trainer.id || trainer.uid || trainer.trainerId) : trainer;
+    const trainerEmail = typeof trainer === 'object' ? trainer.email : undefined;
+    const trainerName = typeof trainer === 'object' ? (trainer.name || 'this trainer') : 'this trainer';
+    if (!window.confirm(`Are you sure you want to delete ${trainerName}?`)) return;
     try {
-      await deleteTrainer(trainerId);
+      await deleteTrainer(trainerId, trainerEmail ? { email: trainerEmail } : {});
       queryClient.invalidateQueries({ queryKey: ['adminDashboardAll'] });
       refetchAdminData();
       showModal('Success', 'Trainer deleted successfully.', 'success');
@@ -8312,7 +8315,7 @@ const AdminDashboard = () => {
                         <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => openTrainerModal(t)}>
                           <Pencil size={14} /> Edit
                         </button>
-                        <button className="btn btn-danger" style={{ padding: '6px 12px', fontSize: 12, backgroundColor: '#EF4444', color: 'white', display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => handleDeleteTrainer(t.id)}>
+                        <button className="btn btn-danger" style={{ padding: '6px 12px', fontSize: 12, backgroundColor: '#EF4444', color: 'white', display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => handleDeleteTrainer(t)}>
                           <Trash2 size={14} /> Delete
                         </button>
                       </div>

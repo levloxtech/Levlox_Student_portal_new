@@ -59,7 +59,7 @@ function getMailTransporter() {
   const host = process.env.MAIL_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.MAIL_PORT || '587', 10);
   const user = process.env.MAIL_USER;
-  const pass = process.env.MAIL_PASS;
+  const pass = process.env.MAIL_PASS || process.env.MAIL_PASSWORD;
   if (!user || !pass) return null;
   return nodemailer.createTransport({
     host,
@@ -627,53 +627,113 @@ router.post('/submit', async (req, res) => {
       localDb.saveCollection('leads', leads);
     }
 
-    // If passed, send Congratulations Qualification Email
-    if (passed) {
+    // Send Assessment Result Email with detailed scorecard (Both for Passed and Failed)
+    const transporter = getMailTransporter();
+    if (transporter) {
+      const baseUrl = process.env.PUBLIC_APP_URL || 'http://localhost:5173';
+      const enrollmentLink = `${baseUrl}/student`;
+      const portalUrl = `${baseUrl}/login`;
 
-      // Send Congratulations Qualification Email
-      const transporter = getMailTransporter();
-      if (transporter) {
-        const baseUrl = process.env.PUBLIC_APP_URL || 'http://localhost:5173';
-        const enrollmentLink = `${baseUrl}/academy?qualified=true&email=${encodeURIComponent(normEmail)}`;
-        const passMailHtml = `
-          <div style="font-family: Arial, sans-serif; background: #0B0F19; color: #FFFFFF; padding: 36px 20px;">
-            <div style="max-width: 560px; margin: 0 auto; background: #131D31; border-radius: 18px; border: 1.5px solid #22C55E; padding: 32px; text-align: center;">
-              <div style="font-size: 40px; margin-bottom: 10px;">🎉 🏆</div>
-              <h1 style="color: #22C55E; font-size: 24px; margin: 0 0 10px;">Congratulations! You Qualified!</h1>
-              <p style="color: #94A3B8; font-size: 14.5px; line-height: 1.6; margin: 0 0 20px;">
-                Dear <strong>${studentName || normEmail}</strong>, you have successfully cleared the Machine Learning Engineer Internship Qualifying Exam with a score of <strong>${scorePercent}%</strong> (Required: ${passThreshold}%).
+      let mailSubject = '';
+      let mailHtml = '';
+
+      if (passed) {
+        mailSubject = `🎉 Congratulations! You Passed the ML Internship Qualifying Exam (${scorePercent}%)`;
+        mailHtml = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #0B0F19; color: #FFFFFF; padding: 40px 20px;">
+            <div style="max-width: 580px; margin: 0 auto; background: #131D31; border-radius: 18px; border: 1.5px solid #22C55E; padding: 36px 30px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.4);">
+              <div style="font-size: 44px; margin-bottom: 12px;">🎉 🏆</div>
+              <div style="display: inline-block; background: rgba(34, 197, 94, 0.15); color: #22C55E; border: 1px solid rgba(34, 197, 94, 0.3); padding: 4px 14px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 14px;">
+                Assessment Cleared &bull; 1-Year Pass Unlocked
+              </div>
+              <h1 style="color: #22C55E; font-size: 24px; font-weight: 800; margin: 0 0 12px;">Congratulations! You Qualified!</h1>
+              <p style="color: #94A3B8; font-size: 14.5px; line-height: 1.6; margin: 0 0 24px;">
+                Dear <strong>${studentName || normEmail}</strong>, you have successfully cleared the Machine Learning Engineer Internship Qualifying Exam with a score of <strong style="color: #22C55E;">${scorePercent}%</strong> (Threshold: ${passThreshold}%).
               </p>
-              <div style="background: #0B0F19; border-radius: 14px; border: 1px solid #1E293B; padding: 18px; margin-bottom: 24px; text-align: left;">
-                <div style="color: #E2E8F0; font-size: 14px; font-weight: bold; margin-bottom: 8px;">Your Performance Summary:</div>
-                <div style="display: flex; justify-content: space-between; color: #94A3B8; font-size: 13px; margin-bottom: 4px;">
+
+              <div style="background: #0B0F19; border-radius: 14px; border: 1px solid #1E293B; padding: 20px; margin-bottom: 24px; text-align: left;">
+                <div style="color: #94A3B8; font-size: 12px; font-weight: 800; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Official Assessment Scorecard:</div>
+                <div style="display: flex; justify-content: space-between; color: #CBD5E1; font-size: 13.5px; padding: 6px 0; border-bottom: 1px solid #1E293B;">
                   <span>Total Questions:</span> <strong style="color: #FFF;">${totalQuestions}</strong>
                 </div>
-                <div style="display: flex; justify-content: space-between; color: #94A3B8; font-size: 13px; margin-bottom: 4px;">
-                  <span>Correct Answers:</span> <strong style="color: #22C55E;">${correctCount}</strong>
+                <div style="display: flex; justify-content: space-between; color: #CBD5E1; font-size: 13.5px; padding: 6px 0; border-bottom: 1px solid #1E293B;">
+                  <span>Correct Answers:</span> <strong style="color: #22C55E;">${correctCount} of ${totalQuestions}</strong>
                 </div>
-                <div style="display: flex; justify-content: space-between; color: #94A3B8; font-size: 13px; margin-bottom: 4px;">
-                  <span>Final Score:</span> <strong style="color: #22C55E;">${scorePercent}% (PASSED)</strong>
+                <div style="display: flex; justify-content: space-between; color: #CBD5E1; font-size: 13.5px; padding: 6px 0; border-bottom: 1px solid #1E293B;">
+                  <span>Final Accuracy Score:</span> <strong style="color: #22C55E; font-size: 16px;">${scorePercent}%</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; color: #CBD5E1; font-size: 13.5px; padding: 6px 0;">
+                  <span>Qualification Status:</span> <strong style="color: #22C55E;">APPROVED &bull; 1-YEAR UNLOCKED</strong>
                 </div>
               </div>
-              <p style="color: #E2E8F0; font-size: 14px; margin-bottom: 20px;">
-                You are now eligible to complete your enrollment for the <strong>Machine Learning Engineer Internship (365 Days • ₹11,499)</strong>.
+
+              <p style="color: #E2E8F0; font-size: 14px; margin-bottom: 24px; line-height: 1.5;">
+                You are now eligible to complete your enrollment for the <strong>Machine Learning Engineer Internship (365 Days &bull; ₹11,499)</strong>.
               </p>
-              <a href="${enrollmentLink}" style="display: inline-block; background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #FFFFFF; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 800; font-size: 15px; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);">
-                Enroll for Machine Learning Internship Now →
+
+              <a href="${enrollmentLink}" style="display: inline-block; background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #FFFFFF; text-decoration: none; padding: 14px 34px; border-radius: 12px; font-weight: 800; font-size: 15px; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);">
+                Enroll for 1-Year Machine Learning Internship &rarr;
               </a>
             </div>
           </div>
         `;
-        try {
-          await transporter.sendMail({
-            from: `"${process.env.MAIL_FROM_NAME || 'Levlox Academy'}" <${process.env.MAIL_FROM || process.env.MAIL_USER}>`,
-            to: normEmail,
-            subject: '🎉 Congratulations! You Passed the Machine Learning Internship Qualifying Exam!',
-            html: passMailHtml
-          });
-        } catch (mailErr) {
-          console.warn('[Exam Pass Mail] SMTP send failed:', mailErr.message);
-        }
+      } else {
+        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+        const nextDate = new Date(Date.now() + SEVEN_DAYS_MS).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        mailSubject = `📋 Your ML Internship Assessment Scorecard (${scorePercent}%)`;
+        mailHtml = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #0B0F19; color: #FFFFFF; padding: 40px 20px;">
+            <div style="max-width: 580px; margin: 0 auto; background: #131D31; border-radius: 18px; border: 1.5px solid #F59E0B; padding: 36px 30px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.4);">
+              <div style="font-size: 40px; margin-bottom: 12px;">📊</div>
+              <div style="display: inline-block; background: rgba(245, 158, 11, 0.15); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.3); padding: 4px 14px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 14px;">
+                Assessment Completed &bull; Scorecard
+              </div>
+              <h1 style="color: #F8FAFC; font-size: 22px; font-weight: 800; margin: 0 0 12px;">Assessment Scorecard & Next Steps</h1>
+              <p style="color: #94A3B8; font-size: 14.5px; line-height: 1.6; margin: 0 0 24px;">
+                Dear <strong>${studentName || normEmail}</strong>, you recently completed the Machine Learning Engineer Internship Qualifying Exam. Here is your official performance summary.
+              </p>
+
+              <div style="background: #0B0F19; border-radius: 14px; border: 1px solid #1E293B; padding: 20px; margin-bottom: 24px; text-align: left;">
+                <div style="color: #94A3B8; font-size: 12px; font-weight: 800; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Performance Breakdown:</div>
+                <div style="display: flex; justify-content: space-between; color: #CBD5E1; font-size: 13.5px; padding: 6px 0; border-bottom: 1px solid #1E293B;">
+                  <span>Total Questions:</span> <strong style="color: #FFF;">${totalQuestions}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; color: #CBD5E1; font-size: 13.5px; padding: 6px 0; border-bottom: 1px solid #1E293B;">
+                  <span>Correct Answers:</span> <strong style="color: #F59E0B;">${correctCount} of ${totalQuestions}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; color: #CBD5E1; font-size: 13.5px; padding: 6px 0; border-bottom: 1px solid #1E293B;">
+                  <span>Your Score:</span> <strong style="color: #F59E0B; font-size: 16px;">${scorePercent}%</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; color: #CBD5E1; font-size: 13.5px; padding: 6px 0; border-bottom: 1px solid #1E293B;">
+                  <span>Required to Qualify:</span> <strong style="color: #FFF;">${passThreshold}%</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; color: #CBD5E1; font-size: 13.5px; padding: 6px 0;">
+                  <span>Next Retake Available:</span> <strong style="color: #38BDF8;">${nextDate} (7 Days)</strong>
+                </div>
+              </div>
+
+              <div style="background: rgba(245, 158, 11, 0.08); border-radius: 12px; border: 1px solid rgba(245, 158, 11, 0.2); padding: 14px 18px; margin-bottom: 24px; text-align: left; font-size: 13px; color: #FDE68A; line-height: 1.55;">
+                💡 <strong>Academic Preparation Interval Active:</strong> A minimum of 80% is required to qualify for the 1-Year ML Internship. Your retake will automatically unlock in 7 days on <strong>${nextDate}</strong>. Continue with your <strong>Weekly Learning Cycle</strong> to review course materials, modules, and practice tests.
+              </div>
+
+              <a href="${portalUrl}" style="display: inline-block; background: linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%); color: #FFFFFF; text-decoration: none; padding: 14px 34px; border-radius: 12px; font-weight: 800; font-size: 14.5px; box-shadow: 0 6px 20px rgba(124, 58, 237, 0.35);">
+                Continue Weekly Learning on Portal &rarr;
+              </a>
+            </div>
+          </div>
+        `;
+      }
+
+      try {
+        await transporter.sendMail({
+          from: `"${process.env.MAIL_FROM_NAME || 'Levlox Academy'}" <${process.env.MAIL_FROM || process.env.MAIL_USER}>`,
+          to: normEmail,
+          subject: mailSubject,
+          html: mailHtml
+        });
+        console.log(`[Exam Result Mail] Email successfully sent to ${normEmail} (Passed: ${passed}, Score: ${scorePercent}%)`);
+      } catch (mailErr) {
+        console.warn('[Exam Result Mail] SMTP send failed:', mailErr.message);
       }
     }
 
@@ -701,7 +761,15 @@ router.get(['/status/:email', '/eligibility/:email'], (req, res) => {
     const normEmail = String(req.params.email).toLowerCase().trim();
     const submissions = localDb.loadCollection('internship_exam_submissions');
     const studentSubmissions = submissions.filter(s => s.studentEmail === normEmail);
-    const hasPassed = studentSubmissions.some(s => s.passed);
+    // Sort reverse chronological so index 0 is always the latest attempt
+    studentSubmissions.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+
+    const students = localDb.loadCollection('students');
+    const student = students.find(s => s.email?.toLowerCase() === normEmail);
+    const users = localDb.loadCollection('users');
+    const user = users.find(u => u.email?.toLowerCase() === normEmail);
+
+    const hasPassed = studentSubmissions.some(s => s.passed) || Boolean(student?.hasPassedInternshipExam || user?.hasPassedInternshipExam);
     const latestAttempt = studentSubmissions[0] || null;
 
     const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -710,7 +778,12 @@ router.get(['/status/:email', '/eligibility/:email'], (req, res) => {
     let cooldownRemainingMs = 0;
     let nextAttemptDate = null;
 
-    if (latestAttempt && !hasPassed) {
+    if (hasPassed) {
+      canAttempt = false;
+      cooldownActive = false;
+      cooldownRemainingMs = 0;
+      nextAttemptDate = null;
+    } else if (latestAttempt) {
       const lastAttemptTime = new Date(latestAttempt.submittedAt).getTime();
       const elapsedMs = Date.now() - lastAttemptTime;
       if (elapsedMs < SEVEN_DAYS_MS) {
@@ -718,6 +791,11 @@ router.get(['/status/:email', '/eligibility/:email'], (req, res) => {
         cooldownActive = true;
         cooldownRemainingMs = SEVEN_DAYS_MS - elapsedMs;
         nextAttemptDate = new Date(lastAttemptTime + SEVEN_DAYS_MS).toISOString();
+      } else {
+        canAttempt = true;
+        cooldownActive = false;
+        cooldownRemainingMs = 0;
+        nextAttemptDate = null;
       }
     }
 
@@ -777,6 +855,62 @@ router.get('/admin/submissions', (req, res) => {
   try {
     const submissions = localDb.loadCollection('internship_exam_submissions');
     res.json({ success: true, submissions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── 8B. ADMIN: DELETE PROCTORING VIDEO FROM SUBMISSION ──────────────────────
+router.delete(['/admin/submission/:id/video', '/admin/submission-video/:id'], (req, res) => {
+  try {
+    const subId = req.params.id;
+    const submissions = localDb.loadCollection('internship_exam_submissions');
+    const idx = submissions.findIndex(s => s.id === subId);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Submission not found.' });
+    }
+
+    const sub = submissions[idx];
+    if (sub.proctoringVideoUrl) {
+      const filename = path.basename(sub.proctoringVideoUrl);
+      const filePath = path.join(EXAM_VIDEOS_DIR, filename);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+          console.log(`[Exam Video] Deleted physical video file: ${filePath}`);
+        } catch (e) {
+          console.warn('[Exam Video] Failed to unlink video file:', e.message);
+        }
+      }
+      submissions[idx].proctoringVideoUrl = null;
+      localDb.saveCollection('internship_exam_submissions', submissions);
+    }
+
+    res.json({ success: true, message: 'Proctoring video deleted successfully.', submission: submissions[idx] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── 8C. ADMIN: DELETE ENTIRE SUBMISSION RECORD ──────────────────────────────
+router.delete('/admin/submission/:id', (req, res) => {
+  try {
+    const subId = req.params.id;
+    let submissions = localDb.loadCollection('internship_exam_submissions');
+    const sub = submissions.find(s => s.id === subId);
+    if (!sub) return res.status(404).json({ error: 'Submission not found.' });
+
+    if (sub.proctoringVideoUrl) {
+      const filename = path.basename(sub.proctoringVideoUrl);
+      const filePath = path.join(EXAM_VIDEOS_DIR, filename);
+      if (fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch (e) {}
+      }
+    }
+
+    submissions = submissions.filter(s => s.id !== subId);
+    localDb.saveCollection('internship_exam_submissions', submissions);
+    res.json({ success: true, message: 'Exam submission deleted successfully.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

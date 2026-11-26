@@ -1779,7 +1779,12 @@ app.delete('/api/data/:collection/:id', (req, res) => {
         const binResult = localDb.moveToRecycleBin(id || explicitEmail);
         console.log(`[LocalDb] Moved student to recycle bin ${id}:`, binResult);
       }
-    } else if (collection === 'trainers' || collection === 'users' || collection === 'leads') {
+    } else if (collection === 'trainers') {
+      localDb.deleteDocument('trainers', id);
+      const purgeResult = localDb.purgeUserCompletely(id, explicitEmail);
+      console.log(`[LocalDb] Purged trainer ${id}:`, purgeResult);
+    } else if (collection === 'users' || collection === 'leads') {
+      localDb.deleteDocument(collection, id);
       const purgeResult = localDb.purgeUserCompletely(id, explicitEmail);
       console.log(`[LocalDb] Purged ${collection} ${id}:`, purgeResult);
     } else {

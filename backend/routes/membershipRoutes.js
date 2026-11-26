@@ -1023,6 +1023,27 @@ router.post('/create-order', async (req, res) => {
       }
     }
 
+    // Flagship 1-Year Program Qualifying Assessment Gate:
+    // Candidate MUST have passed the qualifying exam with >= 80% to enroll in annual
+    if (planId === 'annual') {
+      const submissions = localDb.loadCollection('internship_exam_submissions');
+      const studentSubmissions = submissions.filter(s => s.studentEmail === normEmail);
+      const passedInSubmissions = studentSubmissions.some(s => s.passed);
+
+      const usersCheck = localDb.loadCollection('users');
+      const studentsCheck = localDb.loadCollection('students');
+      const existingUser = usersCheck.find(u => u.email?.toLowerCase() === normEmail);
+      const existingStudent = studentsCheck.find(s => s.email?.toLowerCase() === normEmail);
+      const hasPassed = passedInSubmissions || Boolean(existingUser?.hasPassedInternshipExam || existingStudent?.hasPassedInternshipExam);
+
+      if (!hasPassed) {
+        return res.status(403).json({
+          error: 'Qualifying Assessment Exam required (score ≥ 80%) before enrolling in the 1-Year Machine Learning Engineer Internship. Please complete the assessment test first.',
+          requiresExam: true
+        });
+      }
+    }
+
     let basePrice = isWeekly
       ? (isRenewal ? (plan.renewalPrice || 299) : (plan.promotionalPrice || 113))
       : 11499;
@@ -1189,6 +1210,27 @@ router.post('/verify-payment', async (req, res) => {
         return res.status(403).json({
           error: 'First-time members must start with the Weekly Learning Sprint (Week 1 for ₹113) before unlocking the full 1-Year Machine Learning Engineer Internship.',
           requiresWeeklyFirst: true
+        });
+      }
+    }
+
+    // Flagship 1-Year Program Qualifying Assessment Gate:
+    // Candidate MUST have passed the qualifying exam with >= 80% to activate annual
+    if (planId === 'annual') {
+      const submissions = localDb.loadCollection('internship_exam_submissions');
+      const studentSubmissions = submissions.filter(s => s.studentEmail === normEmail);
+      const passedInSubmissions = studentSubmissions.some(s => s.passed);
+
+      const usersCheck = localDb.loadCollection('users');
+      const studentsCheck = localDb.loadCollection('students');
+      const existingUser = usersCheck.find(u => u.email?.toLowerCase() === normEmail);
+      const existingStudent = studentsCheck.find(s => s.email?.toLowerCase() === normEmail);
+      const hasPassed = passedInSubmissions || Boolean(existingUser?.hasPassedInternshipExam || existingStudent?.hasPassedInternshipExam);
+
+      if (!hasPassed) {
+        return res.status(403).json({
+          error: 'Qualifying Assessment Exam required (score ≥ 80%) before activating the 1-Year Machine Learning Engineer Internship. Please complete the assessment test first.',
+          requiresExam: true
         });
       }
     }

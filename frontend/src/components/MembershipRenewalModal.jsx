@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Lock, CheckCircle2, Sparkles, Shield,
-  CreditCard, ArrowRight, X, Loader2, Tag, Check, Zap
+  CreditCard, ArrowRight, X, Loader2, Tag, Check, Zap, AlertTriangle, Award, Clock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,8 +11,14 @@ export default function MembershipRenewalModal({
   onClose,
   onSuccess
 }) {
+  const navigate = useNavigate();
   const { userProfile, currentUser, refreshProfile } = useAuth();
   const student = userProfile || currentUser || {};
+  const studentEmail = (student.email || currentUser?.email || userProfile?.email || '').toLowerCase().trim();
+
+  // Qualifying Assessment Exam Eligibility State
+  const [examEligibility, setExamEligibility] = useState(null);
+  const [loadingExamEligibility, setLoadingExamEligibility] = useState(false);
 
   // Independent Coupon State for Weekly and Annual Cards
   const [weeklyCoupon, setWeeklyCoupon] = useState('');
@@ -29,6 +36,27 @@ export default function MembershipRenewalModal({
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [paymentSuccess, setPaymentSuccess] = useState(null);
 
+  // Fetch student qualifying exam eligibility when modal opens
+  useEffect(() => {
+    if (!isOpen || !studentEmail) return;
+    let isMounted = true;
+    setLoadingExamEligibility(true);
+    fetch(`/api/internship-exam/eligibility/${encodeURIComponent(studentEmail)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (isMounted && data.success) {
+          setExamEligibility(data);
+        }
+      })
+      .catch(err => {
+        console.warn('[MembershipRenewalModal] Failed to fetch exam eligibility:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingExamEligibility(false);
+      });
+    return () => { isMounted = false; };
+  }, [isOpen, studentEmail]);
+
   if (!isOpen) return null;
 
   const previousPlanName = student.membership?.planName || student.course || 'Weekly Learning Cycle';
@@ -39,6 +67,33 @@ export default function MembershipRenewalModal({
 
   const weeklyFinalPayable = Math.max(0, 299 - weeklyDiscount);
   const annualFinalPayable = Math.max(0, 11499 - annualDiscount);
+
+  // Exam Qualification Checks
+  const hasPassedExam = Boolean(
+    examEligibility?.hasPassed ||
+    student?.hasPassedInternshipExam ||
+    userProfile?.hasPassedInternshipExam ||
+    currentUser?.hasPassedInternshipExam
+  );
+
+  const passedScore = examEligibility?.latestAttempt?.scorePercent ||
+    student?.internshipExamScore ||
+    userProfile?.internshipExamScore ||
+    80;
+
+  const isCooldownActive = Boolean(!hasPassedExam && examEligibility?.cooldownActive);
+
+  const cooldownDaysLeft = examEligibility?.cooldownRemainingMs
+    ? Math.max(1, Math.ceil(examEligibility.cooldownRemainingMs / (24 * 60 * 60 * 1000)))
+    : (examEligibility?.nextAttemptDate
+      ? Math.max(1, Math.ceil((new Date(examEligibility.nextAttemptDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+      : 7);
+
+  const nextAttemptFormatted = examEligibility?.nextAttemptDate
+    ? new Date(examEligibility.nextAttemptDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : 'in a few days';
+
+  const lastAttemptScore = examEligibility?.latestAttempt?.scorePercent ?? 0;
 
   // Apply Coupon for Weekly Card
   const handleApplyWeeklyCoupon = async (e) => {
@@ -96,6 +151,10 @@ export default function MembershipRenewalModal({
 
   // Live Gateway Checkout
   const handleRenewalPayment = async (planId) => {
+    if (planId === 'annual' && !hasPassedExam) {
+      alert('Qualifying Assessment Exam required (Score ≥ 80%) before enrolling in the 1-Year Machine Learning Engineer Internship. Please take the qualifying exam first.');
+      return;
+    }
     setLoadingPlan(planId);
     try {
       const email = student.email;
@@ -204,6 +263,10 @@ export default function MembershipRenewalModal({
 
   // Simulated Test Checkout
   const handleSimulatedRenewal = async (planId) => {
+    if (planId === 'annual' && !hasPassedExam) {
+      alert('Qualifying Assessment Exam required (Score ≥ 80%) before enrolling in the 1-Year Machine Learning Engineer Internship. Please take the qualifying exam first.');
+      return;
+    }
     setLoadingPlan(planId);
     try {
       const email = student.email;
@@ -693,23 +756,77 @@ export default function MembershipRenewalModal({
                     }} />
                   </div>
 
-                  {/* Verified Certificate Callout */}
-                  <div style={{
-                    margin: '10px 0 12px',
-                    background: '#FFFBEB',
-                    border: '1px solid #FDE68A',
-                    borderRadius: 7,
-                    padding: '6px 10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontSize: 11,
-                    color: '#92400E',
-                    fontWeight: 700
-                  }}>
-                    <Sparkles size={13} color="#D97706" style={{ flexShrink: 0 }} />
-                    <span>One year of verified internship certificate with industrial experience</span>
-                  </div>
+                  {/* Assessment Status / Qualification Callout */}
+                  {hasPassedExam ? (
+                    <div style={{
+                      margin: '10px 0 12px',
+                      background: '#ECFDF5',
+                      border: '1.5px solid #10B981',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8
+                    }}>
+                      <CheckCircle2 size={16} color="#059669" style={{ flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 800, color: '#065F46' }}>
+                          ✓ Qualifying Exam Cleared ({passedScore}%) • 1-Year Pass Unlocked
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#047857', marginTop: 1 }}>
+                          You cleared the 80%+ assessment criteria. Full 1-Year internship unlocked.
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: 9.5, fontWeight: 800, color: '#065F46', background: '#D1FAE5',
+                        padding: '2px 7px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: 0.4
+                      }}>
+                        Verified
+                      </span>
+                    </div>
+                  ) : isCooldownActive ? (
+                    <div style={{
+                      margin: '10px 0 12px',
+                      background: '#FFFBEB',
+                      border: '1.5px solid #F59E0B',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 8
+                    }}>
+                      <Clock size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 2 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 800, color: '#92400E' }}>
+                          ⏱ 7-Day Academic Preparation Cooldown Active
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#B45309', marginTop: 2, lineHeight: 1.45 }}>
+                          You scored <strong>{lastAttemptScore}%</strong> (80% required). Retake automatically unlocks on <strong>{nextAttemptFormatted}</strong> ({cooldownDaysLeft} {cooldownDaysLeft === 1 ? 'day' : 'days'} left). Continue with the Weekly Learning Cycle to prepare.
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      margin: '10px 0 12px',
+                      background: '#F5F3FF',
+                      border: '1.5px solid #8B5CF6',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 8
+                    }}>
+                      <Lock size={16} color="#7C3AED" style={{ flexShrink: 0, marginTop: 2 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 800, color: '#5B21B6' }}>
+                          🔒 Qualifying Assessment Required (Score ≥ 80%)
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#6D28D9', marginTop: 2, lineHeight: 1.45 }}>
+                          Complete the 15-question proctored ML test with 80%+ score before enrolling into the 1-Year Flagship Internship.
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Pricing Header */}
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, margin: '10px 0 14px' }}>
@@ -879,47 +996,109 @@ export default function MembershipRenewalModal({
                     <span style={{ color: '#059669', fontWeight: 700 }}>✓ Zero Fee</span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleRenewalPayment('annual')}
-                    disabled={loadingPlan === 'annual'}
-                    style={{
-                      width: '100%',
-                      background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
-                      color: '#FFFFFF',
-                      padding: '12px 18px',
-                      borderRadius: 10,
-                      fontSize: 14,
-                      fontWeight: 800,
-                      border: 'none',
-                      cursor: loadingPlan === 'annual' ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 7,
-                      boxShadow: '0 6px 18px rgba(124, 58, 237, 0.35)'
-                    }}
-                  >
-                    {loadingPlan === 'annual' ? (
-                      <><Loader2 size={15} className="animate-spin" /> Processing...</>
-                    ) : (
-                      <>Pay ₹{annualFinalPayable} for 1-Year ML Internship →</>
-                    )}
-                  </button>
+                  {hasPassedExam ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleRenewalPayment('annual')}
+                        disabled={loadingPlan === 'annual'}
+                        style={{
+                          width: '100%',
+                          background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                          color: '#FFFFFF',
+                          padding: '12px 18px',
+                          borderRadius: 10,
+                          fontSize: 14,
+                          fontWeight: 800,
+                          border: 'none',
+                          cursor: loadingPlan === 'annual' ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 7,
+                          boxShadow: '0 6px 18px rgba(124, 58, 237, 0.35)'
+                        }}
+                      >
+                        {loadingPlan === 'annual' ? (
+                          <><Loader2 size={15} className="animate-spin" /> Processing...</>
+                        ) : (
+                          <>Pay ₹{annualFinalPayable} for 1-Year ML Internship →</>
+                        )}
+                      </button>
 
-                  <div style={{ textAlign: 'center', marginTop: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => handleSimulatedRenewal('annual')}
-                      disabled={loadingPlan === 'annual'}
-                      style={{
-                        background: 'none', border: 'none', color: '#64748B',
-                        fontSize: 11, cursor: 'pointer', textDecoration: 'underline'
-                      }}
-                    >
-                      ⚡ Instant Test Checkout (Simulated)
-                    </button>
-                  </div>
+                      <div style={{ textAlign: 'center', marginTop: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => handleSimulatedRenewal('annual')}
+                          disabled={loadingPlan === 'annual'}
+                          style={{
+                            background: 'none', border: 'none', color: '#64748B',
+                            fontSize: 11, cursor: 'pointer', textDecoration: 'underline'
+                          }}
+                        >
+                          ⚡ Instant Test Checkout (Simulated)
+                        </button>
+                      </div>
+                    </>
+                  ) : isCooldownActive ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={true}
+                        style={{
+                          width: '100%',
+                          background: '#F1F5F9',
+                          color: '#94A3B8',
+                          padding: '12px 18px',
+                          borderRadius: 10,
+                          fontSize: 13,
+                          fontWeight: 800,
+                          border: '1px solid #CBD5E1',
+                          cursor: 'not-allowed',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 7
+                        }}
+                      >
+                        <Lock size={15} /> Exam Cooldown Active • Retake in {cooldownDaysLeft} {cooldownDaysLeft === 1 ? 'day' : 'days'}
+                      </button>
+                      <div style={{ textAlign: 'center', marginTop: 8, fontSize: 11, color: '#64748B' }}>
+                        Renew <strong>Weekly Sprint</strong> (on the left) to keep studying while waiting
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          navigate(`/internship-exam?email=${encodeURIComponent(studentEmail)}`);
+                        }}
+                        style={{
+                          width: '100%',
+                          background: 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)',
+                          color: '#FFFFFF',
+                          padding: '12px 18px',
+                          borderRadius: 10,
+                          fontSize: 13.5,
+                          fontWeight: 800,
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 7,
+                          boxShadow: '0 6px 18px rgba(124, 58, 237, 0.35)'
+                        }}
+                      >
+                        Take Qualifying Exam to Unlock (Score ≥ 80%) →
+                      </button>
+                      <div style={{ textAlign: 'center', marginTop: 8, fontSize: 11, color: '#64748B' }}>
+                        15 questions • 2 minutes • Score ≥ 80% to unlock 1-Year Pass
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

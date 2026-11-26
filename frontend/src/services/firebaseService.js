@@ -1084,7 +1084,7 @@ export const createTrainerProfile = async (uid, data) => {
 
 export const updateTrainer = (id, data) => updateDocumentFields("trainers", id, data);
 
-export const deleteTrainer = (id) => deleteDocument("trainers", id);
+export const deleteTrainer = (id, extraParams = {}) => deleteDocument("trainers", id, extraParams);
 
 /**
  * Assign a trainer to a batch atomically, updating both batches/{batchId} and trainers/{trainerUid}.

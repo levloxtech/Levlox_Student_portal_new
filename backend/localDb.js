@@ -167,7 +167,16 @@ function deleteDocument(name, id) {
     const iId = String(item.id || '').trim();
     const iUid = String(item.uid || '').trim();
     const iUnderscoreId = String(item._id || '').trim();
-    return iId !== targetId && iUid !== targetId && iUnderscoreId !== targetId;
+    const iTrainerId = String(item.trainerId || item.trainer_id || '').trim();
+    const iEmail = String(item.email || '').trim().toLowerCase();
+    const isTargetEmail = targetId.includes('@');
+    if (iId === targetId || iUid === targetId || iUnderscoreId === targetId || iTrainerId === targetId) {
+      return false;
+    }
+    if (isTargetEmail && iEmail === targetId.toLowerCase()) {
+      return false;
+    }
+    return true;
   });
   if (cache[name].length !== initialLength) {
     saveCollection(name);
@@ -372,6 +381,22 @@ function purgeUserCompletely(identifier, explicitEmail) {
     });
   } catch (_) {}
 
+  // 5. Scan trainers
+  try {
+    const trainers = loadCollection('trainers');
+    trainers.forEach((t) => {
+      const matchId = (t.id && idsToPurge.has(String(t.id))) || (t.uid && idsToPurge.has(String(t.uid))) || (t.trainerId && idsToPurge.has(String(t.trainerId))) || (t.trainer_id && idsToPurge.has(String(t.trainer_id)));
+      const matchEmail = t.email && emailsToPurge.has(String(t.email).trim().toLowerCase());
+      if (matchId || matchEmail) {
+        if (t.id) idsToPurge.add(String(t.id));
+        if (t.uid) idsToPurge.add(String(t.uid));
+        if (t.trainerId) idsToPurge.add(String(t.trainerId));
+        if (t.trainer_id) idsToPurge.add(String(t.trainer_id));
+        if (t.email) emailsToPurge.add(String(t.email).trim().toLowerCase());
+      }
+    });
+  } catch (_) {}
+
   // Perform permanent cleanups across collections:
   // students
   try {
@@ -435,6 +460,21 @@ function purgeUserCompletely(identifier, explicitEmail) {
     });
     cache['store_credits'] = filtered;
     saveCollection('store_credits');
+  } catch (_) {}
+
+  // trainers
+  try {
+    const trainers = loadCollection('trainers');
+    const filtered = trainers.filter(t => {
+      if (t.id && idsToPurge.has(String(t.id))) return false;
+      if (t.uid && idsToPurge.has(String(t.uid))) return false;
+      if (t.trainerId && idsToPurge.has(String(t.trainerId))) return false;
+      if (t.trainer_id && idsToPurge.has(String(t.trainer_id))) return false;
+      if (t.email && emailsToPurge.has(String(t.email).trim().toLowerCase())) return false;
+      return true;
+    });
+    cache['trainers'] = filtered;
+    saveCollection('trainers');
   } catch (_) {}
 
   // deletedUsers
